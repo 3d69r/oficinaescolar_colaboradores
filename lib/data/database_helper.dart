@@ -1,0 +1,411 @@
+// `database_helper.dart`
+import 'dart:async';
+import 'dart:convert';
+import 'package:sqflite/sqflite.dart';
+import 'package:path/path.dart';
+import 'package:flutter/foundation.dart';
+
+import 'package:oficinaescolar_colaboradores/models/aviso_model.dart';
+import 'package:oficinaescolar_colaboradores/models/colores_model.dart';
+
+/// Clase [DatabaseHelper]
+///
+/// Esta clase es un Singleton que gestiona todas las operaciones relacionadas
+/// con la base de datos SQLite local de la aplicación.
+class DatabaseHelper {
+  static Database? _database;
+  static const String _dbName = 'oficina_escolar_db.db';
+  static const int _dbVersion = 2; // ✅ Mantenido el número de versión
+
+  static const String _schoolDataTable = 'school_data';
+  static const String _colaboradorDataTable = 'colaborador_data'; // ✅ [REF] Cambiado de _alumnoDataTable
+  static const String _individualAvisosTable = 'individual_avisos';
+  static const String _articulosCafDataTable = 'articulos_caf_data';
+  static const String _cafeteriaMovimientosDataTable = 'cafeteria_movimientos_data';
+  static const String _sessionDataTable = 'session_data';
+  static const String _coloresAppTable = 'colores_app';
+  static const String _tokensTable = 'tokens_data';
+  
+  DatabaseHelper._privateConstructor();
+
+  static final DatabaseHelper instance = DatabaseHelper._privateConstructor();
+
+  Future<Database> get database async {
+    if (_database != null) return _database!;
+    _database = await _initDb();
+    return _database!;
+  }
+
+  Future<Database> _initDb() async {
+    final databasePath = await getDatabasesPath();
+    final path = join(databasePath, _dbName);
+    debugPrint('DatabaseHelper: Ruta de la base de datos: $path');
+
+    return await openDatabase(
+      path,
+      version: _dbVersion,
+      onCreate: _onCreate,
+      onUpgrade: _onUpgrade,
+      onDowngrade: onDatabaseDowngradeDelete,
+    );
+  }
+
+  Future<void> _onCreate(Database db, int version) async {
+    debugPrint('DatabaseHelper: Creando tablas de la base de datos...');
+    await db.execute('''
+      CREATE TABLE $_schoolDataTable (
+        id TEXT PRIMARY KEY,
+        data_json TEXT NOT NULL,
+        last_fetch_time INTEGER NOT NULL
+      )
+    ''');
+    await db.execute('''
+      CREATE TABLE $_colaboradorDataTable (
+        id TEXT PRIMARY KEY,
+        data_json TEXT NOT NULL,
+        last_fetch_time INTEGER NOT NULL
+      )
+    ''');
+    await db.execute('''
+      CREATE TABLE $_individualAvisosTable (
+        id_calendario TEXT NOT NULL,
+        id_empresa_colaborador_cache_id TEXT NOT NULL,
+        titulo TEXT,
+        color_titulo TEXT,
+        comentario TEXT,
+        fecha TEXT,
+        fecha_fin TEXT,
+        leido INTEGER NOT NULL DEFAULT 0,
+        archivo TEXT,
+        imagenLocalPath TEXT,
+        imagenCacheTimestamp TEXT,
+        seccion TEXT,
+        tipo_respuesta TEXT,
+        seg_respuesta TEXT,
+        opcion_1 TEXT,
+        opcion_2 TEXT,
+        opcion_3 TEXT,
+        opcion_4 TEXT,
+        opcion_5 TEXT,
+        PRIMARY KEY (id_calendario, id_empresa_colaborador_cache_id)
+      )
+    ''');
+    await db.execute('''
+      CREATE TABLE $_articulosCafDataTable (
+        id TEXT PRIMARY KEY,
+        data_json TEXT NOT NULL,
+        last_fetch_time INTEGER NOT NULL
+      )
+    ''');
+    await db.execute('''
+      CREATE TABLE $_cafeteriaMovimientosDataTable (
+        id TEXT PRIMARY KEY,
+        saldo_actual REAL,
+        data_json TEXT NOT NULL,
+        last_fetch_time INTEGER NOT NULL
+      )
+    ''');
+    await db.execute('''
+      CREATE TABLE $_sessionDataTable (
+        id TEXT PRIMARY KEY,
+        data_json TEXT NOT NULL,
+        last_update_time INTEGER NOT NULL
+      )
+    ''');
+    await db.execute('''
+      CREATE TABLE $_coloresAppTable(
+        id INTEGER PRIMARY KEY,
+        app_color_header TEXT,
+        app_color_footer TEXT,
+        app_color_background TEXT,
+        app_color_botones TEXT,
+        app_cred_color_header_1 TEXT,
+        app_cred_color_header_2 TEXT,
+        app_cred_color_letra_1 TEXT,
+        app_cred_color_letra_2 TEXT,
+        app_cred_color_background_1 TEXT,
+        app_cred_color_background_2 TEXT
+      )
+    ''');
+    await db.execute('''
+      CREATE TABLE $_tokensTable(
+        id TEXT PRIMARY KEY,
+        id_token TEXT,
+        token_celular TEXT
+      )
+    ''');
+    debugPrint('DatabaseHelper: Tablas creadas exitosamente.');
+  }
+
+  Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
+    // ✅ [REF] Se mantiene el método de migración, pero se elimina la lógica de las columnas
+    //          ya que el nuevo app usará la base de datos con el esquema final desde el inicio.
+    debugPrint('DatabaseHelper: Iniciando migración de la base de datos de la versión $oldVersion a $newVersion.');
+    // No se realiza ninguna acción de migración específica en este nuevo proyecto,
+    // ya que no hay cambios de esquema desde la versión 1 a la 2 aquí.
+    debugPrint('DatabaseHelper: Migración completada.');
+  }
+
+  Future<void> close() async {
+    final db = await instance.database;
+    await db.close();
+    _database = null;
+    debugPrint('DatabaseHelper: Base de datos cerrada.');
+  }
+
+  Future<void> clearAllData() async {
+    final db = await instance.database;
+    await db.delete(_schoolDataTable);
+    await db.delete(_colaboradorDataTable); 
+    await db.delete(_individualAvisosTable);
+    await db.delete(_articulosCafDataTable);
+    await db.delete(_cafeteriaMovimientosDataTable);
+    await db.delete(_sessionDataTable);
+    await db.delete(_coloresAppTable);
+    await db.delete(_tokensTable);
+    // ✅ [REF] Eliminadas las líneas para limpiar tablas de CFDI, pagos, cargos y materias
+    debugPrint('DatabaseHelper: Todas las tablas limpiadas.');
+  }
+
+  // --- Métodos Genéricos para Guardar y Obtener Datos ---
+  Future<void> _saveData(String tableName, String id, Map<String, dynamic> dataJson, {bool isSessionData = false}) async {
+    final db = await database;
+    final String jsonString = json.encode(dataJson);
+    final int timestamp = DateTime.now().millisecondsSinceEpoch;
+
+    await db.insert(
+      tableName,
+      {
+        'id': id,
+        'data_json': jsonString,
+        isSessionData ? 'last_update_time' : 'last_fetch_time': timestamp
+      },
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+    debugPrint('DatabaseHelper: Datos guardados/actualizados en $tableName para ID: $id');
+  }
+
+  Future<void> _saveListData(String tableName, String id, List<dynamic> dataJsonList) async {
+    final db = await database;
+    final String jsonString = json.encode(dataJsonList);
+    final int timestamp = DateTime.now().millisecondsSinceEpoch;
+
+    await db.insert(
+      tableName,
+      {'id': id, 'data_json': jsonString, 'last_fetch_time': timestamp},
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+    debugPrint('DatabaseHelper: Lista de datos guardada/actualizada en $tableName para ID: $id');
+  }
+  
+  Future<Map<String, dynamic>?> _getData(String tableName, String id, {bool isSessionData = false}) async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      tableName,
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+
+    if (maps.isNotEmpty) {
+      final data = maps.first;
+      debugPrint('DatabaseHelper: Datos obtenidos de $tableName para ID: $id');
+      return {
+        'data_json': json.decode(data['data_json'] as String),
+        'last_fetch_time': DateTime.fromMillisecondsSinceEpoch(data[isSessionData ? 'last_update_time' : 'last_fetch_time'] as int),
+      };
+    }
+    debugPrint('DatabaseHelper: No se encontraron datos en $tableName para ID: $id');
+    return null;
+  }
+  
+  // --- Métodos Específicos para Guardar y Obtener Datos por Tipo ---
+
+  Future<void> saveSchoolData(String id, Map<String, dynamic> dataJson) async {
+    await _saveData(_schoolDataTable, id, dataJson);
+  }
+  Future<Map<String, dynamic>?> getSchoolData(String id) async {
+    return await _getData(_schoolDataTable, id);
+  }
+  
+  // ✅ [REF] Nuevos métodos para la tabla de colaboradores
+  Future<void> saveColaboradorData(String id, Map<String, dynamic> dataJson) async {
+    await _saveData(_colaboradorDataTable, id, dataJson);
+  }
+  Future<Map<String, dynamic>?> getColaboradorData(String id) async {
+    return await _getData(_colaboradorDataTable, id);
+  }
+
+  Future<void> saveAvisosData(String cacheId, List<AvisoModel> avisos) async {
+    final db = await database;
+    await db.delete(
+      _individualAvisosTable,
+      where: 'id_empresa_colaborador_cache_id = ?', // ✅ [REF] Cambiado de id_empresa_alumno_cache_id
+      whereArgs: [cacheId],
+    );
+    debugPrint('DatabaseHelper: Eliminados avisos antiguos para cacheId: $cacheId de $_individualAvisosTable.');
+
+    for (final aviso in avisos) {
+      final avisoData = aviso.toDatabaseJson();
+      avisoData['id_empresa_colaborador_cache_id'] = cacheId; // ✅ [REF] Cambiado
+      await db.insert(
+        _individualAvisosTable,
+        avisoData,
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
+    }
+    debugPrint('DatabaseHelper: ${avisos.length} avisos guardados/actualizados en $_individualAvisosTable para cacheId: $cacheId.');
+  }
+
+  Future<List<AvisoModel>> getAvisosData(String cacheId) async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      _individualAvisosTable,
+      where: 'id_empresa_colaborador_cache_id = ?', // ✅ [REF] Cambiado
+      whereArgs: [cacheId],
+      orderBy: 'fecha DESC',
+    );
+
+    if (maps.isNotEmpty) {
+      debugPrint('DatabaseHelper: ${maps.length} avisos obtenidos de $_individualAvisosTable para cacheId: $cacheId.');
+      return maps.map((map) => AvisoModel.fromDatabaseJson(map)).toList();
+    }
+    debugPrint('DatabaseHelper: No se encontraron avisos en $_individualAvisosTable para cacheId: $cacheId.');
+    return [];
+  }
+
+  Future<void> updateAvisoReadStatus(String idCalendario, String cacheId, bool isRead) async {
+    final db = await database;
+    await db.update(
+      _individualAvisosTable,
+      {'leido': isRead ? 1 : 0},
+      where: 'id_calendario = ? AND id_empresa_colaborador_cache_id = ?', // ✅ [REF] Cambiado
+      whereArgs: [idCalendario, cacheId],
+    );
+    debugPrint('DatabaseHelper: Estado "leido" actualizado para aviso $idCalendario en $_individualAvisosTable.');
+  }
+
+  Future<void> updateAvisoWithImageCache(AvisoModel aviso, String cacheId) async {
+    final db = await database;
+    await db.update(
+      _individualAvisosTable,
+      {
+        'imagenLocalPath': aviso.imagenLocalPath,
+        'imagenCacheTimestamp': aviso.imagenCacheTimestamp?.toIso8601String(),
+      },
+      where: 'id_calendario = ? AND id_empresa_colaborador_cache_id = ?', // ✅ [REF] Cambiado
+      whereArgs: [aviso.idCalendario, cacheId],
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+    debugPrint('DatabaseHelper: Campos de caché de imagen actualizados para aviso ${aviso.idCalendario} en $_individualAvisosTable.');
+  }
+
+  Future<void> updateAvisoRespuesta(String idCalendario, String cacheId, String respuesta) async {
+    final db = await database;
+    await db.update(
+      _individualAvisosTable,
+      {'seg_respuesta': respuesta},
+      where: 'id_calendario = ? AND id_empresa_colaborador_cache_id = ?', // ✅ [REF] Cambiado
+      whereArgs: [idCalendario, cacheId],
+    );
+  }
+  
+  // ✅ [REF] Eliminados los métodos para CFDI, Pagos Realizados, Cargos Pendientes y Materias
+
+  Future<void> saveArticulosCafData(String id, List<dynamic> dataJsonList) async {
+    await _saveListData(_articulosCafDataTable, id, dataJsonList);
+  }
+  Future<Map<String, dynamic>?> getArticulosCafData(String id) async {
+    return await _getData(_articulosCafDataTable, id);
+  }
+  
+  Future<void> saveCafeteriaData(String id, double saldoActual, List<dynamic> dataJsonList) async {
+    final db = await database;
+    final String jsonString = json.encode(dataJsonList);
+    final int timestamp = DateTime.now().millisecondsSinceEpoch;
+
+    await db.insert(
+      _cafeteriaMovimientosDataTable,
+      {
+        'id': id,
+        'saldo_actual': saldoActual,
+        'data_json': jsonString,
+        'last_fetch_time': timestamp,
+      },
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+    debugPrint('DatabaseHelper: Datos de cafetería guardados/actualizados para ID: $id');
+  }
+
+  Future<Map<String, dynamic>?> getCafeteriaData(String id) async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      _cafeteriaMovimientosDataTable,
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+
+    if (maps.isNotEmpty) {
+      final data = maps.first;
+      debugPrint('DatabaseHelper: Datos de cafetería obtenidos para ID: $id');
+      return {
+        'saldo_actual': data['saldo_actual'] as double?,
+        'data_json': json.decode(data['data_json'] as String),
+        'last_fetch_time': DateTime.fromMillisecondsSinceEpoch(data['last_fetch_time'] as int),
+      };
+    }
+    debugPrint('DatabaseHelper: No se encontraron datos de cafetería para ID: $id');
+    return null;
+  }
+
+  Future<void> saveSessionData(String id, Map<String, dynamic> dataJson) async {
+    await _saveData(_sessionDataTable, id, dataJson, isSessionData: true);
+  }
+  Future<Map<String, dynamic>?> getSessionData(String id) async {
+    return await _getData(_sessionDataTable, id, isSessionData: true);
+  }
+  
+  Future<void> saveColoresData(Colores colores) async {
+    final db = await database;
+    await db.insert(
+      _coloresAppTable,
+      colores.toMap()..['id'] = 1,
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+    debugPrint('DatabaseHelper: Colores de la app guardados/actualizados.');
+  }
+
+  Future<Colores?> getColoresData() async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(_coloresAppTable, where: 'id = ?', whereArgs: [1]);
+
+    if (maps.isNotEmpty) {
+      debugPrint('DatabaseHelper: Colores de la app obtenidos.');
+      return Colores.fromMap(maps.first);
+    }
+    debugPrint('DatabaseHelper: No se encontraron colores de la app.');
+    return null;
+  }
+  
+  Future<void> saveTokens(String id, String idToken, String fcmToken) async {
+    final db = await database;
+    await db.insert(
+      _tokensTable,
+      {'id': id, 'id_token': idToken, 'token_celular': fcmToken},
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+    debugPrint('DatabaseHelper: Tokens guardados/actualizados en $_tokensTable para ID: $id');
+  }
+
+  Future<Map<String, dynamic>?> getTokens(String id) async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      _tokensTable,
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+    if (maps.isNotEmpty) {
+      return maps.first;
+    }
+    return null;
+  }
+}
