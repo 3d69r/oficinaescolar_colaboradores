@@ -5,7 +5,11 @@ import 'package:provider/provider.dart';
 
 // Asegúrate de tener estas importaciones correctas para tu proyecto
 import 'package:oficinaescolar_colaboradores/models/colaborador_model.dart'; 
+import 'package:oficinaescolar_colaboradores/models/boleta_encabezado_model.dart'; // Aunque no se use aquí, se usa en la navegación
 import 'package:oficinaescolar_colaboradores/providers/user_provider.dart'; 
+
+// ⭐️ Importación de la nueva vista de calificaciones
+import 'package:oficinaescolar_colaboradores/screens/captura_calificaciones_screen.dart'; // Asume que esta es la ruta correcta
 
 class AsistenciaScreen extends StatefulWidget {
   const AsistenciaScreen({super.key});
@@ -31,7 +35,7 @@ class _AsistenciaScreenState extends State<AsistenciaScreen> {
     
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Tomar Asistencia'),
+        title: const Text('Calificaciones y Asistencia'),
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -39,21 +43,19 @@ class _AsistenciaScreenState extends State<AsistenciaScreen> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text(
-              'Selecciona el tipo de asistencia:',
+              'Selecciona la opcion deseada:',
               style: Theme.of(context).textTheme.titleLarge,
             ),
             const SizedBox(height: 20),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
-                // ✅ LLAMADA ACTUALIZADA
                 _construirBotonOpcion(
                   context,
                   title: 'Materia',
                   icon: Icons.school,
                   value: 'materia',
                 ),
-                // ✅ LLAMADA ACTUALIZADA
                 _construirBotonOpcion(
                   context,
                   title: 'Clubes',
@@ -70,7 +72,6 @@ class _AsistenciaScreenState extends State<AsistenciaScreen> {
                 style: Theme.of(context).textTheme.titleLarge,
               ),
               const SizedBox(height: 20),
-              // ✅ LLAMADA ACTUALIZADA
               Expanded(
                 child: _construirListaCursos(userProvider),
               ),
@@ -82,7 +83,7 @@ class _AsistenciaScreenState extends State<AsistenciaScreen> {
   }
 
   // ✅ MÉTODO: Construir botón de opción (Materia/Clubes)
-  Widget _construirBotonOpcion( // ✅ CAMBIO DE NOMBRE
+  Widget _construirBotonOpcion( 
       BuildContext context, {
         required String title,
         required IconData icon,
@@ -127,11 +128,10 @@ class _AsistenciaScreenState extends State<AsistenciaScreen> {
   }
 
   // ✅ MÉTODO: Construir lista de cursos (Materias o Clubes)
-  Widget _construirListaCursos(UserProvider userProvider) { // ✅ CAMBIO DE NOMBRE
+  Widget _construirListaCursos(UserProvider userProvider) { 
     final bool isMateria = _selectedOption == 'materia';
     
-    // Asumimos que los modelos MateriaModel y ClubModel existen y tienen los getters correctos
-    // para 'idCurso', 'materia', 'nombreCurso', 'planEstudio', 'horario'.
+    // El código asume que MateriaModel y ClubModel tienen los getters correctos
     final List items = isMateria 
         ? userProvider.colaboradorMaterias 
         : userProvider.colaboradorClubes;
@@ -173,13 +173,18 @@ class _AsistenciaScreenState extends State<AsistenciaScreen> {
             trailing: const Icon(Icons.arrow_forward_ios),
             onTap: () {
               if (isMateria) {
-                // Navegación a la vista de detalles/opciones para Materias
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Navegar a detalles de materia: $title')),
+                // ⭐️ LÓGICA DE NAVEGACIÓN A CALIFICACIONES
+                Navigator.push(
+                  context, 
+                  MaterialPageRoute(
+                    builder: (_) => CapturaCalificacionesScreen(
+                      materiaSeleccionada: item as MateriaModel, // Se pasa el modelo completo
+                    ),
+                  ),
                 );
               
               } else {
-                // Navegación a la ListaScreen para tomar asistencia de Clubes
+                // Navegación original a la ListaScreen (Asistencia de Clubes)
                  Navigator.push(
                     context, 
                     MaterialPageRoute(

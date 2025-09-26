@@ -1,5 +1,7 @@
 import 'dart:convert';
 
+import 'package:oficinaescolar_colaboradores/models/boleta_encabezado_model.dart';
+
 class ColaboradorModel {
   // Propiedades de la respuesta principal
   final String status;
@@ -8,6 +10,8 @@ class ColaboradorModel {
   // Propiedades de las listas: Siempre serán Listas vacías si no hay datos.
   final List<MateriaModel> materiasData;
   final List<ClubModel> materiasClubes;
+   // ⭐️ NUEVA PROPIEDAD: Lista de estructuras de boleta
+  final List<BoletaEncabezadoModel> encabezadosBoleta;
 
   // Propiedades de 'persona_data'
   final String idColaborador;
@@ -31,6 +35,7 @@ class ColaboradorModel {
     required this.message,
     required this.materiasData,
     required this.materiasClubes,
+    required this.encabezadosBoleta,
     required this.idColaborador,
     required this.nombre,
     required this.apellidoPat,
@@ -71,6 +76,13 @@ class ColaboradorModel {
               .map((e) => ClubModel.fromJson(e))
               .toList()
           : [], // Si es null, false, o cualquier otra cosa, devuelve []
+
+          encabezadosBoleta: (json['encabezados_boleta'] is List)
+          ? (json['encabezados_boleta'] as List<dynamic>)
+              .whereType<Map<String, dynamic>>()
+              .map((e) => BoletaEncabezadoModel.fromJson(e))
+              .toList()
+          : [],
           
       // Mapeo de campos de persona_data
       idColaborador: personaData['id_colaborador'] as String? ?? '',

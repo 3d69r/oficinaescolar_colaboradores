@@ -11,6 +11,7 @@ import 'package:device_info_plus/device_info_plus.dart';
 import 'package:oficinaescolar_colaboradores/data/database_helper.dart';
 import 'package:oficinaescolar_colaboradores/config/api_constants.dart';
 import 'package:oficinaescolar_colaboradores/models/alumno_asistencia_model.dart';
+import 'package:oficinaescolar_colaboradores/models/boleta_encabezado_model.dart';
 import 'package:oficinaescolar_colaboradores/models/comentario_model.dart';
 import 'package:oficinaescolar_colaboradores/models/escuela_model.dart';
 import 'package:oficinaescolar_colaboradores/models/colaborador_model.dart'; // ✅ [REF] Nuevo modelo
@@ -33,6 +34,7 @@ class UserProvider with ChangeNotifier {
   String? _fcmToken;
   String? _idToken;
   String? _tokenCelular;
+  String? _idMateriaAlumno;
 
   double _ultimoSaldoConocido = 0.0;
   double get ultimoSaldoConocido => _ultimoSaldoConocido;
@@ -71,6 +73,7 @@ class UserProvider with ChangeNotifier {
   List<AvisoModel> _avisos = [];
   List<Articulo> _articulosCaf = [];
   List<Map<String, dynamic>> _cafeteriaMovimientos = [];
+  List<BoletaEncabezadoModel> _boletaEncabezados = [];
   
   // ✅ [REF] Eliminados los modelos de datos para CFDI, Pagos, Cargos, Materias
 
@@ -86,6 +89,7 @@ class UserProvider with ChangeNotifier {
   String? get fcmToken => _fcmToken;
   String? get idToken => _idToken;
   String? get tokenCelular => _tokenCelular;
+  String? get idMateriaAlumno => _idMateriaAlumno;
 
   String get rutaLogoEscuela => _rutaLogoEscuela;
   String? get selectedCafeteriaPeriodId => _selectedCafeteriaPeriodId;
@@ -102,7 +106,10 @@ class UserProvider with ChangeNotifier {
   List<Articulo> get articulosCaf => _articulosCaf;
   List<Map<String, dynamic>> get cafeteriaMovimientos => _cafeteriaMovimientos;
   ColaboradorModel? get currentColaboradorDetails => _currentColaboradorDetails; // ✅ [REF] Cambiado de currentAlumnoDetails
-  
+    
+  // Getter para acceder a la configuración de la boleta
+  List<BoletaEncabezadoModel> get boletaEncabezados => _boletaEncabezados;
+
   int get unreadAvisosCount => _avisos.where((aviso) => !aviso.leido).length;
 
   Colores get colores => _colores ?? _defaultColores;
@@ -263,6 +270,7 @@ class UserProvider with ChangeNotifier {
       
       // Obtener los datos base del colaborador para la URL
       final String escuelaCode = _escuela;
+      final String idMateriaAlumno = _idMateriaAlumno ?? '';
       final String idToken = _idToken ?? ''; 
       final String fechaHoraApiCall = _fechaHora.isNotEmpty ? _fechaHora : generateApiFechaHora();
 
@@ -274,7 +282,7 @@ class UserProvider with ChangeNotifier {
       // 1. Determinar el endpoint y la URL
       String apiEndpoint;
       if (tipoCurso == TipoCurso.materia) {
-        apiEndpoint = ApiConstants.getAlumnosMateria(escuelaCode,  idCurso,fechaHoraApiCall, idToken);
+        apiEndpoint = ApiConstants.getCursoListaAlumnos(escuelaCode,  idMateriaAlumno,fechaHoraApiCall, idToken);
       } else {
         apiEndpoint = ApiConstants.getAlumnosClub(escuelaCode,  idCurso, fechaHoraApiCall, idToken);
       }
@@ -316,6 +324,73 @@ class UserProvider with ChangeNotifier {
         debugPrint('UserProvider: ClientException al cargar alumnos. Problema de red.');
       } catch (e) {
         debugPrint('UserProvider: Excepción general al cargar alumnos: $e.');
+      }
+
+      return [];
+    }
+
+    Future<List<Map<String, dynamic>>> fetchAlumnosParaCalificar({
+      required String idCurso, // Este será el idMateriaClase/idClub
+      required TipoCurso tipoCurso,
+    }) async {
+      
+      // Obtener los datos base del colaborador para la URL
+      final String escuelaCode = _escuela;
+      // Usaremos idCurso (que es el idMateriaClase) para el endpoint de materia, 
+      // ya que la API no requiere _idMateriaAlumno (variable de estado) aquí.
+      final String idMateriaClase = idCurso; 
+      final String idToken = _idToken ?? ''; 
+      final String fechaHoraApiCall = _fechaHora.isNotEmpty ? _fechaHora : generateApiFechaHora();
+
+      if (escuelaCode.isEmpty || idColaborador.isEmpty || idMateriaClase.isEmpty) {
+        debugPrint('UserProvider: Datos de sesión o idCurso/idMateriaClase incompletos para cargar alumnos para calificar.');
+        return [];
+      }
+      
+      // 1. Determinar el endpoint y la URL
+      String apiEndpoint;
+      if (tipoCurso == TipoCurso.materia) {
+        // ✅ Usamos el idCurso/idMateriaClase en lugar de la variable de estado _idMateriaAlumno.
+        // ASUMIMOS que ApiConstants.getCursoListaAlumnos() usa el segundo parámetro para filtrar la materia.
+        apiEndpoint = ApiConstants.getCursoListaAlumnos(escuelaCode,  idMateriaClase, fechaHoraApiCall, idToken);
+      } else {
+        apiEndpoint = ApiConstants.getAlumnosClub(escuelaCode,  idCurso, fechaHoraApiCall, idToken);
+      }
+
+      final alumnosDataUrl = Uri.parse(apiEndpoint);
+      
+      debugPrint('UserProvider: Llamando a API de alumnos para CALIFICAR ${tipoCurso.name} (ID: $idCurso): $alumnosDataUrl');
+      
+      try {
+        final response = await http.get(alumnosDataUrl);
+
+        if (response.statusCode == 200) {
+
+          final rawData = json.decode(response.body);
+
+          if (rawData is List) {
+            // 2. Devolvemos la lista de Map<String, dynamic> (JSON crudo)
+            // Esto es crucial para que la UI pueda manejar campos dinámicos de P1, P2, OB, etc.
+            final List<Map<String, dynamic>> alumnosData = rawData
+                .whereType<Map<String, dynamic>>()
+                .toList();
+                
+            debugPrint('UserProvider: Se cargaron ${alumnosData.length} alumnos para CALIFICAR (ID $idCurso).');
+            return alumnosData;
+          } else {
+            debugPrint('UserProvider: La API devolvió un formato inesperado para calificaciones (no es una lista).');
+            return [];
+          }
+        } else {
+          debugPrint('UserProvider: Error HTTP al cargar alumnos para calificar (${response.statusCode}).');
+          return [];
+        }
+      } on SocketException {
+        debugPrint('UserProvider: SocketException al cargar alumnos para calificar. Sin conexión.');
+      } on http.ClientException {
+        debugPrint('UserProvider: ClientException al cargar alumnos para calificar. Problema de red.');
+      } catch (e) {
+        debugPrint('UserProvider: Excepción general al cargar alumnos para calificar: $e.');
       }
 
       return [];
@@ -526,6 +601,7 @@ class UserProvider with ChangeNotifier {
       debugPrint('Excepción actualizando token: $e');
     }
   }
+  
 
   Future<void> processAndSaveSchoolColors(Map<String, dynamic> apiResponse) async {
     // ... (este método no cambia)
@@ -637,6 +713,9 @@ class UserProvider with ChangeNotifier {
     debugPrint('UserProvider: Intentando cargar datos del colaborador desde el caché local...');
     final cachedData = await DatabaseHelper.instance.getColaboradorData(idColaborador);
     
+    // ⭐️ INTEGRACIÓN (INICIO): Cargar la estructura de la boleta desde el caché/DB
+    _boletaEncabezados = await DatabaseHelper.instance.getBoletaEncabezados();
+
     if (cachedData != null) {
       colaboradorJsonData = cachedData['data_json'];
       _lastColaboradorDataFetch = cachedData['last_fetch_time'];
@@ -647,6 +726,12 @@ class UserProvider with ChangeNotifier {
         tempColaboradorModel = ColaboradorModel.fromJson(colaboradorJsonData!);
         _colaboradorModel = tempColaboradorModel;
         _currentColaboradorDetails = tempColaboradorModel;
+
+        // ⭐️ Actualizar la variable del Provider con la data del modelo, si existe en caché
+        if (tempColaboradorModel.encabezadosBoleta.isNotEmpty) {
+           _boletaEncabezados = tempColaboradorModel.encabezadosBoleta;
+        }
+
         notifyListeners(); // Notificamos para mostrar datos rápidos de caché
 
       } catch (e) {
@@ -704,7 +789,7 @@ class UserProvider with ChangeNotifier {
       }
     }
     
-    // 3. Lógica de validación y retorno final (similar al del alumno)
+    // 3. Lógica de validación y retorno final (incluyendo guardado de encabezados)
     if (colaboradorJsonData != null) {
       try {
         // ✅ Parseamos el JSON final (ya sea de caché o de la API)
@@ -712,6 +797,15 @@ class UserProvider with ChangeNotifier {
         
         // Asumiendo que idColaborador.isNotEmpty es la validación de un registro válido
         if (tempColaboradorModel.idColaborador.isNotEmpty) {
+          
+          // ⭐️ INTEGRACIÓN CLAVE (FINAL): Guardar la estructura de la Boleta en la base de datos
+          if (tempColaboradorModel.encabezadosBoleta.isNotEmpty) {
+             await DatabaseHelper.instance.saveBoletaEncabezados(tempColaboradorModel.encabezadosBoleta);
+             // Actualizar la variable del Provider con la data fresca de la API
+             _boletaEncabezados = tempColaboradorModel.encabezadosBoleta; 
+             debugPrint('UserProvider: Estructura de Boleta guardada/actualizada.');
+          }
+          
           _colaboradorModel = tempColaboradorModel;
           _currentColaboradorDetails = tempColaboradorModel;
           notifyListeners();
@@ -728,7 +822,8 @@ class UserProvider with ChangeNotifier {
     notifyListeners();
     debugPrint('UserProvider: No se pudieron cargar los datos del colaborador desde la API o el caché.');
     return null;
-}
+  }
+
   Future<String?> getAvisoImagePath(AvisoModel aviso) async {
     // ... (este método no cambia)
     if (aviso.archivo == null || aviso.archivo!.isEmpty) {
@@ -1067,9 +1162,7 @@ class UserProvider with ChangeNotifier {
       'id_persona':'0',
       'seg_respuesta': respuesta ?? '',
       'id_colaborador': _idColaborador, 
-      'id_token': idTokenParam,
-      
- 
+      'id_token': idTokenParam, 
     };
 
     final url = Uri.parse('${ApiConstants.apiBaseUrl}${ApiConstants.setAvisoLeidoEndpoint}');
@@ -1082,7 +1175,7 @@ class UserProvider with ChangeNotifier {
         final avisoIndex = _avisos.indexWhere((a) => a.idCalendario == idCalendario);
         if (avisoIndex != -1) {
           final dbHelper = DatabaseHelper.instance;
-          final cacheId = '$_idEmpresa$_idColaborador'; // ✅ [REF] Cambiado de idAlumno
+          final cacheId = '${idEmpresa}_$idColaborador'; // ✅ [REF] Cambiado de idAlumno
 
          // 1. Marcar como leído en la base de datos
           await dbHelper.updateAvisoReadStatus(idCalendario, cacheId, true);

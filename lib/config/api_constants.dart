@@ -61,8 +61,8 @@ class ApiConstants {
   }
 
    // ✅ NUEVO ENDPOINT para Alumnos de una Materia
-  static String getAlumnosMateria(String escuela,  String idCurso, String fechaHora, String idToken) {
-    return '${apiBaseUrl}get_alumnos_materia/$escuela/$idCurso/$fechaHora/$idToken';
+  static String getCursoListaAlumnos(String escuela,  String idMateriaClase, String fechaHora, String idToken) {
+    return '${apiBaseUrl}get_curso_lista_alumnos/$escuela/$idMateriaClase/$fechaHora/$idToken';
   }
 
   // ✅ NUEVO ENDPOINT para Alumnos de un Club

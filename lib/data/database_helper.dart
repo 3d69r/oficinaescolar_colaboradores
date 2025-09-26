@@ -1,12 +1,15 @@
 // `database_helper.dart`
 import 'dart:async';
 import 'dart:convert';
+import 'package:oficinaescolar_colaboradores/models/boleta_encabezado_model.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 import 'package:flutter/foundation.dart';
 
 import 'package:oficinaescolar_colaboradores/models/aviso_model.dart';
 import 'package:oficinaescolar_colaboradores/models/colores_model.dart';
+// ⭐️ IMPORTANTE: Asegúrate de que esta importación apunte a tu modelo BoletaEncabezadoModel
+import 'package:oficinaescolar_colaboradores/models/colaborador_model.dart'; 
 
 /// Clase [DatabaseHelper]
 ///
@@ -25,6 +28,8 @@ class DatabaseHelper {
   static const String _sessionDataTable = 'session_data';
   static const String _coloresAppTable = 'colores_app';
   static const String _tokensTable = 'tokens_data';
+  // ⭐️ NUEVO: Tabla para la estructura de encabezados de calificación
+  static const String _encabezadosBoletaTable = 'boleta_encabezados';
   
   DatabaseHelper._privateConstructor();
 
@@ -134,6 +139,13 @@ class DatabaseHelper {
         token_celular TEXT
       )
     ''');
+    // ⭐️ NUEVO: Creación de la tabla de encabezados de boleta
+    await db.execute('''
+      CREATE TABLE $_encabezadosBoletaTable (
+        nivel_educativo TEXT PRIMARY KEY,
+        data TEXT NOT NULL
+      )
+    ''');
     debugPrint('DatabaseHelper: Tablas creadas exitosamente.');
   }
 
@@ -163,6 +175,8 @@ class DatabaseHelper {
     await db.delete(_sessionDataTable);
     await db.delete(_coloresAppTable);
     await db.delete(_tokensTable);
+    // ⭐️ NUEVO: Limpiar tabla de encabezados de boleta
+    await db.delete(_encabezadosBoletaTable); 
     // ✅ [REF] Eliminadas las líneas para limpiar tablas de CFDI, pagos, cargos y materias
     debugPrint('DatabaseHelper: Todas las tablas limpiadas.');
   }
@@ -233,6 +247,59 @@ class DatabaseHelper {
   }
   Future<Map<String, dynamic>?> getColaboradorData(String id) async {
     return await _getData(_colaboradorDataTable, id);
+  }
+
+  // ⭐️ NUEVO: Métodos para Guardar y Obtener la Configuración de la Boleta
+  
+  /// Guarda la estructura de encabezados de boleta en la base de datos local.
+  Future<void> saveBoletaEncabezados(List<BoletaEncabezadoModel> encabezados) async {
+    final db = await database;
+    
+    // Borrar todo antes de guardar, ya que es una configuración de lista global
+    await db.delete(_encabezadosBoletaTable); 
+    debugPrint('DatabaseHelper: Limpiada la tabla $_encabezadosBoletaTable.');
+
+    for (final enc in encabezados) {
+        // Creamos un Map que puede ser serializado a JSON para la columna 'data'
+        final Map<String, dynamic> serializableData = {
+            'encabezados': enc.encabezados,
+            'relaciones': enc.relaciones,
+            'comentarios': enc.comentarios,
+            'promedioKey': enc.promedioKey,
+        };
+        
+        final Map<String, dynamic> dataToSave = {
+            'nivel_educativo': enc.nivelEducativo,
+            'data': json.encode(serializableData),
+        };
+        await db.insert(
+            _encabezadosBoletaTable, 
+            dataToSave, 
+            conflictAlgorithm: ConflictAlgorithm.replace
+        );
+    }
+    debugPrint('DatabaseHelper: ${encabezados.length} estructuras de boleta guardadas.');
+  }
+
+  /// Obtiene la lista de estructuras de encabezados de boleta desde la base de datos local.
+  Future<List<BoletaEncabezadoModel>> getBoletaEncabezados() async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(_encabezadosBoletaTable);
+
+    if (maps.isEmpty) return [];
+
+    return maps.map((map) {
+        final Map<String, dynamic> rawData = json.decode(map['data'] as String);
+        
+        // Reconstruir el modelo desde la data guardada, asegurando los tipos
+        return BoletaEncabezadoModel(
+            nivelEducativo: map['nivel_educativo'] as String,
+            encabezados: Map<String, String>.from(rawData['encabezados'] as Map),
+            relaciones: Map<String, String>.from(rawData['relaciones'] as Map),
+            comentarios: Map<String, String>.from(rawData['comentarios'] as Map),
+            promedioKey: rawData['promedioKey'] as String?,
+        );
+    }).toList();
   }
 
   Future<void> saveAvisosData(String cacheId, List<AvisoModel> avisos) async {
