@@ -314,6 +314,7 @@ class EscuelaModel {
   final List<CuentaBancaria> cuentasBancariasCaf;
   final List<PeriodoCafeteria> cafPeriodos;
   final String cafPeriodoActual;
+  final String appPermisosColab;
 
   EscuelaModel({
     required this.status,
@@ -347,6 +348,7 @@ class EscuelaModel {
     required this.cuentasBancariasCaf,
     required this.cafPeriodos,
     required this.cafPeriodoActual,
+    required this.appPermisosColab,
   });
 
   factory EscuelaModel.fromJson(Map<String, dynamic> json) {
@@ -383,6 +385,7 @@ class EscuelaModel {
       rutaLogo: schoolJson['ruta_logo']?.toString() ?? '',
       rutaFirma: schoolJson['ruta_credencial_firma']?.toString() ?? '',
       appPermisos: schoolJson['app_permisos']?.toString() ?? '',
+      appPermisosColab: schoolJson['app_permisos_colab']?.toString() ?? '',
       cicloEscolar: CicloEscolar.fromJson(cicloEscolarJson),
       contactos: contactosJson.map((e) => Contacto.fromJson(e as Map<String, dynamic>)).toList(),
        dirDomicilios: dirDomiciliosJson?.map((e) => Domicilio.fromJson(e as Map<String, dynamic>)).toList() ?? [], 

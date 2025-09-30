@@ -115,12 +115,19 @@ class _HomeScreenState extends State<HomeScreen> {
             .map((e) => e.trim())
             .toList() ??
         [];
+    
+    final List<String> permisosColab =
+        userProvider.escuelaModel?.appPermisosColab
+            .split(',')
+            .map((e) => e.trim())
+            .toList() ??
+        [];
 
     final List<Widget> dynamicPages = [];
     final List<Widget> dynamicNavItems = [];
     
     // ✅ [AGREGADO] Se añade la pantalla y el ícono para subir avisos si el permiso está presente
-    if (permisos.contains('Directorio')) {//CAMBIAR NOMBRE
+    if (permisosColab.contains('Crud_Avisos')) {
       dynamicPages.add(const SubirAvisosScreen());
       dynamicNavItems.add(
         const Icon(Icons.campaign_outlined, size: 30, color: Colors.white),
@@ -132,19 +139,19 @@ class _HomeScreenState extends State<HomeScreen> {
         const Icon(Icons.public, size: 30, color: Colors.white),
       );
     }
-    if (permisos.contains('Cafeteria')) {
+    if (permisosColab.contains('Asistencia')) {
       dynamicPages.add(const AsistenciaScreen());
       dynamicNavItems.add(
         const Icon(Icons.check_circle_outline, size: 30, color: Colors.white),
       );
     }
-    if (permisos.contains('Materias')) {
+    /*if (permisosColab.contains('Calificar')) {
       dynamicPages.add(const MateriasScreen());
       dynamicNavItems.add(
         const Icon(Icons.class_outlined, size: 30, color: Colors.white),
       );
-    }
-    if (permisos.contains('SUBIR ARCHIVOS')) {
+    }*/
+    if (permisos.contains('Directorio')) {
       dynamicPages.add(const ContactosScreen());
       dynamicNavItems.add(
         const Icon(Icons.contact_phone, size: 30, color: Colors.white),
@@ -192,7 +199,7 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       );
     }
-    if (permisos.contains('Asistencia')) {
+    if (permisos.contains('Cafeteria')) {
       dynamicPages.add(const CafeteriaView());
       dynamicNavItems.add(
         const Icon(Icons.local_cafe, size: 30, color: Colors.white),

@@ -5,11 +5,10 @@ import 'package:provider/provider.dart';
 
 // Asegúrate de tener estas importaciones correctas para tu proyecto
 import 'package:oficinaescolar_colaboradores/models/colaborador_model.dart'; 
-import 'package:oficinaescolar_colaboradores/models/boleta_encabezado_model.dart'; // Aunque no se use aquí, se usa en la navegación
+import 'package:oficinaescolar_colaboradores/models/boleta_encabezado_model.dart'; 
 import 'package:oficinaescolar_colaboradores/providers/user_provider.dart'; 
-
-// ⭐️ Importación de la nueva vista de calificaciones
-import 'package:oficinaescolar_colaboradores/screens/captura_calificaciones_screen.dart'; // Asume que esta es la ruta correcta
+import 'package:oficinaescolar_colaboradores/screens/captura_calificaciones_screen.dart'; 
+import 'package:oficinaescolar_colaboradores/screens/preescolar_listado_screen.dart'; // ⭐️ NUEVA IMPORTACIÓN ⭐️
 
 class AsistenciaScreen extends StatefulWidget {
   const AsistenciaScreen({super.key});
@@ -25,6 +24,10 @@ class _AsistenciaScreenState extends State<AsistenciaScreen> {
   @override
   Widget build(BuildContext context) {
     final userProvider = Provider.of<UserProvider>(context);
+    
+    // ⭐️ EXTRACCIÓN Y CONVERSIÓN DEL COLOR ⭐️
+    // Asumimos que userProvider.colores.headerColor devuelve un Color de Flutter
+    final Color headerColor = userProvider.colores.headerColor;
 
     if (userProvider.colaboradorModel == null) {
       return Scaffold(
@@ -35,7 +38,9 @@ class _AsistenciaScreenState extends State<AsistenciaScreen> {
     
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Calificaciones y Asistencia'),
+        title: const Text('Calificaciones y Asistencia',  style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
+        backgroundColor: headerColor, // Usando el color dinámico en el AppBar
+        centerTitle: true,
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -55,12 +60,14 @@ class _AsistenciaScreenState extends State<AsistenciaScreen> {
                   title: 'Materia',
                   icon: Icons.school,
                   value: 'materia',
+                  headerColor: headerColor
                 ),
                 _construirBotonOpcion(
                   context,
                   title: 'Clubes',
                   icon: Icons.sports_soccer,
                   value: 'clubes',
+                  headerColor: headerColor
                 ),
               ],
             ),
@@ -88,6 +95,7 @@ class _AsistenciaScreenState extends State<AsistenciaScreen> {
         required String title,
         required IconData icon,
         required String value,
+        required Color headerColor // Tipo Color para el parámetro
       }) {
     final bool isSelected = _selectedOption == value;
     return Expanded(
@@ -96,7 +104,8 @@ class _AsistenciaScreenState extends State<AsistenciaScreen> {
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(15),
           side: isSelected
-              ? const BorderSide(color: Colors.blueAccent, width: 2)
+              // ⭐️ Uso del color dinámico en el borde
+              ?  BorderSide(color: headerColor , width: 2)
               : BorderSide.none,
         ),
         child: InkWell(
@@ -109,14 +118,16 @@ class _AsistenciaScreenState extends State<AsistenciaScreen> {
             padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 10),
             child: Column(
               children: [
-                Icon(icon, size: 40, color: isSelected ? Colors.blueAccent : Colors.grey),
+                // Uso del color dinámico en el ícono
+                Icon(icon, size: 40, color: isSelected ? headerColor : Colors.grey),
                 const SizedBox(height: 10),
                 Text(
                   title,
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
-                    color: isSelected ? Colors.blueAccent : Colors.black87,
+                    // Uso del color dinámico en el texto
+                    color: isSelected ? headerColor : Colors.black87,
                   ),
                 ),
               ],
@@ -130,6 +141,7 @@ class _AsistenciaScreenState extends State<AsistenciaScreen> {
   // ✅ MÉTODO: Construir lista de cursos (Materias o Clubes)
   Widget _construirListaCursos(UserProvider userProvider) { 
     final bool isMateria = _selectedOption == 'materia';
+    final Color headerColor = userProvider.colores.headerColor; // Color para usar en ExpansionTile
     
     // El código asume que MateriaModel y ClubModel tienen los getters correctos
     final List items = isMateria 
@@ -153,53 +165,135 @@ class _AsistenciaScreenState extends State<AsistenciaScreen> {
       itemBuilder: (context, index) {
         final item = items[index];
         
+        // Manejo de modelos
+        final MateriaModel? materia = isMateria ? (item as MateriaModel) : null;
+        
         final String idCurso = isMateria 
-            ? (item as MateriaModel).idCurso 
+            ? materia!.idCurso 
             : (item as ClubModel).idCurso;
             
         final String title = isMateria
-            ? (item as MateriaModel).materia
+            ? materia!.materia
             : (item as ClubModel).nombreCurso; 
         
         final String subtitle = isMateria
-            ? 'Plan: ${(item as MateriaModel).planEstudio}'
+            ? 'Plan: ${materia!.planEstudio}'
             : 'Horario: ${(item as ClubModel).horario}';
 
+        // ⭐️ LÓGICA CLAVE: Verificar si es Preescolar ⭐️
+        final bool isPreescolar = isMateria && materia!.planEstudio == 'Preescolar';
+
+        // Si es Club, usa el ListTile simple para asistencia
+        if (!isMateria) {
+            return Card(
+                margin: const EdgeInsets.symmetric(vertical: 8.0),
+                child: ListTile(
+                    title: Text(title),
+                    subtitle: Text(subtitle),
+                    trailing: const Icon(Icons.arrow_forward_ios),
+                    onTap: () {
+                        // Navegación a ListaScreen (Asistencia de Clubes)
+                        Navigator.push(
+                            context, 
+                            MaterialPageRoute(
+                                builder: (_) => ListaScreen(
+                                    idCurso: idCurso, 
+                                    tipoCurso: TipoCurso.club,
+                                ),
+                            ),
+                        );
+                    },
+                ),
+            );
+        }
+
+        // Si es Materia, usamos la lógica de ExpansionTile para Preescolar, o ListTile para las demás
         return Card(
           margin: const EdgeInsets.symmetric(vertical: 8.0),
-          child: ListTile(
-            title: Text(title),
-            subtitle: Text(subtitle),
-            trailing: const Icon(Icons.arrow_forward_ios),
-            onTap: () {
-              if (isMateria) {
-                // ⭐️ LÓGICA DE NAVEGACIÓN A CALIFICACIONES
-                Navigator.push(
-                  context, 
-                  MaterialPageRoute(
-                    builder: (_) => CapturaCalificacionesScreen(
-                      materiaSeleccionada: item as MateriaModel, // Se pasa el modelo completo
-                    ),
-                  ),
-                );
-              
-              } else {
-                // Navegación original a la ListaScreen (Asistencia de Clubes)
-                 Navigator.push(
-                    context, 
-                    MaterialPageRoute(
-                      builder: (_) => ListaScreen(
-                        idCurso: idCurso, 
-                        tipoCurso: TipoCurso.club,
-                      ),
-                    ),
-                  );
-                
-              }
-            },
-          ),
+          child: isPreescolar
+              ? _buildPreescolarExpansionTile(context, materia!, title, subtitle, headerColor)
+              : _buildGeneralMateriaTile(context, materia!, title, subtitle),
         );
       },
     );
+  }
+
+  // ⭐️ MÉTODO: Para materias de Preescolar (con botones de acción)
+  Widget _buildPreescolarExpansionTile(
+      BuildContext context, 
+      MateriaModel materia, 
+      String title, 
+      String subtitle,
+      Color headerColor,
+  ) {
+      return ExpansionTile(
+          key: PageStorageKey<String>(materia.idMateriaClase),
+          title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
+          subtitle: Text(subtitle),
+          initiallyExpanded: false,
+          collapsedIconColor: headerColor,
+          iconColor: headerColor,
+          childrenPadding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+          children: <Widget>[
+              // 1. Botón para Capturar Comentarios
+              ListTile(
+                  leading: Icon(Icons.edit_note, color: headerColor),
+                  title: const Text('Capturar Comentarios'),
+                  trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                  onTap: () {
+                      Navigator.push(
+                          context, 
+                          MaterialPageRoute(
+                              builder: (_) => CapturaCalificacionesScreen(
+                                  materiaSeleccionada: materia, 
+                              ),
+                          ),
+                      );
+                  },
+              ),
+              const Divider(height: 1),
+              // 2. Botón para Ver Listado
+              ListTile(
+                  leading: const Icon(Icons.list_alt, color: Colors.blueGrey),
+                  title: const Text('Ver Listado de Comentarios'),
+                  trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                  onTap: () {
+                      Navigator.push(
+                          context, 
+                          MaterialPageRoute(
+                              builder: (_) => PreescolarListadoScreen(
+                                  materiaSeleccionada: materia,
+                              ),
+                          ),
+                      );
+                  },
+              ),
+          ],
+      );
+  }
+
+  // ⭐️ MÉTODO: Para materias Generales 
+  Widget _buildGeneralMateriaTile(
+      BuildContext context, 
+      MateriaModel materia, 
+      String title, 
+      String subtitle,
+  ) {
+      return ListTile(
+          title: Text(title),
+          subtitle: Text(subtitle),
+          trailing: const Icon(Icons.arrow_forward_ios),
+          onTap: () {
+              // Navegación directa a CapturaCalificacionesScreen para los demás niveles
+              Navigator.push(
+                  context, 
+                  MaterialPageRoute(
+                      builder: (_) => CapturaCalificacionesScreen(
+                          materiaSeleccionada: materia,
+                      ),
+                  ),
+              );
+          },
+      );
   }
 }

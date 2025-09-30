@@ -91,7 +91,7 @@ class _SubirAvisosScreenState extends State<SubirAvisosScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Avisos'),
+        title: const Text('Subir Avisos'),
         elevation: 0,
         backgroundColor: Colors.white,
         foregroundColor: Colors.black,

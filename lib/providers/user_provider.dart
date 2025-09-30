@@ -579,6 +579,8 @@ class UserProvider with ChangeNotifier {
         }
       };
 
+      debugPrint('Enviando actualización token con body: $body');
+
       final response = await http.post(url, body: body);
       final responseData = json.decode(response.body);
 
@@ -1042,12 +1044,13 @@ class UserProvider with ChangeNotifier {
     bool forceRefresh = false,
   }) async {
     final String escuelaCode = _escuela;
+    final String idAlumno = '0'; 
     final String fechaHoraApiCallFormatted = generateApiFechaHora();
     final String periodParam = idPeriodo ?? '';
     final String cicloParam = idCiclo ?? '';
     final String idEmpresa = _idEmpresa;
     final String idToken = _idToken ?? ''; 
-    final String idAlumno = '0'; 
+    
 
     if (escuelaCode.isEmpty || idColaborador.isEmpty || fechaHoraApiCallFormatted.isEmpty) {
       debugPrint('UserProvider: Datos de sesión o parámetros incompletos para cargar movimientos de cafetería.');
@@ -1097,7 +1100,7 @@ class UserProvider with ChangeNotifier {
       debugPrint('UserProvider: Intentando obtener datos desde la API...');
       try {
         final movimientosDataUrl = Uri.parse(
-          ApiConstants.getEdoCtaCafeteria(escuelaCode, idColaborador, periodParam, cicloParam, fechaHoraApiCallFormatted, idEmpresa, idToken, idAlumno) // ✅ [REF] Cambiado a idColaborador
+          ApiConstants.getEdoCtaCafeteria(escuelaCode, idAlumno, idColaborador, periodParam, cicloParam, fechaHoraApiCallFormatted,idEmpresa,idToken)
         );
         debugPrint('UserProvider: API URL para movimientos de cafetería: $movimientosDataUrl');
         final movimientosResponse = await http.get(movimientosDataUrl);
