@@ -29,6 +29,8 @@ class _ListaScreenState extends State<ListaScreen> {
   List<AlumnoAsistenciaModel> _alumnos = []; 
   
   final Map<String, AttendanceStatus> _attendanceState = {};
+  // ⭐️ Color estático para Presente/Asistencia ⭐️
+  final Color _presenteColor = Colors.green.shade600;
 
   @override
   void initState() {
@@ -36,7 +38,7 @@ class _ListaScreenState extends State<ListaScreen> {
     _cargarAlumnos(); 
   }
   
-  // ✅ MÉTODO: Cargar alumnos (MODIFICADO para iniciar en Ausente)
+  // ✅ MÉTODO: Cargar alumnos
   void _cargarAlumnos() {
     final userProvider = Provider.of<UserProvider>(context, listen: false);
     
@@ -51,7 +53,7 @@ class _ListaScreenState extends State<ListaScreen> {
       
       _alumnos = alumnos; 
       
-      // ✅ MODIFICACIÓN 1: Inicializar el estado de asistencia de todos los alumnos a 'ausente' (Falta)
+      // ✅ Inicializar el estado de asistencia de todos los alumnos a 'ausente' (Falta)
       for (var alumno in _alumnos) {
         _attendanceState[alumno.idCursoAlumno] = AttendanceStatus.ausente;
       }
@@ -71,7 +73,7 @@ class _ListaScreenState extends State<ListaScreen> {
     );
   }
 
-  // ✅ NUEVO MÉTODO: Marcar Falta a Todos (Reemplaza a Desmarcar)
+  // ✅ MÉTODO: Marcar Falta a Todos
   void _marcarTodosAusentes() { 
     setState(() {
       for (var alumno in _alumnos) {
@@ -86,6 +88,7 @@ class _ListaScreenState extends State<ListaScreen> {
   // ✅ MÉTODO: Marcar asistencia individual
   void _marcarAsistencia(String idCursoAlumno, AttendanceStatus status) { 
     setState(() {
+      // Si ya tiene el mismo estado, cambiar a Pendiente
       if (_attendanceState[idCursoAlumno] == status) {
         _attendanceState[idCursoAlumno] = AttendanceStatus.pendiente;
       } else {
@@ -96,6 +99,7 @@ class _ListaScreenState extends State<ListaScreen> {
 
   // ✅ MÉTODO: Enviar datos de asistencia
   void _enviarAsistencia() { 
+    // ignore: avoid_print
     debugPrint('Datos de asistencia a enviar: $_attendanceState');
     
     final int pendientes = _attendanceState.values.where((s) => s == AttendanceStatus.pendiente).length;
@@ -115,13 +119,24 @@ class _ListaScreenState extends State<ListaScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // ⭐️ ACCESO AL PROVEEDOR DE COLOR ⭐️
+    final colores = Provider.of<UserProvider>(context).colores;
+    final Color dynamicHeaderColor = colores.headerColor;
+    // ------------------------------------
+    
     final String title = widget.tipoCurso == TipoCurso.club 
         ? 'Asistencia Club' 
         : 'Asistencia Materia';
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(title),
+        // ⭐️ APLICACIÓN DEL FORMATO DE TÍTULO CONSISTENTE Y COLOR DINÁMICO ⭐️
+        title: Text(
+          title,
+          style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white)
+        ),
+        backgroundColor: dynamicHeaderColor, // ⭐️ Color Dinámico para el AppBar ⭐️
+        centerTitle: true,
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: 8.0),
@@ -160,14 +175,14 @@ class _ListaScreenState extends State<ListaScreen> {
                 padding: const EdgeInsets.all(12.0),
                 child: Row(
                   children: [
-                    // ⭐️ BOTÓN 1: MARCAR ASISTENCIA A TODOS (PRESENTE)
+                    // ⭐️ BOTÓN 1: MARCAR ASISTENCIA A TODOS (PRESENTE) - COLOR VERDE FIJO ⭐️
                     Expanded(
                       child: ElevatedButton.icon(
                         onPressed: _marcarTodosPresentes, 
                         icon: const Icon(Icons.check_circle, size: 20),
                         label: const Text('Asistencia', style: TextStyle(fontWeight: FontWeight.bold)),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.green.shade600,
+                          backgroundColor: _presenteColor, // ⭐️ Color Verde Fijo ⭐️
                           foregroundColor: Colors.white,
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                           padding: const EdgeInsets.symmetric(vertical: 15),
@@ -176,14 +191,14 @@ class _ListaScreenState extends State<ListaScreen> {
                       ),
                     ),
                     const SizedBox(width: 8),
-                    // ⭐️ BOTÓN 2: MARCAR FALTA A TODOS (AUSENTE) - MODIFICADO
+                    // ⭐️ BOTÓN 2: MARCAR FALTA A TODOS (AUSENTE) - COLOR ROJO FIJO ⭐️
                     Expanded(
                       child: ElevatedButton.icon(
-                        onPressed: _marcarTodosAusentes, // ✅ NUEVA LLAMADA
-                        icon: const Icon(Icons.close, size: 20), // Icono de Falta
-                        label: const Text('Falta a Todos', style: TextStyle(fontWeight: FontWeight.bold)), // Nuevo Texto
+                        onPressed: _marcarTodosAusentes,
+                        icon: const Icon(Icons.close, size: 20),
+                        label: const Text('Falta a Todos', style: TextStyle(fontWeight: FontWeight.bold)),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.red.shade600, // Color de Falta
+                          backgroundColor: Colors.red.shade600, // Color Rojo Fijo
                           foregroundColor: Colors.white,
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                           padding: const EdgeInsets.symmetric(vertical: 15),
@@ -204,7 +219,8 @@ class _ListaScreenState extends State<ListaScreen> {
                       final alumno = alumnos[index];
                       final currentStatus = _attendanceState[alumno.idCursoAlumno] ?? AttendanceStatus.ausente;
                       
-                      return _construirTarjetaAlumno(context, alumno, currentStatus); 
+                      // ⭐️ Pasar _presenteColor ⭐️
+                      return _construirTarjetaAlumno(context, alumno, currentStatus, _presenteColor); 
                     },
                   ),
                 ),
@@ -217,8 +233,14 @@ class _ListaScreenState extends State<ListaScreen> {
   }
 
   // ✅ WIDGET: Construir la tarjeta del alumno
-  Widget _construirTarjetaAlumno(BuildContext context, AlumnoAsistenciaModel alumno, AttendanceStatus currentStatus) { 
-    Color statusColor = _obtenerColorPorEstado(currentStatus); 
+  Widget _construirTarjetaAlumno(
+    BuildContext context, 
+    AlumnoAsistenciaModel alumno, 
+    AttendanceStatus currentStatus,
+    Color presenteColor, // Ahora es el color Verde fijo
+  ) { 
+    // ⭐️ Usar el color Verde para Presente ⭐️
+    Color statusColor = _obtenerColorPorEstado(currentStatus, presenteColor); 
 
     return Card(
       elevation: 4, 
@@ -248,8 +270,9 @@ class _ListaScreenState extends State<ListaScreen> {
           trailing: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              _construirBotonEstado(alumno.idCursoAlumno, AttendanceStatus.presente, currentStatus, Icons.check, Colors.green), 
-              _construirBotonEstado(alumno.idCursoAlumno, AttendanceStatus.ausente, currentStatus, Icons.close, Colors.red), 
+              // ⭐️ Pasar _presenteColor ⭐️
+              _construirBotonEstado(alumno.idCursoAlumno, AttendanceStatus.presente, currentStatus, Icons.check, presenteColor), 
+              _construirBotonEstado(alumno.idCursoAlumno, AttendanceStatus.ausente, currentStatus, Icons.close, Colors.red.shade600), // Mantener rojo para falta
             ],
           ),
         ),
@@ -257,7 +280,7 @@ class _ListaScreenState extends State<ListaScreen> {
     );
   }
 
-  // ✅ WIDGET: Construir el botón de estado
+  // ✅ WIDGET: Construir el botón de estado (Sin cambios en la lógica interna)
   Widget _construirBotonEstado( 
     String idCursoAlumno,
     AttendanceStatus status,
@@ -294,12 +317,12 @@ class _ListaScreenState extends State<ListaScreen> {
   }
 
   // ✅ MÉTODO: Obtener color
-  Color _obtenerColorPorEstado(AttendanceStatus status) { 
+  Color _obtenerColorPorEstado(AttendanceStatus status, Color presenteColor) { 
     switch (status) {
       case AttendanceStatus.presente:
-        return Colors.green.shade600;
+        return presenteColor; // ⭐️ Color Verde Fijo ⭐️
       case AttendanceStatus.ausente:
-        return Colors.red.shade600;
+        return Colors.red.shade600; // Mantener rojo
       case AttendanceStatus.pendiente:
         return Colors.blueGrey.shade300;
     }

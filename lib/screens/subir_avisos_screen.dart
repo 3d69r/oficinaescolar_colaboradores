@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart'; // 1. Importar Provider
 import 'crear_aviso_screen.dart';
+import 'package:oficinaescolar_colaboradores/providers/user_provider.dart'; // 2. Importar UserProvider
 
-// Modelo de datos para el aviso
+// Modelo de datos para el aviso (Sin cambios)
 class Aviso {
   final String id;
   String titulo;
@@ -29,7 +31,7 @@ class SubirAvisosScreen extends StatefulWidget {
 }
 
 class _SubirAvisosScreenState extends State<SubirAvisosScreen> {
-  // Datos de ejemplo para la lista de avisos
+  // Datos de ejemplo para la lista de avisos (Sin cambios)
   final List<Aviso> _avisos = [
     Aviso(
       id: '1',
@@ -74,7 +76,7 @@ class _SubirAvisosScreenState extends State<SubirAvisosScreen> {
     }
   }
 
-  // Lista filtrada de avisos
+  // Lista filtrada de avisos (Sin cambios)
   List<Aviso> get _avisosFiltrados {
     if (_fechaFiltroInicio == null || _fechaFiltroFin == null) {
       return _avisos;
@@ -89,13 +91,20 @@ class _SubirAvisosScreenState extends State<SubirAvisosScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // ⭐️ ACCESO AL PROVEEDOR DE COLOR ⭐️
+    final colores = Provider.of<UserProvider>(context).colores;
+    final Color dynamicPrimaryColor = colores.footerColor;
+    // ------------------------------------
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Subir Avisos'),
-        elevation: 0,
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black,
-      ),
+          title: const Text(
+            'Subir Avisos',
+            style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
+          ),
+          backgroundColor: colores.headerColor,
+          centerTitle: true,
+        ),
       body: Column(
         children: [
           Padding(
@@ -106,14 +115,15 @@ class _SubirAvisosScreenState extends State<SubirAvisosScreen> {
                 Expanded(
                   child: ElevatedButton(
                     onPressed: () {
+                      // Se asume que 'CrearAvisoScreen' es la vista correcta
                       Navigator.of(context).push(
                         MaterialPageRoute(
-                          builder: (context) => const CrearAvisoScreen(),
+                          builder: (context) => const CrearAvisoScreen(), 
                         ),
                       );
                     },
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.blueAccent,
+                      backgroundColor: dynamicPrimaryColor, // ⭐️ Color Dinámico ⭐️
                       padding: const EdgeInsets.symmetric(vertical: 16),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
@@ -127,9 +137,9 @@ class _SubirAvisosScreenState extends State<SubirAvisosScreen> {
                   child: OutlinedButton(
                     onPressed: () {},
                     style: OutlinedButton.styleFrom(
-                      foregroundColor: Colors.blueAccent,
+                      foregroundColor: dynamicPrimaryColor, // ⭐️ Color Dinámico ⭐️
                       padding: const EdgeInsets.symmetric(vertical: 16),
-                      side: const BorderSide(color: Colors.blueAccent, width: 1.5),
+                      side: BorderSide(color: dynamicPrimaryColor, width: 1.5), // ⭐️ Color Dinámico ⭐️
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
@@ -148,10 +158,15 @@ class _SubirAvisosScreenState extends State<SubirAvisosScreen> {
               child: InputDecorator(
                 decoration: InputDecoration(
                   labelText: 'Filtro de Fecha',
+                  labelStyle: TextStyle(color: dynamicPrimaryColor), // ⭐️ Color Dinámico ⭐️
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  suffixIcon: const Icon(Icons.calendar_today),
+                  focusedBorder: OutlineInputBorder( // Color de borde al enfocar
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: dynamicPrimaryColor, width: 2.0), // ⭐️ Color Dinámico ⭐️
+                  ),
+                  suffixIcon: Icon(Icons.calendar_today, color: dynamicPrimaryColor), // ⭐️ Color Dinámico ⭐️
                 ),
                 child: Text(
                   _fechaFiltroInicio == null
@@ -168,69 +183,52 @@ class _SubirAvisosScreenState extends State<SubirAvisosScreen> {
               itemCount: _avisosFiltrados.length,
               itemBuilder: (context, index) {
                 final aviso = _avisosFiltrados[index];
-                return Dismissible(
-                  key: Key(aviso.id),
-                  direction: DismissDirection.startToEnd,
-                  background: Container(
-                    color: Colors.red,
-                    alignment: Alignment.centerLeft,
-                    padding: const EdgeInsets.only(left: 20.0),
-                    child: const Icon(Icons.delete, color: Colors.white, size: 36),
-                  ),
-                  onDismissed: (direction) {
-                    setState(() {
-                      _avisos.removeAt(index);
-                    });
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('${aviso.titulo} eliminado')),
-                    );
-                  },
-                  child: Card(
-                    margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    elevation: 4,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-                    child: InkWell(
-                      onTap: () {
-                        // Navegar a la vista de edición
-                        Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (context) => _CrearEditarAvisoView(avisoParaEditar: aviso),
-                          ),
-                        );
-                      },
-                      child: Padding(
-                        padding: const EdgeInsets.all(16.0),
-                        child: Row(
-                          children: [
-                            const CircleAvatar(
-                              backgroundColor: Colors.blueAccent,
-                              child: Icon(Icons.campaign, color: Colors.white),
-                            ),
-                            const SizedBox(width: 16),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    aviso.titulo,
-                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-                                  ),
-                                  Text(
-                                    '${aviso.fechaInicioVisualizacion.day}/${aviso.fechaInicioVisualizacion.month}/${aviso.fechaInicioVisualizacion.year} - ${aviso.fechaFinVisualizacion.day}/${aviso.fechaFinVisualizacion.month}/${aviso.fechaFinVisualizacion.year}',
-                                    style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-                                  ),
-                                  const SizedBox(height: 8),
-                                  Text(
-                                    aviso.contenido,
-                                    maxLines: 2,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(fontSize: 14, color: Colors.grey[800]),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
+                // ❌ ELIMINADO: El widget Dismissible ha sido removido
+                return Card(
+                  margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  elevation: 4,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                  child: InkWell(
+                    onTap: () {
+                      // Navegar a la vista de edición
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (context) => _CrearEditarAvisoView(avisoParaEditar: aviso),
                         ),
+                      );
+                    },
+                    child: Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Row(
+                        children: [
+                          CircleAvatar(
+                            backgroundColor: dynamicPrimaryColor, // ⭐️ Color Dinámico ⭐️
+                            child: const Icon(Icons.campaign, color: Colors.white),
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  aviso.titulo,
+                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                                ),
+                                Text(
+                                  '${aviso.fechaInicioVisualizacion.day}/${aviso.fechaInicioVisualizacion.month}/${aviso.fechaInicioVisualizacion.year} - ${aviso.fechaFinVisualizacion.day}/${aviso.fechaFinVisualizacion.month}/${aviso.fechaFinVisualizacion.year}',
+                                  style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  aviso.contenido,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(fontSize: 14, color: Colors.grey[800]),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ),
@@ -244,7 +242,7 @@ class _SubirAvisosScreenState extends State<SubirAvisosScreen> {
   }
 }
 
-// Vista de creación y edición (sin cambios, ya que está en un archivo separado)
+// Vista de creación y edición (Sin cambios, se incluye para completar el código)
 class _CrearEditarAvisoView extends StatelessWidget {
   final Aviso? avisoParaEditar;
 
@@ -252,6 +250,12 @@ class _CrearEditarAvisoView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // ⭐️ ACCESO AL PROVEEDOR DE COLOR ⭐️
+    final colores = Provider.of<UserProvider>(context).colores;
+    final Color dynamicPrimaryColor = colores.footerColor;
+    final Color dynamicAccentColor = colores.headerColor; // Usamos un color de acento/secundario para "Guardar"
+    // ------------------------------------
+    
     return Scaffold(
       appBar: AppBar(
         title: Text(avisoParaEditar == null ? 'Crear Aviso' : 'Editar Aviso'),
@@ -267,22 +271,25 @@ class _CrearEditarAvisoView extends StatelessWidget {
             if (avisoParaEditar != null)
               ElevatedButton(
                 onPressed: () {
+                  // Lógica para eliminar el aviso (se asume que se hace aquí)
                   Navigator.pop(context);
                 },
-                style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.red), // Mantener el rojo para "Eliminar"
                 child: const Text('Eliminar', style: TextStyle(color: Colors.white)),
               ),
             ElevatedButton(
               onPressed: () {
+                // Lógica para guardar el aviso
                 Navigator.pop(context);
               },
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+              style: ElevatedButton.styleFrom(backgroundColor: dynamicAccentColor), // ⭐️ Color Dinámico ⭐️
               child: const Text('Guardar', style: TextStyle(color: Colors.white)),
             ),
             OutlinedButton(
               onPressed: () {
                 Navigator.pop(context);
               },
+              style: OutlinedButton.styleFrom(foregroundColor: dynamicPrimaryColor), // ⭐️ Color Dinámico ⭐️
               child: const Text('Cancelar'),
             ),
           ],

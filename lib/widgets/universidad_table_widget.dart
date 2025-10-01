@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
-
+import 'package:provider/provider.dart'; // 1. Importar Provider
 // Asegúrate de importar tu modelo de Boleta Encabezado
 import 'package:oficinaescolar_colaboradores/models/boleta_encabezado_model.dart'; 
+import 'package:oficinaescolar_colaboradores/providers/user_provider.dart'; // 2. Importar UserProvider
 
 class UniversidadCalificacionesWidget extends StatelessWidget {
   final List<Map<String, dynamic>> alumnos;
@@ -11,10 +12,10 @@ class UniversidadCalificacionesWidget extends StatelessWidget {
   // pero mantenemos la propiedad por consistencia.
   final List<String> readonlyKeys; 
   
-  // Color distintivo para Universidad (ej. Gris oscuro/Negro)
-  final Color headerColor = Colors.grey.shade900; 
+  // Eliminamos el color estático
+  // final Color headerColor = Colors.grey.shade900; 
 
-   UniversidadCalificacionesWidget({
+   const UniversidadCalificacionesWidget({ // Usamos const para el constructor
     super.key,
     required this.alumnos,
     required this.estructura,
@@ -29,6 +30,10 @@ class UniversidadCalificacionesWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // 3. ACCESO AL COLOR DINÁMICO
+    final colores = Provider.of<UserProvider>(context).colores;
+    final Color dynamicHeaderColor = colores.headerColor;
+    
     if (alumnos.isEmpty) {
       return const Center(
         child: Text('No se encontraron alumnos asignados a este curso.'),
@@ -47,7 +52,8 @@ class UniversidadCalificacionesWidget extends StatelessWidget {
         child: Column(
           children: [
             // Cabecera
-            _buildHeaderRow(headers),
+            // ⭐️ Pasar el color dinámico ⭐️
+            _buildHeaderRow(headers, dynamicHeaderColor),
             
             // Filas de Alumnos
             ...List.generate(alumnos.length, (index) {
@@ -60,7 +66,7 @@ class UniversidadCalificacionesWidget extends StatelessWidget {
     );
   }
 
-  // --- LÓGICA DE ENCABEZADOS DINÁMICOS ---
+  // --- LÓGICA DE ENCABEZADOS DINÁMICOS (SIN CAMBIOS) ---
 
   List<Map<String, dynamic>> _getDynamicHeaders() {
     final List<Map<String, dynamic>> headers = [];
@@ -97,9 +103,9 @@ class UniversidadCalificacionesWidget extends StatelessWidget {
     return headers;
   }
   
-  // --- CONSTRUCCIÓN DE LA CABECERA ---
+  // --- CONSTRUCCIÓN DE LA CABECERA (Modificamos la firma) ---
   
-  Widget _buildHeaderRow(List<Map<String, dynamic>> headers) {
+  Widget _buildHeaderRow(List<Map<String, dynamic>> headers, Color headerColor) {
     // Para simplificar la interfaz, si solo hay un encabezado principal, lo hacemos simple
     final bool isSimpleHeader = headers.length == 1 && headers.first['subHeaders'].length == 1;
     final double headerHeight = 50.0;
@@ -113,7 +119,7 @@ class UniversidadCalificacionesWidget extends StatelessWidget {
             width: NAME_CELL_WIDTH, 
             // Si el encabezado es simple (solo un sub-encabezado), la altura es 1x
             height: isSimpleHeader ? headerHeight : headerHeight * 2, 
-            color: headerColor
+            color: headerColor // ⭐️ Color Dinámico ⭐️
           ),
 
           // Encabezados Dinámicos
@@ -127,7 +133,7 @@ class UniversidadCalificacionesWidget extends StatelessWidget {
                     displayText, 
                     width: GRADE_CELL_WIDTH, 
                     height: headerHeight, 
-                    color: headerColor,
+                    color: headerColor, // ⭐️ Color Dinámico ⭐️
                 );
             }
 
@@ -139,7 +145,7 @@ class UniversidadCalificacionesWidget extends StatelessWidget {
                   header['header'].toString().toUpperCase(), 
                   width: subHeaders.length * GRADE_CELL_WIDTH, 
                   height: headerHeight, 
-                  color: headerColor,
+                  color: headerColor, // ⭐️ Color Dinámico ⭐️
                 ),
                 // Sub-Encabezado (Ej: CALIFICACIÓN FINAL, EVALÚA OBSERVACIONES)
                 Row(
@@ -150,7 +156,7 @@ class UniversidadCalificacionesWidget extends StatelessWidget {
                     
                     final Color subHeaderColor = readonlyKeys.contains(subHeaderKey) 
                         ? Colors.black.withOpacity(0.9) 
-                        : headerColor.withOpacity(0.8);
+                        : headerColor.withOpacity(0.8); // ⭐️ Color Dinámico ⭐️
 
                     return _buildHeaderCell(
                       displayText, 
@@ -169,7 +175,7 @@ class UniversidadCalificacionesWidget extends StatelessWidget {
   }
 
 
-  // --- CONSTRUCCIÓN DE LAS FILAS DE DATOS (REUSA LÓGICA DE PRIMARIA/SECUNDARIA) ---
+  // --- CONSTRUCCIÓN DE LAS FILAS DE DATOS (SIN CAMBIOS) ---
 
   Widget _buildAlumnoRow(
     Map<String, dynamic> alumno, 
@@ -178,11 +184,11 @@ class UniversidadCalificacionesWidget extends StatelessWidget {
   ) {
     final Color rowColor = isEven ? Colors.grey.shade200 : Colors.white;
     final String alumnoId = alumno['id_alumno'] as String? ?? '';
-
-    // Formato del nombre (Primer Nombre + Apellido Paterno)
     final String primerNombre = alumno['primer_nombre'] as String? ?? '';
+    final String segundoNombre = alumno['segundo_nombre'] as String? ?? '';
     final String apellidoPat = alumno['apellido_pat'] as String? ?? '';
-    final String nombreCompleto = '$primerNombre $apellidoPat'.trim().replaceAll(RegExp(r'\s+'), ' '); 
+    final String apellidoMat = alumno['apellido_mat'] as String? ?? '';
+    final String nombreCompleto = '$primerNombre $segundoNombre $apellidoPat $apellidoMat'.trim().replaceAll(RegExp(r'\s+'), ' '); 
 
     return IntrinsicHeight(
       child: Row(
@@ -220,7 +226,7 @@ class UniversidadCalificacionesWidget extends StatelessWidget {
     );
   }
 
-  // --- MÉTODOS AUXILIARES (REUSADOS) ---
+  // --- MÉTODOS AUXILIARES (Modificamos la firma de _buildHeaderCell) ---
 
   Widget _buildGradeCellAsContainer(DataCell dataCell, double width, Color color) {
     final Widget cellContent = dataCell.child; 
@@ -267,6 +273,7 @@ class UniversidadCalificacionesWidget extends StatelessWidget {
     );
   }
   
+  // Modificamos la firma para que use el color dinámico que se le pasa
   Widget _buildHeaderCell(String text, {required double width, required double height, required Color color}) {
     return SizedBox(
       width: width,
@@ -274,7 +281,7 @@ class UniversidadCalificacionesWidget extends StatelessWidget {
       child: Container(
         decoration: BoxDecoration(
           border: Border.all(color: Colors.black, width: 1.0),
-          color: color,
+          color: color, // ⭐️ Color Dinámico ⭐️
         ),
         padding: const EdgeInsets.all(6.0),
         child: Center(

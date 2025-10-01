@@ -19,7 +19,7 @@ import 'perfil_screen.dart';
 import 'datos_escuela_screen.dart';
 import 'comentarios_screen.dart';
 import 'asistencia_screen.dart'; 
-import 'materias_screen.dart'; 
+//import 'materias_screen.dart'; 
 import 'subir_avisos_screen.dart'; // ✅ [NUEVO] Importar pantalla de Subir Avisos
 
 class HomeScreen extends StatefulWidget {

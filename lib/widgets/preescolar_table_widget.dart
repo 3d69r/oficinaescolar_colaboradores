@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart'; // 1. Importar Provider
 import 'package:oficinaescolar_colaboradores/models/boleta_encabezado_model.dart'; 
+import 'package:oficinaescolar_colaboradores/providers/user_provider.dart'; // 2. Importar UserProvider
 
 class PreescolarCalificacionesWidget extends StatelessWidget {
   final List<Map<String, dynamic>> alumnos;
@@ -9,9 +11,9 @@ class PreescolarCalificacionesWidget extends StatelessWidget {
   // Aquí usamos 'observationKeys' como el identificador de los campos editables
   final List<String> observationKeys; 
   
-  final Color headerColor = Colors.green.shade700; 
+  //final Color headerColor = Colors.green.shade700; // Eliminado
 
-   PreescolarCalificacionesWidget({
+   const PreescolarCalificacionesWidget({
     super.key,
     required this.alumnos,
     required this.estructura,
@@ -24,44 +26,54 @@ class PreescolarCalificacionesWidget extends StatelessWidget {
   List<Map<String, dynamic>> _getDynamicHeaders() {
       final List<Map<String, dynamic>> headers = [];
       
-      // En Preescolar, los encabezados principales (Parcial 1) se mapean a las claves de comentario.
+      // Itera sobre los encabezados principales (Parcial 1, Parcial 2, Parcial 3).
       estructura.encabezados.forEach((key, value) {
-          final String relationString = estructura.relaciones[key] ?? key; 
+          // 'key' es el nombre del encabezado (Ej: "Parcial 1")
+          // 'value' es la clave de la relación (Ej: "enc_relacion_1")
+
+          // Busca la clave del dato real (Ej: "comentario_parcial_1") usando la clave de relación.
+          final String relationString = estructura.relaciones[value] ?? ''; 
           
-          // La relación es la clave de la observación
           final List<String> subKeys = relationString
               .split(',')
               .where((s) => s.isNotEmpty)
               .map((s) => s.trim())
               .toList();
 
-          headers.add({
-              'header': value, // Ej: Parcial 1
-              'dataKey': subKeys.first, // Ej: comentario_parcial_1
-          });
+          // Solo si encontramos una clave de dato válida (Ej: 'comentario_parcial_1'), la agregamos.
+          if (subKeys.isNotEmpty) {
+              headers.add({
+                  'header': key, // ⭐️ USAMOS EL NOMBRE DEL ENCABEZADO ("Parcial 1") COMO TÍTULO
+                  'dataKey': subKeys.first, // USAMOS LA CLAVE DEL DATO ("comentario_parcial_1") PARA EL CAMPO
+              });
+          }
       });
-      
-      // Si hay un campo de comentario final (fuera de las relaciones)
-      if (estructura.comentarios.isNotEmpty) {
-        estructura.comentarios.forEach((key, value) {
-            headers.add({
-              'header': value, // Ej: Observaciones Finales
-              'dataKey': key, // Ej: comentario_final
-            });
-        });
-      }
-      return headers;
+      return headers; // Esto debe devolver una lista con 3 elementos: Parcial 1, Parcial 2, Parcial 3.
   }
   
   // --- CONSTRUCCIÓN DE LA TABLA VERTICAL ---
   
   @override
   Widget build(BuildContext context) {
+    // 3. ACCESO AL COLOR DINÁMICO
+    final colores = Provider.of<UserProvider>(context).colores;
+    final Color dynamicHeaderColor = colores.headerColor;
+    
     if (alumnos.isEmpty) {
       return const Center(child: Text('No se encontraron alumnos asignados.'));
     }
 
     final List<Map<String, dynamic>> headers = _getDynamicHeaders();
+    
+    if (headers.isEmpty) {
+        return const Center(
+          child: Text(
+            'Error: No se definió la estructura de observaciones para Preescolar.', 
+            style: TextStyle(color: Colors.red)
+          )
+        );
+    }
+
 
     return SingleChildScrollView(
       scrollDirection: Axis.vertical, // Scroll vertical para los bloques de alumnos
@@ -72,26 +84,30 @@ class PreescolarCalificacionesWidget extends StatelessWidget {
             padding: const EdgeInsets.only(bottom: 12.0),
             child: Text(
               'Captura de Observaciones de Preescolar',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: headerColor),
+              // ⭐️ USAR COLOR DINÁMICO ⭐️
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: dynamicHeaderColor),
             ),
           ),
           
           // Construcción de cada Bloque de Alumno
+          // Pasamos el color al bloque
           ...alumnos.map((alumno) {
-            return _buildAlumnoBlock(alumno, headers);
+            return _buildAlumnoBlock(alumno, headers, dynamicHeaderColor);
           }).toList(),
         ],
       ),
     );
   }
 
-  // --- BLOQUE DE ALUMNO ---
+  // --- BLOQUE DE ALUMNO (Modificamos la firma) ---
   
-  Widget _buildAlumnoBlock(Map<String, dynamic> alumno, List<Map<String, dynamic>> headers) {
+  Widget _buildAlumnoBlock(Map<String, dynamic> alumno, List<Map<String, dynamic>> headers, Color headerColor) {
     final String alumnoId = alumno['id_alumno'] as String? ?? '';
     final String primerNombre = alumno['primer_nombre'] as String? ?? '';
+    final String segundoNombre = alumno['segundo_nombre'] as String? ?? '';
     final String apellidoPat = alumno['apellido_pat'] as String? ?? '';
-    final String nombreCompleto = '$primerNombre $apellidoPat'.trim().replaceAll(RegExp(r'\s+'), ' '); 
+    final String apellidoMat = alumno['apellido_mat'] as String? ?? '';
+    final String nombreCompleto = '$primerNombre $segundoNombre $apellidoPat $apellidoMat'.trim().replaceAll(RegExp(r'\s+'), ' '); 
 
     return Card(
       margin: const EdgeInsets.only(bottom: 16.0),
@@ -108,9 +124,10 @@ class PreescolarCalificacionesWidget extends StatelessWidget {
             ),
             const Divider(),
             
-            // Secciones de Observación (Parcial 1, Parcial 2, etc.)
+            // ⭐️ SOLO ITERA SOBRE LA LISTA DE HEADERS (3 VECES) ⭐️
             ...headers.map((header) {
-              return _buildObservationSection(alumnoId, header);
+              // Pasamos el color a la sección de observación
+              return _buildObservationSection(alumnoId, header, headerColor);
             }).toList(),
           ],
         ),
@@ -118,13 +135,12 @@ class PreescolarCalificacionesWidget extends StatelessWidget {
     );
   }
   
-  // --- SECCIÓN DE OBSERVACIÓN (Parcial 1, Parcial 2, etc.) ---
+  // --- SECCIÓN DE OBSERVACIÓN (Modificamos la firma) ---
   
-  Widget _buildObservationSection(String alumnoId, Map<String, dynamic> header) {
-    final String displayTitle = header['header'].toString().toUpperCase();
-    final String dataKey = header['dataKey'] as String;
-    
-    // En Preescolar, la clave de dato es la clave de la observación
+  Widget _buildObservationSection(String alumnoId, Map<String, dynamic> header, Color headerColor) {
+    // Usamos el nombre del encabezado (Ej: "Parcial 1") como título.
+    final String displayTitle = header['header'].toString().toUpperCase(); 
+    final String dataKey = header['dataKey'] as String; // Ej: "comentario_parcial_1"
     
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8.0),
@@ -134,6 +150,7 @@ class PreescolarCalificacionesWidget extends StatelessWidget {
           // Título del Parcial/Observación
           Text(
             displayTitle,
+            // ⭐️ USAR COLOR DINÁMICO ⭐️
             style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: headerColor),
           ),
           const SizedBox(height: 6),

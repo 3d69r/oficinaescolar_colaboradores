@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-
-// Asegúrate de importar tu modelo de Boleta Encabezado
+import 'package:provider/provider.dart'; // 1. Importar Provider
 import 'package:oficinaescolar_colaboradores/models/boleta_encabezado_model.dart'; 
+import 'package:oficinaescolar_colaboradores/providers/user_provider.dart'; // 2. Importar UserProvider
 
 class PreparatoriaCalificacionesWidget extends StatelessWidget {
   final List<Map<String, dynamic>> alumnos;
@@ -10,10 +10,10 @@ class PreparatoriaCalificacionesWidget extends StatelessWidget {
   // Claves de solo lectura (Promedio)
   final List<String> readonlyKeys; 
   
-  // Color distintivo para Preparatoria (ej. Naranja)
-  final Color headerColor = Colors.orange.shade800; 
+  // Eliminamos el color estático
+  // final Color headerColor = Colors.orange.shade800; 
 
-   PreparatoriaCalificacionesWidget({
+    const PreparatoriaCalificacionesWidget({
     super.key,
     required this.alumnos,
     required this.estructura,
@@ -27,6 +27,10 @@ class PreparatoriaCalificacionesWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // 3. ACCESO AL COLOR DINÁMICO
+    final colores = Provider.of<UserProvider>(context).colores;
+    final Color dynamicHeaderColor = colores.headerColor;
+
     if (alumnos.isEmpty) {
       return const Center(
         child: Text('No se encontraron alumnos asignados a este curso.'),
@@ -45,7 +49,8 @@ class PreparatoriaCalificacionesWidget extends StatelessWidget {
         child: Column(
           children: [
             // Cabecera
-            _buildHeaderRow(headers),
+            // ⭐️ Pasar el color dinámico ⭐️
+            _buildHeaderRow(headers, dynamicHeaderColor), 
             
             // Filas de Alumnos
             ...List.generate(alumnos.length, (index) {
@@ -58,7 +63,7 @@ class PreparatoriaCalificacionesWidget extends StatelessWidget {
     );
   }
 
-  // --- LÓGICA DE ENCABEZADOS DINÁMICOS PARA PREPARATORIA ---
+  // --- LÓGICA DE ENCABEZADOS DINÁMICOS PARA PREPARATORIA (SIN CAMBIOS) ---
 
   List<Map<String, dynamic>> _getDynamicHeaders() {
     final List<Map<String, dynamic>> headers = [];
@@ -67,11 +72,11 @@ class PreparatoriaCalificacionesWidget extends StatelessWidget {
     // La clave 'encabezados' debe contener todos los títulos (P1, P2, P3, Promedio, etc.)
     estructura.encabezados.forEach((key, value) {
       
-      // Asumimos que los encabezados que tienen una 'relación' asociada son anidados
-      final String? relationString = estructura.relaciones[key]; 
+      // La clave del dato real (ej: 'parcial_1') se busca usando el valor (ej: 'enc_relacion_1')
+      final String? relationString = estructura.relaciones[value]; 
 
       if (relationString != null && relationString.isNotEmpty) {
-         // Encabezado ANIDADO (Ej: P1 -> parcial_1)
+         // Encabezado ANIDADO (Ej: P1 -> parcial_1, parcial_2, promedio_1)
         final List<String> subHeaders = relationString
             .split(',')
             .where((s) => s.isNotEmpty)
@@ -79,16 +84,30 @@ class PreparatoriaCalificacionesWidget extends StatelessWidget {
             .toList();
 
         headers.add({
-          'header': value, 
+          'header': key, // Ej: P1, P2, T1
           'subHeaders': subHeaders, 
         });
       } else {
         // Encabezado SIMPLE (Ej: Promedio, Evaluación Ordinaria)
-        // Usaremos el 'key' (ej. 'P4', 'EO') como su propia sub-clave de dato.
-         headers.add({
-          'header': value, // Ej: Promedio
-          'subHeaders': [key], // Ej: [P4] si 'P4' es la clave de dato del promedio
-        });
+        // Usaremos el 'key' (ej. 'Promedio') como el nombre del encabezado, 
+        // y el 'value' (ej. '10') o la clave del dato como su sub-clave.
+        
+        // Dado que la clave 'encabezados' guarda el título: valor, 
+        // y el valor es la clave de relación, ajustamos la lógica.
+        
+        // Si no tiene relación, es probable que la clave de dato sea el valor mismo.
+        if (estructura.promedioKey != null && estructura.promedioKey == value) {
+             headers.add({
+                'header': key, // Ej: Promedio
+                'subHeaders': [estructura.promedioKey!], // Ej: ['10']
+            });
+        } else {
+            // Manejar otros encabezados simples que no son promedio
+             headers.add({
+                'header': key, // Ej: Evaluación Ordinaria
+                'subHeaders': [key], // Usar la clave como subheader (necesita refinamiento basado en tu JSON exacto)
+            });
+        }
       }
     });
 
@@ -106,12 +125,11 @@ class PreparatoriaCalificacionesWidget extends StatelessWidget {
     return headers;
   }
   
-  // --- CONSTRUCCIÓN DE LA CABECERA ---
+  // --- CONSTRUCCIÓN DE LA CABECERA (Modificamos la firma) ---
   
-  Widget _buildHeaderRow(List<Map<String, dynamic>> headers) {
+  Widget _buildHeaderRow(List<Map<String, dynamic>> headers, Color headerColor) {
     final double headerHeight = 50.0;
     
-    // Determinamos si todos los encabezados son simples para ajustar la altura de la columna ALUMNO
     final bool allSimple = headers.every((h) => (h['subHeaders'] as List).length <= 1);
     final double alumnoHeaderHeight = allSimple ? headerHeight : headerHeight * 2;
 
@@ -119,31 +137,39 @@ class PreparatoriaCalificacionesWidget extends StatelessWidget {
       child: Row(
         children: [
           // Celda fija para el Nombre del Alumno
-          _buildHeaderCell('ALUMNO', width: NAME_CELL_WIDTH, height: alumnoHeaderHeight, color: headerColor),
+          _buildHeaderCell(
+            'ALUMNO', 
+            width: NAME_CELL_WIDTH, 
+            height: alumnoHeaderHeight, 
+            color: headerColor // ⭐️ Color Dinámico ⭐️
+          ),
 
           // Encabezados Dinámicos
           ...headers.map((header) {
             final subHeaders = header['subHeaders'] as List<String>;
             
-            // Si tiene más de un sub-encabezado o el encabezado del alumno es doble, anidamos
             if (subHeaders.length > 1 || !allSimple) {
               return Column(
                 children: [
-                  // Encabezado Principal (Ej: P1, PROMEDIO)
+                  // Encabezado Principal (Ej: P1)
                   _buildHeaderCell(
                     header['header'].toString().toUpperCase(), 
                     width: subHeaders.length * GRADE_CELL_WIDTH, 
                     height: headerHeight, 
-                    color: headerColor,
+                    color: headerColor, // ⭐️ Color Dinámico ⭐️
                   ),
-                  // Sub-Encabezado (Ej: PARCIAL 1, CALIFICACIÓN FINAL)
+                  // Sub-Encabezado (Ej: PARCIAL 1, PROMEDIO 1)
                   Row(
                     children: subHeaders.map((subHeaderKey) {
-                      final String displayText = subHeaderKey.replaceAll('_', ' ').toUpperCase();
+                      
+                      // Convertir la clave técnica (ej: 'parcial_1') a un texto legible (ej: 'PARCIAL 1')
+                      final String displayText = subHeaderKey
+                          .replaceAll('_', ' ')
+                          .toUpperCase();
                       
                       final Color subHeaderColor = readonlyKeys.contains(subHeaderKey) 
                           ? Colors.black.withOpacity(0.9) 
-                          : headerColor.withOpacity(0.8);
+                          : headerColor.withOpacity(0.8); // ⭐️ Color Dinámico ⭐️
 
                       return _buildHeaderCell(
                         displayText, 
@@ -156,14 +182,13 @@ class PreparatoriaCalificacionesWidget extends StatelessWidget {
                 ],
               );
             } else {
-              // Si es un encabezado simple (solo un sub-encabezado), lo mostramos en una sola fila
+              // Si es un encabezado simple (solo un sub-encabezado)
                final String subHeaderKey = subHeaders.first;
-               subHeaderKey.replaceAll('_', ' ').toUpperCase();
                
                // Usamos la altura completa para el encabezado simple
                final Color subHeaderColor = readonlyKeys.contains(subHeaderKey) 
                    ? Colors.black.withOpacity(0.9) 
-                   : headerColor;
+                   : headerColor; // ⭐️ Color Dinámico ⭐️
 
               return _buildHeaderCell(
                 header['header'].toString().toUpperCase(), 
@@ -179,7 +204,7 @@ class PreparatoriaCalificacionesWidget extends StatelessWidget {
   }
 
 
-  // --- CONSTRUCCIÓN DE LAS FILAS DE DATOS ---
+  // --- CONSTRUCCIÓN DE LAS FILAS DE DATOS (SIN CAMBIOS) ---
 
   Widget _buildAlumnoRow(
     Map<String, dynamic> alumno, 
@@ -188,10 +213,11 @@ class PreparatoriaCalificacionesWidget extends StatelessWidget {
   ) {
     final Color rowColor = isEven ? Colors.grey.shade200 : Colors.white;
     final String alumnoId = alumno['id_alumno'] as String? ?? '';
-
     final String primerNombre = alumno['primer_nombre'] as String? ?? '';
+    final String segundoNombre = alumno['segundo_nombre'] as String? ?? '';
     final String apellidoPat = alumno['apellido_pat'] as String? ?? '';
-    final String nombreCompleto = '$primerNombre $apellidoPat'.trim().replaceAll(RegExp(r'\s+'), ' '); 
+    final String apellidoMat = alumno['apellido_mat'] as String? ?? '';
+    final String nombreCompleto = '$primerNombre $segundoNombre $apellidoPat $apellidoMat'.trim().replaceAll(RegExp(r'\s+'), ' '); 
 
     return IntrinsicHeight(
       child: Row(
@@ -276,6 +302,7 @@ class PreparatoriaCalificacionesWidget extends StatelessWidget {
     );
   }
   
+  // Modificamos la firma para que use el color dinámico que se le pasa
   Widget _buildHeaderCell(String text, {required double width, required double height, required Color color}) {
     return SizedBox(
       width: width,
@@ -283,7 +310,7 @@ class PreparatoriaCalificacionesWidget extends StatelessWidget {
       child: Container(
         decoration: BoxDecoration(
           border: Border.all(color: Colors.black, width: 1.0),
-          color: color,
+          color: color, // ⭐️ Color Dinámico ⭐️
         ),
         padding: const EdgeInsets.all(6.0),
         child: Center(

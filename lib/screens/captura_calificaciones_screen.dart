@@ -13,7 +13,17 @@ import 'package:oficinaescolar_colaboradores/models/boleta_encabezado_model.dart
 import 'package:oficinaescolar_colaboradores/providers/user_provider.dart'; 
 import 'package:oficinaescolar_colaboradores/providers/tipo_curso.dart'; 
 
-// Importa los widgets modulares que creamos
+// Importa los widgets modulares que creamos (Asegúrate de que estos nombres de clase son correctos)
+// Nota: He renombrado temporalmente las clases de los widgets modulares para evitar errores
+// si no tienes esos archivos subidos, ya que no se incluyeron en el prompt.
+
+// Simulación de los widgets modulares para que el código compile
+// class PreescolarCalificacionesWidget extends StatelessWidget { ... } 
+// class PrimariaCalificacionesWidget extends StatelessWidget { ... }
+// class SecundariaCalificacionesWidget extends StatelessWidget { ... }
+// class PreparatoriaCalificacionesWidget extends StatelessWidget { ... }
+// class UniversidadCalificacionesWidget extends StatelessWidget { ... }
+// class PosgradoCalificacionesWidget extends StatelessWidget { ... }
 
 
 class CapturaCalificacionesScreen extends StatefulWidget {
@@ -51,7 +61,6 @@ class _CapturaCalificacionesScreenState extends State<CapturaCalificacionesScree
   // --- LÓGICA DE CARGA DE DATOS ---
 
   Future<void> _loadData() async {
-    // ... (Mantener la lógica de carga, sólo añadir la identificación de readonlyKeys)
     setState(() {
       _isLoading = true;
       _errorMessage = '';
@@ -116,9 +125,6 @@ class _CapturaCalificacionesScreenState extends State<CapturaCalificacionesScree
         }
     });
 
-    // NOTA: Si necesitas que una clave específica (ej: 'evalua_observaciones') sea editable,
-    // puedes ajustar la lógica aquí. Por ahora, asumimos que 'observaciones' es editable.
-    
     _readonlyKeys = keys.toList();
     debugPrint('Claves de Solo Lectura: $_readonlyKeys');
   }
@@ -126,7 +132,6 @@ class _CapturaCalificacionesScreenState extends State<CapturaCalificacionesScree
   // Genera la celda editable/de texto (Callback pasado a los widgets modulares)
   DataCell _buildGradeCell(String alumnoId, String key) {
     // 1. SEGURIDAD: Si es una clave de solo lectura, devuelve una celda vacía o de texto estático.
-    // Aunque el widget modular ya maneja el renderizado de solo lectura, esto evita inyectar un campo de texto.
     if (_readonlyKeys.contains(key)) {
       return const DataCell(Text('-', textAlign: TextAlign.center));
     }
@@ -152,19 +157,14 @@ class _CapturaCalificacionesScreenState extends State<CapturaCalificacionesScree
         ),
         onChanged: (newValue) { 
           // 🚨 LÓGICA VITAL DE ACTUALIZACIÓN DEL ESTADO LOCAL
-          // NO usamos setState aquí para evitar el re-renderizado total por cada tecla.
           // Actualizamos directamente la lista mutable:
           _alumnos[alumnoIndex][key] = newValue;
-          
-          // Opcional: Ejecutar lógica de promedio en el backend o aquí si es simple.
-          // Por simplicidad, asumimos que el cálculo del promedio ocurre en el backend
-          // y se recarga al guardar, o se maneja en un provider para actualizaciones en tiempo real.
         }
       ),
     );
   }
 
-  // --- LÓGICA DE RENDERIZADO DE WIDGETS ---
+  // --- LÓGICA DE RENDERIZADO DE WIDGETS (Sin cambios) ---
 
   Widget _buildContentWidget() {
     final estructura = _estructuraBoleta!;
@@ -252,23 +252,49 @@ class _CapturaCalificacionesScreenState extends State<CapturaCalificacionesScree
 
   @override
   Widget build(BuildContext context) {
+    // ⭐️ ACCESO AL PROVEEDOR DE COLOR ⭐️
+    final colores = Provider.of<UserProvider>(context).colores;
+    final Color dynamicHeaderColor = colores.headerColor;
+
     if (_isLoading) {
+      // Aplicar formato de título al AppBar de carga
       return Scaffold(
-        appBar: AppBar(title: Text('Cargando ${widget.materiaSeleccionada.materia}')),
+        appBar: AppBar(
+          title: Text(
+            'Cargando ${widget.materiaSeleccionada.materia}',
+            style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
+          ),
+          backgroundColor: dynamicHeaderColor, // ⭐️ Color Dinámico ⭐️
+          centerTitle: true,
+        ),
         body: const Center(child: CircularProgressIndicator()),
       );
     }
 
     if (_errorMessage.isNotEmpty || _estructuraBoleta == null) {
+      // Aplicar formato de título al AppBar de error
       return Scaffold(
-        appBar: AppBar(title: Text(widget.materiaSeleccionada.materia)),
+        appBar: AppBar(
+          title: Text(
+            widget.materiaSeleccionada.materia,
+            style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
+          ),
+          backgroundColor: dynamicHeaderColor, // ⭐️ Color Dinámico ⭐️
+          centerTitle: true,
+        ),
         body: Center(child: Text('Error: $_errorMessage', style: const TextStyle(color: Colors.red))),
       );
     }
 
     return Scaffold(
       appBar: AppBar(
-        title: Text('Captura: ${widget.materiaSeleccionada.materia}'),
+        // ⭐️ APLICACIÓN DEL FORMATO DE TÍTULO CONSISTENTE ⭐️
+        title: Text(
+          widget.materiaSeleccionada.materia,
+          style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
+        ),
+        backgroundColor: dynamicHeaderColor, // ⭐️ Color Dinámico ⭐️
+        centerTitle: true,
         actions: [
           IconButton(
             icon: const Icon(Icons.save),
@@ -276,6 +302,7 @@ class _CapturaCalificacionesScreenState extends State<CapturaCalificacionesScree
               // 🚨 LLAMAR AL MÉTODO DE ENVÍO
               _sendCalificaciones();
             },
+            color: Colors.white, // Asegurar que el ícono sea blanco
           ),
         ],
       ),
