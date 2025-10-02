@@ -211,7 +211,7 @@ class _AsistenciaScreenState extends State<AsistenciaScreen> {
         return Card(
           margin: const EdgeInsets.symmetric(vertical: 8.0),
           child: isPreescolar
-              ? _buildPreescolarExpansionTile(context, materia!, title, subtitle, headerColor)
+              ? _buildPreescolarExpansionTile(context, materia, title, subtitle, headerColor)
               : _buildGeneralMateriaTile(context, materia!, title, subtitle),
         );
       },
