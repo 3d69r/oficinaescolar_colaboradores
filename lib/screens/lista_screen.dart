@@ -104,17 +104,47 @@ class _ListaScreenState extends State<ListaScreen> {
   }
 
   // ✅ MÉTODO: Enviar datos de asistencia
-  void _enviarAsistencia() { 
-    // Ahora, si hay alumnos en el mapa, todos tienen un estado válido (Presente o Ausente),
-    // por lo que no hay alumnos "pendientes" y podemos enviar la asistencia directamente.
-    
-    // ignore: avoid_print
-    debugPrint('Datos de asistencia a enviar: $_attendanceState');
-    
-    // TODO: Implementación real de la API POST
+  void _enviarAsistencia() async { 
+    final userProvider = Provider.of<UserProvider>(context, listen: false);
+
+    // Deshabilitar la interfaz temporalmente (opcional) y mostrar indicador de carga
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Asistencia guardada con éxito (Simulación).')),
+      const SnackBar(content: Text('Enviando asistencia, por favor espere...')),
     );
+
+    try {
+      final Map<String, dynamic> result = await userProvider.setAsistenciaClubesOMaterias(
+        idCurso: widget.idCurso,
+        tipoCurso: widget.tipoCurso,
+        attendanceState: _attendanceState,
+      );
+
+      // Limpiar la barra de mensajes anterior
+      ScaffoldMessenger.of(context).hideCurrentSnackBar(); 
+
+      // Mostrar el resultado de la API
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(result['message'] as String),
+          backgroundColor: result['status'] == 'success' ? Colors.green : Colors.red,
+        ),
+      );
+
+      // Si fue exitoso, puedes querer regresar a la pantalla anterior
+      if (result['status'] == 'success') {
+        // Simplemente cerramos la pantalla de lista después de un éxito
+        Navigator.of(context).pop(); 
+      }
+
+    } catch (e) {
+      ScaffoldMessenger.of(context).hideCurrentSnackBar(); 
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error de aplicación al enviar: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
   @override
@@ -153,15 +183,15 @@ class _ListaScreenState extends State<ListaScreen> {
                     shape: BoxShape.rectangle, 
                     borderRadius: BorderRadius.circular(8), // ⭐️ ESQUINAS REDONDEADAS ⭐️
                     // ignore: deprecated_member_use
-                    color: colores.botonesColor.withOpacity(0.9),
-                    border: Border.all(color: colores.botonesColor, width: 2),
+                    color: Colors.green.withOpacity(0.9),
+                    border: Border.all(color: Colors.green, width: 2),
                     boxShadow: [
                       // ignore: deprecated_member_use
                       BoxShadow(color: colores.botonesColor.withOpacity(0.4), blurRadius: 4, offset: const Offset(0, 2))
                     ],
                   ),
                   child: const Icon(
-                    Icons.send, 
+                    Icons.save, 
                     size: 22,
                     color: Colors.white,
                   ),

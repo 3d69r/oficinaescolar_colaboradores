@@ -23,7 +23,7 @@ class SecundariaCalificacionesWidget extends StatelessWidget {
   });
   
   static const double GRADE_CELL_WIDTH = 100.0;
-  static const double NAME_CELL_WIDTH = 300.0;
+  static const double NAME_CELL_WIDTH = 280.0;
 
 
   @override
@@ -177,10 +177,10 @@ class SecundariaCalificacionesWidget extends StatelessWidget {
     final Color rowColor = isEven ? Colors.grey.shade200 : Colors.white;
     final String alumnoId = alumno['id_alumno'] as String? ?? '';
     final String primerNombre = alumno['primer_nombre'] as String? ?? '';
+    final String segundoNombre = alumno['segundo_nombre'] as String? ?? '';
     final String apellidoPat = alumno['apellido_pat'] as String? ?? '';
-    
-    // Simplificamos la concatenación del nombre por consistencia
-    final String nombreCompleto = '$primerNombre $apellidoPat'.trim().replaceAll(RegExp(r'\s+'), ' '); 
+    final String apellidoMat = alumno['apellido_mat'] as String? ?? '';
+    final String nombreCompleto = '$primerNombre $segundoNombre $apellidoPat $apellidoMat'.trim().replaceAll(RegExp(r'\s+'), ' '); 
 
     return IntrinsicHeight(
       child: Row(

@@ -119,7 +119,7 @@ class PreescolarCalificacionesWidget extends StatelessWidget {
           children: [
             // Nombre del Alumno
             Text(
-              'Alumno: $nombreCompleto',
+              'Alumno: $nombreCompleto'.toUpperCase(),
               style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: Colors.black87),
             ),
             const Divider(),

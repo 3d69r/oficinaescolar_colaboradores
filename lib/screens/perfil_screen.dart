@@ -421,7 +421,7 @@ class _PerfilScreenState extends State<PerfilScreen>
                         style: TextStyle(
                           fontSize: 20, 
                           fontWeight: FontWeight.bold,
-                          color: colores.credHeaderColor1, 
+                          color: colores.credLetraColor1, 
                         ),
                         overflow: TextOverflow.visible,
                       ),

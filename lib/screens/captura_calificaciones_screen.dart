@@ -13,18 +13,6 @@ import 'package:oficinaescolar_colaboradores/models/boleta_encabezado_model.dart
 import 'package:oficinaescolar_colaboradores/providers/user_provider.dart'; 
 import 'package:oficinaescolar_colaboradores/providers/tipo_curso.dart'; 
 
-// Importa los widgets modulares que creamos (Asegúrate de que estos nombres de clase son correctos)
-// Nota: He renombrado temporalmente las clases de los widgets modulares para evitar errores
-// si no tienes esos archivos subidos, ya que no se incluyeron en el prompt.
-
-// Simulación de los widgets modulares para que el código compile
-// class PreescolarCalificacionesWidget extends StatelessWidget { ... } 
-// class PrimariaCalificacionesWidget extends StatelessWidget { ... }
-// class SecundariaCalificacionesWidget extends StatelessWidget { ... }
-// class PreparatoriaCalificacionesWidget extends StatelessWidget { ... }
-// class UniversidadCalificacionesWidget extends StatelessWidget { ... }
-// class PosgradoCalificacionesWidget extends StatelessWidget { ... }
-
 
 class CapturaCalificacionesScreen extends StatefulWidget {
   final MateriaModel materiaSeleccionada;

@@ -23,7 +23,7 @@ class PrimariaCalificacionesWidget extends StatelessWidget {
   });
   
   static const double GRADE_CELL_WIDTH = 100.0;
-  static const double NAME_CELL_WIDTH = 300.0;
+  static const double NAME_CELL_WIDTH = 280.0;
 
 
   @override

@@ -25,7 +25,7 @@ class UniversidadCalificacionesWidget extends StatelessWidget {
   
   // Ajustamos el ancho para los nombres ya que las columnas de calificación son pocas
   static const double GRADE_CELL_WIDTH = 150.0;
-  static const double NAME_CELL_WIDTH = 350.0;
+  static const double NAME_CELL_WIDTH = 280.0;
 
 
   @override

@@ -41,6 +41,9 @@ class ApiConstants {
   // endpoint de prueba para las cabeceras 
   static const String notificarFirebaseEndpoint = 'notificar_firebase';
 
+  // endpoint para enviar la lista de asistencia de clubes 
+  static const String setAsistenciaClubes = 'set_asistencia_clubes';
+
   //Duración minima en la que se debe de recargar la información entre cambio de pestaña
   static const int minutosRecarga = 10;
 

@@ -21,8 +21,8 @@ class PreparatoriaCalificacionesWidget extends StatelessWidget {
     required this.readonlyKeys, 
   });
   
-  static const double GRADE_CELL_WIDTH = 120.0;
-  static const double NAME_CELL_WIDTH = 300.0;
+  static const double GRADE_CELL_WIDTH = 90.0;
+  static const double NAME_CELL_WIDTH = 270.0;
 
 
   @override

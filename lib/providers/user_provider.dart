@@ -21,6 +21,7 @@ import 'package:oficinaescolar_colaboradores/models/articulo_model.dart';
 //import 'package:oficinaescolar_colaboradores/models/pago_model.dart'; // Mantener el modelo si la API lo retorna
 import 'package:oficinaescolar_colaboradores/models/colores_model.dart';
 import 'package:oficinaescolar_colaboradores/providers/tipo_curso.dart';
+import 'package:oficinaescolar_colaboradores/screens/lista_screen.dart';
 
 class UserProvider with ChangeNotifier {
   // --- Datos de Sesión y Control (Variables Privadas) ---
@@ -451,6 +452,13 @@ class UserProvider with ChangeNotifier {
     // ... (este método no cambia)
     final now = DateTime.now();
     final formatter = DateFormat('ddMMyyyyHHmmss');
+    return formatter.format(now);
+  }
+
+   /// ✅ NUEVO MÉTODO: Genera la fecha actual en formato 'AAAA-MM-DD'.
+  String generarFechaActualApi() {
+    final now = DateTime.now();
+    final formatter = DateFormat('yyyy-MM-dd');
     return formatter.format(now);
   }
 
@@ -1291,5 +1299,96 @@ class UserProvider with ChangeNotifier {
       forceRefresh: forceRefresh,
     );
     debugPrint('UserProvider: fetchAndLoadAllColaboradorSpecificData completado para el colaborador: $idColaborador');
+  }
+
+  /// Envía el estado de asistencia de todos los alumnos de un curso o club a la API.
+Future<Map<String, dynamic>> setAsistenciaClubesOMaterias({
+    required String idCurso,
+    required TipoCurso tipoCurso,
+    required Map<String, AttendanceStatus> attendanceState,
+  }) async {
+    
+    // El idTokenParam sigue siendo necesario para el BODY, aunque no para la validación de SALIDA.
+    final String idTokenParam = _idToken ?? '0'; // Usamos '0' o cadena vacía si es nulo.
+
+    // 1. Preparar los datos de asistencia para la API
+    final Map<String, String> rawAttendanceData = {};
+    attendanceState.forEach((idCursoAlumno, status) {
+      final String apiStatus = status == AttendanceStatus.presente ? '1' : '0';
+      rawAttendanceData[idCursoAlumno] = apiStatus;
+    });
+
+    // 2. Stringificar el mapa de asistencia (JSON en una cadena para el body)
+    final String asistenciaDataJsonString = json.encode(rawAttendanceData);
+
+    // 3. Construir los datos de la solicitud
+    final String tipoCursoString = tipoCurso == TipoCurso.materia ? 'materia' : 'club';
+    final String fechaHoraApiCall = _fechaHora.isNotEmpty ? _fechaHora : generateApiFechaHora();
+    // ✅ NUEVO PARÁMETRO DE FECHA
+    final String fechaActualApiCall = generarFechaActualApi(); 
+    
+    final Map<String, String> body = {
+      'escuela': _escuela,
+      'id_curso': idCurso,
+      'tipo_curso': tipoCursoString, 
+      //'id_colaborador': _idColaborador,
+      'fechahora': fechaActualApiCall, 
+      //'id_token': idTokenParam, 
+      'asistencia': asistenciaDataJsonString, 
+      'fecha_asistencia': fechaHoraApiCall,
+    };
+
+    final url = Uri.parse('${ApiConstants.apiBaseUrl}${ApiConstants.setAsistenciaClubes}');
+    
+    // ⭐️ LOG DE DEPURACIÓN DETALLADO (ACTUALIZADO) ⭐️
+    debugPrint('--- [API ASISTENCIA] ---');
+    debugPrint('URL de API: $url');
+    debugPrint('Body (escuela): $_escuela');
+    debugPrint('Body (id_curso): $idCurso');
+    debugPrint('Body (tipo_curso): $tipoCursoString');
+    debugPrint('Body (id_colaborador): $_idColaborador');
+    debugPrint('Body (fechahora): $fechaHoraApiCall');
+    debugPrint('Body (fecha): $fechaActualApiCall'); // ✅ LOG AÑADIDO
+    debugPrint('Body (id_token): $idTokenParam');
+    debugPrint('Body (asistencia_data JSON): $asistenciaDataJsonString');
+    debugPrint('--- [FIN LOG ASISTENCIA] ---');
+
+    // 4. VALIDACIÓN DE SESIÓN (SOLO ESCUELA Y COLABORADOR REQUERIDOS)
+    if (_escuela.isEmpty || _idColaborador.isEmpty) {
+      debugPrint('UserProvider: Datos de sesión (Escuela o Colaborador) incompletos.');
+      return {'status': 'error', 'message': 'Error de sesión. Faltan datos esenciales (Escuela/Colaborador).'};
+    }
+
+    // 5. LLAMADA HTTP
+    try {
+      final response = await http.post(url, body: body);
+
+      if (response.statusCode == 200) {
+        final responseData = json.decode(response.body);
+        
+        if (responseData['status'] == 'success') {
+          debugPrint('Asistencia enviada exitosamente.');
+          return {'status': 'success', 'message': responseData['message'] ?? 'Asistencia guardada con éxito.'};
+        } else {
+          String errorMessage = responseData['message'] ?? 'Ocurrió un error al guardar la asistencia.';
+          debugPrint('Error de API: $errorMessage');
+          debugPrint('Respuesta de error completa del servidor: ${response.body}');
+          return {'status': 'error', 'message': errorMessage};
+        }
+      } else {
+        debugPrint('Error de servidor HTTP: ${response.statusCode}');
+        debugPrint('Cuerpo de la respuesta del servidor: ${response.body}');
+        return {'status': 'error', 'message': 'Error de conexión con el servidor (${response.statusCode}).'};
+      }
+    } on SocketException {
+      debugPrint('Excepción al enviar asistencia: SocketException');
+      return {'status': 'error', 'message': 'No se pudo conectar al servidor. Revisa tu conexión a internet.'};
+    } on http.ClientException {
+      debugPrint('Excepción al enviar asistencia: ClientException');
+      return {'status': 'error', 'message': 'Problema de red al enviar datos.'};
+    } catch (e) {
+      debugPrint('Excepción general al enviar asistencia: $e');
+      return {'status': 'error', 'message': 'Ocurrió un error inesperado al guardar la asistencia.'};
+    }
   }
 }
