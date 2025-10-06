@@ -1337,8 +1337,10 @@ Future<Map<String, dynamic>> setAsistenciaClubesOMaterias({
     
     final Map<String, String> body = {
       'escuela': _escuela,
+      'id_escuela': idEmpresa,
       'id_curso': idCurso,
-      'tipo_curso': tipoCursoString, 
+      'tipo_curso': tipoCursoString,
+      'id_ciclo': idCiclo, 
       //'id_colaborador': _idColaborador,
       'fechahora': fechaActualApiCall, 
       //'id_token': idTokenParam, 
