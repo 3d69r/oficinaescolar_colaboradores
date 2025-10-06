@@ -6,7 +6,7 @@ import 'package:oficinaescolar_colaboradores/providers/user_provider.dart';
 import 'package:oficinaescolar_colaboradores/models/alumno_asistencia_model.dart'; 
 import 'package:oficinaescolar_colaboradores/providers/tipo_curso.dart'; // Tu enum TipoCurso
 
-// ⭐️ MODIFICACIÓN 1: Enum con solo Presente y Ausente ⭐️
+// ⭐️ Enum con solo Presente y Ausente ⭐️
 enum AttendanceStatus { presente, ausente }
 
 
@@ -85,7 +85,7 @@ class _ListaScreenState extends State<ListaScreen> {
     );
   }
 
-  // ⭐️ MODIFICACIÓN 2: Lógica de marcado individual simple ⭐️
+  // ⭐️ Lógica de marcado individual simple ⭐️
   void _marcarAsistencia(String idCursoAlumno, AttendanceStatus status) { 
     setState(() {
       final currentStatus = _attendanceState[idCursoAlumno];
@@ -147,6 +147,8 @@ class _ListaScreenState extends State<ListaScreen> {
     }
   }
 
+  // ⭐️ La función _buildStudentCountAvatar fue eliminada.
+
   @override
   Widget build(BuildContext context) {
     // ⭐️ ACCESO AL PROVEEDOR DE COLOR ⭐️
@@ -167,6 +169,7 @@ class _ListaScreenState extends State<ListaScreen> {
         backgroundColor: dynamicHeaderColor,
         centerTitle: true,
         actions: [
+          
           Padding(
             padding: const EdgeInsets.only(right: 12.0, top: 5.0, bottom: 5.0), // Ajuste de padding
             child: InkWell(
@@ -272,7 +275,8 @@ class _ListaScreenState extends State<ListaScreen> {
                       final alumno = alumnos[index];
                       final currentStatus = _attendanceState[alumno.idCursoAlumno] ?? AttendanceStatus.ausente;
                       
-                      return _construirTarjetaAlumno(context, alumno, currentStatus, _presenteColor); 
+                      // ✅ MODIFICACIÓN CLAVE: Pasamos el índice (index)
+                      return _construirTarjetaAlumno(context, alumno, currentStatus, _presenteColor, index); 
                     },
                   ),
                 ),
@@ -290,8 +294,10 @@ class _ListaScreenState extends State<ListaScreen> {
     AlumnoAsistenciaModel alumno, 
     AttendanceStatus currentStatus,
     Color presenteColor,
+    int index, // ✅ RECIBE EL ÍNDICE
   ) { 
     Color statusColor = _obtenerColorPorEstado(currentStatus, presenteColor); 
+    final int alumnoNumero = index + 1; // Contador 1-based (1, 2, 3...)
 
     return Card(
       elevation: 4, 
@@ -307,11 +313,17 @@ class _ListaScreenState extends State<ListaScreen> {
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
         child: ListTile(
-          leading: CircleAvatar(
-            backgroundColor: statusColor.withOpacity(0.2),
+          // ✅ MODIFICACIÓN CLAVE: Se reemplaza el CircleAvatar por un Text
+          leading: SizedBox(
+            width: 40, // Damos un ancho fijo para que el número no se mueva
             child: Text(
-              alumno.primerNombre[0].toUpperCase(),
-              style: TextStyle(color: statusColor, fontWeight: FontWeight.bold),
+              alumnoNumero.toString(), // Le añadimos un punto para que parezca un número de lista
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: statusColor, // Mantenemos el color basado en el estado
+                fontWeight: FontWeight.bold,
+                fontSize: 16, // Lo hacemos un poco más grande
+              ),
             ),
           ),
           title: Text(
@@ -331,7 +343,7 @@ class _ListaScreenState extends State<ListaScreen> {
     );
   }
 
-  // ✅ WIDGET: Construir el botón de estado (Sin cambios en la lógica de UI)
+  // ✅ WIDGET: Construir el botón de estado
   Widget _construirBotonEstado( 
     String idCursoAlumno,
     AttendanceStatus status,
@@ -367,7 +379,7 @@ class _ListaScreenState extends State<ListaScreen> {
     );
   }
 
-  // ⭐️ MODIFICACIÓN 3: Obtener color sin Pendiente ⭐️
+  // ⭐️ Obtener color sin Pendiente ⭐️
   Color _obtenerColorPorEstado(AttendanceStatus status, Color presenteColor) { 
     switch (status) {
       case AttendanceStatus.presente:
@@ -377,7 +389,7 @@ class _ListaScreenState extends State<ListaScreen> {
     }
   }
   
-  // ⭐️ MODIFICACIÓN 4: Obtener etiqueta sin Pendiente ⭐️
+  // ⭐️ Obtener etiqueta sin Pendiente ⭐️
   String _obtenerEtiquetaPorEstado(AttendanceStatus status) { 
     switch (status) {
       case AttendanceStatus.presente:

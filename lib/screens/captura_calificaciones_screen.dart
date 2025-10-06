@@ -119,26 +119,49 @@ class _CapturaCalificacionesScreenState extends State<CapturaCalificacionesScree
 
   // Genera la celda editable/de texto (Callback pasado a los widgets modulares)
   DataCell _buildGradeCell(String alumnoId, String key) {
-    // 1. SEGURIDAD: Si es una clave de solo lectura, devuelve una celda vacía o de texto estático.
-    if (_readonlyKeys.contains(key)) {
-      return const DataCell(Text('-', textAlign: TextAlign.center));
-    }
-    
-    // 2. Obtener el valor actual
+    // 1. Obtener el valor actual
     final alumnoIndex = _alumnos.indexWhere((a) => a['id_alumno'] == alumnoId);
     if (alumnoIndex == -1) {
       return const DataCell(Text('Error', style: TextStyle(color: Colors.red)));
     }
     
-    final currentValue = _alumnos[alumnoIndex][key]?.toString() ?? '';
+    // Obtiene el valor actual del estado local (_alumnos)
+    // ✅ MODIFICACIÓN: Usamos .trim() para asegurar que no haya espacios vacíos.
+    final currentValue = _alumnos[alumnoIndex][key]?.toString()?.trim() ?? '';
     
-    // 3. Devolver la celda editable (TextFormField)
+    // 2. SEGURIDAD: Si es una clave de solo lectura (ej: promedio), devuelve un guion.
+    if (_readonlyKeys.contains(key)) {
+      // Muestra el valor si existe, si no, un guion.
+      return DataCell(Text(
+        currentValue.isNotEmpty ? currentValue : '-', 
+        textAlign: TextAlign.center,
+        style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.blueGrey),
+      ));
+    }
+    
+    // ✅ MODIFICACIÓN: LÓGICA DE INMUTABILIDAD POST-GUARDADO
+    // Si ya tiene un valor, lo mostramos como texto estático no editable.
+    if (currentValue.isNotEmpty) {
+      return DataCell(
+        Text(
+          currentValue,
+          textAlign: TextAlign.center,
+          style: const TextStyle(
+            fontWeight: FontWeight.bold, 
+            color: Colors.black54, // Color para indicar que ya está fijo
+          ),
+        ),
+      );
+    }
+    
+    // 4. Devolver la celda editable (TextFormField) - Solo si está vacía
     return DataCell(
       TextFormField(
         initialValue: currentValue,
         textAlign: TextAlign.center,
-        // Usamos el mismo patrón para el tipo de teclado
-        keyboardType: key.toLowerCase().contains('observa') ? TextInputType.text : TextInputType.number,
+        keyboardType: key.toLowerCase().contains('observa') 
+            ? TextInputType.text 
+            : TextInputType.number,
         decoration: const InputDecoration(
           border: InputBorder.none,
           contentPadding: EdgeInsets.zero,
@@ -303,23 +326,63 @@ class _CapturaCalificacionesScreenState extends State<CapturaCalificacionesScree
     );
   }
 
-  // --- LÓGICA DE GUARDADO (Placeholder) ---
+  // --- LÓGICA DE GUARDADO ---
   
-  void _sendCalificaciones() {
-    // 1. Prepara el JSON a enviar (la lista _alumnos tiene todos los datos actualizados)
-    final jsonToSend = _alumnos.map((a) => a).toList(); 
-
-    debugPrint('Datos a enviar: $jsonToSend');
+  // --- LÓGICA DE GUARDADO ---
+  
+void _sendCalificaciones() async {
+    final provider = Provider.of<UserProvider>(context, listen: false);
     
-    // 2. Llama a la API/Provider para guardar
-    // final provider = Provider.of<UserProvider>(context, listen: false);
-    // await provider.saveCalificaciones(jsonToSend);
+    // 1. Verificar si la estructura de la boleta está cargada
+    if (_estructuraBoleta == null) {
+       ScaffoldMessenger.of(context).showSnackBar(
+           const SnackBar(
+               content: Text('Error: La estructura de la boleta no se ha cargado. Inténtalo de nuevo.'),
+               backgroundColor: Colors.orange,
+           ),
+       );
+       return;
+    }
 
+    // La lista _alumnos ya tiene todos los datos actualizados, incluyendo 'id_alumno' y las calificaciones
+    final List<Map<String, dynamic>> jsonToSend = _alumnos.map((a) => a).toList(); 
+
+    // Mostrar indicador de carga
     ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('¡Datos listos para ser enviados a la API!'), duration: Duration(seconds: 2)),
+        const SnackBar(content: Text('Guardando calificaciones...')),
     );
     
-    // Opcional: Volver a cargar los datos después del guardado si el backend recalcula promedios.
-    // _loadData(); 
+    try {
+      // 2. LLAMADA A LA API: Ahora requiere estructuraBoleta
+      final result = await provider.saveCalificaciones(
+        idCurso: widget.materiaSeleccionada.idMateriaClase,
+        calificacionesLista: jsonToSend,
+        estructuraBoleta: _estructuraBoleta!, // <-- ¡PARAMETRO ESENCIAL AGREGADO!
+      );
+
+      ScaffoldMessenger.of(context).hideCurrentSnackBar(); 
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          // La API devuelve 'correcto', pero nuestro Provider lo traduce a 'success'
+          content: Text(result['message'] as String),
+          backgroundColor: result['status'] == 'success' ? Colors.green : Colors.red,
+        ),
+      );
+      
+      // ✅ Si se guarda con éxito, recargamos la data para actualizar el estado visual
+      if (result['status'] == 'success') {
+          // Si _loadData está en progreso, mostrará un indicador de carga.
+          await _loadData(); 
+      }
+      
+    } catch (e) {
+      ScaffoldMessenger.of(context).hideCurrentSnackBar(); 
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error al guardar: ${e.toString()}'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 }

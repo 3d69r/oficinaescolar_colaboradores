@@ -44,6 +44,9 @@ class ApiConstants {
   // endpoint para enviar la lista de asistencia de clubes 
   static const String setAsistenciaClubes = 'set_asistencia_clubes';
 
+  // endpoint para enviar calificaciones 
+  static const String setMateriasCalif = 'set_materias_calif';
+
   //Duración minima en la que se debe de recargar la información entre cambio de pestaña
   static const int minutosRecarga = 10;
 

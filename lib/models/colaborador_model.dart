@@ -1,5 +1,3 @@
-import 'dart:convert';
-
 import 'package:oficinaescolar_colaboradores/models/boleta_encabezado_model.dart';
 
 class ColaboradorModel {

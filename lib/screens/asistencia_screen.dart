@@ -5,7 +5,6 @@ import 'package:provider/provider.dart';
 
 // Asegúrate de tener estas importaciones correctas para tu proyecto
 import 'package:oficinaescolar_colaboradores/models/colaborador_model.dart'; 
-import 'package:oficinaescolar_colaboradores/models/boleta_encabezado_model.dart'; 
 import 'package:oficinaescolar_colaboradores/providers/user_provider.dart'; 
 import 'package:oficinaescolar_colaboradores/screens/captura_calificaciones_screen.dart'; 
 import 'package:oficinaescolar_colaboradores/screens/preescolar_listado_screen.dart'; // ⭐️ NUEVA IMPORTACIÓN ⭐️

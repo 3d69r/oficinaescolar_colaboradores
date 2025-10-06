@@ -1301,7 +1301,7 @@ class UserProvider with ChangeNotifier {
     debugPrint('UserProvider: fetchAndLoadAllColaboradorSpecificData completado para el colaborador: $idColaborador');
   }
 
-  /// Envía el estado de asistencia de todos los alumnos de un curso o club a la API.
+ /// Envía el estado de asistencia de todos los alumnos de un curso o club a la API.
 Future<Map<String, dynamic>> setAsistenciaClubesOMaterias({
     required String idCurso,
     required TipoCurso tipoCurso,
@@ -1311,20 +1311,28 @@ Future<Map<String, dynamic>> setAsistenciaClubesOMaterias({
     // El idTokenParam sigue siendo necesario para el BODY, aunque no para la validación de SALIDA.
     final String idTokenParam = _idToken ?? '0'; // Usamos '0' o cadena vacía si es nulo.
 
-    // 1. Preparar los datos de asistencia para la API
-    final Map<String, String> rawAttendanceData = {};
+    // 1. ✅ MODIFICACIÓN CLAVE: Preparar los datos de asistencia como un ARRAY DE OBJETOS
+    final List<Map<String, dynamic>> listaAsistenciaAEnviar = [];
+    
     attendanceState.forEach((idCursoAlumno, status) {
+      // Usamos el ID del curso-alumno como el 'id' en el JSON
+      final int id = int.tryParse(idCursoAlumno) ?? 0; 
+      
+      // Mantenemos los valores 1 o 0
       final String apiStatus = status == AttendanceStatus.presente ? '1' : '0';
-      rawAttendanceData[idCursoAlumno] = apiStatus;
+      
+      listaAsistenciaAEnviar.add({
+        'id': id,
+        'asistencia': apiStatus, // ✅ Clave 'asistencia' y valor '1' o '0'
+      });
     });
 
-    // 2. Stringificar el mapa de asistencia (JSON en una cadena para el body)
-    final String asistenciaDataJsonString = json.encode(rawAttendanceData);
-
+    // 2. Stringificar la lista de asistencia (JSON en una cadena para el body)
+    final String asistenciaDataJsonString = json.encode(listaAsistenciaAEnviar); // Ahora codificamos la lista
+    
     // 3. Construir los datos de la solicitud
     final String tipoCursoString = tipoCurso == TipoCurso.materia ? 'materia' : 'club';
     final String fechaHoraApiCall = _fechaHora.isNotEmpty ? _fechaHora : generateApiFechaHora();
-    // ✅ NUEVO PARÁMETRO DE FECHA
     final String fechaActualApiCall = generarFechaActualApi(); 
     
     final Map<String, String> body = {
@@ -1334,23 +1342,24 @@ Future<Map<String, dynamic>> setAsistenciaClubesOMaterias({
       //'id_colaborador': _idColaborador,
       'fechahora': fechaActualApiCall, 
       //'id_token': idTokenParam, 
-      'asistencia': asistenciaDataJsonString, 
+      'asistencia': asistenciaDataJsonString, // El nuevo array de JSON stringificado
       'fecha_asistencia': fechaHoraApiCall,
     };
 
     final url = Uri.parse('${ApiConstants.apiBaseUrl}${ApiConstants.setAsistenciaClubes}');
     
-    // ⭐️ LOG DE DEPURACIÓN DETALLADO (ACTUALIZADO) ⭐️
+    // ⭐️ LOG DE DEPURACIÓN DETALLADO ⭐️
     debugPrint('--- [API ASISTENCIA] ---');
     debugPrint('URL de API: $url');
     debugPrint('Body (escuela): $_escuela');
     debugPrint('Body (id_curso): $idCurso');
     debugPrint('Body (tipo_curso): $tipoCursoString');
-    debugPrint('Body (id_colaborador): $_idColaborador');
-    debugPrint('Body (fechahora): $fechaHoraApiCall');
-    debugPrint('Body (fecha): $fechaActualApiCall'); // ✅ LOG AÑADIDO
-    debugPrint('Body (id_token): $idTokenParam');
-    debugPrint('Body (asistencia_data JSON): $asistenciaDataJsonString');
+    debugPrint('Body (fechahora - AAAA-MM-DD): $fechaActualApiCall');
+    debugPrint('Body (fecha_asistencia - AAAA-MM-DD HH:MM:SS): $fechaHoraApiCall');
+    
+    // ✅ LOG ACTUALIZADO: Muestra el JSON Array exacto
+    debugPrint('JSON ARRAY ENVIADO EN EL CAMPO "asistencia": $asistenciaDataJsonString');
+    
     debugPrint('--- [FIN LOG ASISTENCIA] ---');
 
     // 4. VALIDACIÓN DE SESIÓN (SOLO ESCUELA Y COLABORADOR REQUERIDOS)
@@ -1389,6 +1398,127 @@ Future<Map<String, dynamic>> setAsistenciaClubesOMaterias({
     } catch (e) {
       debugPrint('Excepción general al enviar asistencia: $e');
       return {'status': 'error', 'message': 'Ocurrió un error inesperado al guardar la asistencia.'};
+    }
+  }
+
+  Future<Map<String, dynamic>> saveCalificaciones({
+    required String idCurso,
+    required List<Map<String, dynamic>> calificacionesLista,
+    required BoletaEncabezadoModel estructuraBoleta, // ✅ MODIFICACIÓN: Nuevo parámetro para simplificar el JSON
+  }) async {
+    
+    // Preparar datos de sesión (ID Token no requerido)
+    final String idTokenParam = _idToken ?? '0'; 
+    
+    // Usaremos el generador de fecha AAAA-MM-DD que ya tienes
+    final String fechaActualApiCall = generateApiFechaHora(); 
+    
+    // 1. Validar datos mínimos
+    if (_escuela.isEmpty || _idColaborador.isEmpty || idCurso.isEmpty) {
+      debugPrint('UserProvider: Datos de sesión incompletos para guardar calificaciones.');
+      return {'status': 'error', 'message': 'Error de sesión. Faltan datos esenciales (Escuela/Colaborador/Curso).'};
+    }
+
+    final String idColaborador = _idColaborador;
+
+    // ✅ MODIFICACIÓN: Lógica para SIMPLIFICAR EL JSON a enviar
+    // ------------------------------------
+
+    // 1. Recolectar TODAS las claves de calificación/observación de la boleta:
+    Set<String> clavesDeCalificacion = {};
+
+    // Añadir todas las claves de relaciones (P1, P2, CF, etc.)
+    estructuraBoleta.relaciones.values.forEach((relationString) {
+      relationString.split(',').forEach((key) {
+        if (key.trim().isNotEmpty) clavesDeCalificacion.add(key.trim());
+      });
+    });
+
+    // Añadir todas las claves de comentarios (OBSERVACION_FINAL, etc.)
+    clavesDeCalificacion.addAll(estructuraBoleta.comentarios.keys);
+    debugPrint('Claves de Boleta a enviar: ${clavesDeCalificacion.toList()}');
+
+    // 2. Transformar la lista de alumnos para incluir SOLO los IDs y las calificaciones.
+    final List<Map<String, dynamic>> listaCalificacionesAEnviar = calificacionesLista.map((alumno) {
+        final Map<String, dynamic> alumnoData = {};
+        
+        // ID's ESENCIALES
+        alumnoData['id_curso'] = alumno['id_curso'];
+        alumnoData['id_alumno'] = alumno['id_alumno']; // Requerido para identificar el alumno
+        alumnoData['id_alu_mat'] = alumno['id_alu_mat']; // Requerido para identificar el registro
+        
+        // Agregar SOLO las claves de calificación que existen, tienen valor, y no son nulas
+        for (String clave in clavesDeCalificacion) {
+            if (alumno.containsKey(clave) && alumno[clave] != null) {
+                 final String valor = alumno[clave].toString().trim();
+                 if (valor.isNotEmpty) {
+                    alumnoData[clave] = valor;
+                 }
+            }
+        }
+        
+        return alumnoData;
+    }).toList();
+    
+    // ------------------------------------
+
+    // El parámetro 'calificacion' de la API debe ser un JSON String de esta lista.
+    final String calificacionesDataJsonString = json.encode(listaCalificacionesAEnviar);
+    
+    // 3. Construir el cuerpo (body) de la solicitud POST
+    final Map<String, String> finalBody = {
+      'escuela': _escuela,
+      'id_curso': idCurso,
+      //'id_alumno': idColaborador, // ID del colaborador que envía
+      'fechahora': fechaActualApiCall, // AAAA-MM-DD
+      'calificacion': calificacionesDataJsonString, // El JSON simplificado
+    };
+
+
+    final url = Uri.parse('${ApiConstants.apiBaseUrl}${ApiConstants.setMateriasCalif}');
+    
+    // ⭐️ LOG DE DEPURACIÓN DETALLADO ⭐️
+    debugPrint('--- [API CALIFICACIONES] ---');
+    debugPrint('URL de API: $url');
+    debugPrint('Body (escuela): ${_escuela}');
+    debugPrint('Body (id_curso): $idCurso');
+    debugPrint('Body (id_alumno - colaborador): $idColaborador');
+    debugPrint('Body (fechahora): $fechaActualApiCall');
+    debugPrint('Body (calificacion length): ${calificacionesDataJsonString.length} bytes');
+    
+    // ✅ MODIFICACIÓN: Imprimir el JSON completo que se está enviando en 'calificacion'
+    debugPrint('JSON COMPLETO ENVIADO EN EL CAMPO "calificacion": $calificacionesDataJsonString');
+    
+    debugPrint('--- [FIN LOG CALIFICACIONES] ---' );
+
+    // 4. LLAMADA HTTP
+    try {
+      final response = await http.post(url, body: finalBody);
+
+      if (response.statusCode == 200) {
+        final responseData = json.decode(response.body);
+        
+        // ✅ MODIFICACIÓN: Print para ver el JSON de respuesta
+        debugPrint('UserProvider: JSON retornado por la API: ${response.body}');
+        
+        if (responseData['status'] == 'correcto') { // Usamos 'correcto' basado en las imágenes
+          debugPrint('Calificaciones guardadas exitosamente.');
+          return {'status': 'success', 'message': responseData['message'] ?? 'Calificaciones guardadas con éxito.'};
+        } else {
+          String errorMessage = responseData['message'] ?? 'Error al guardar calificaciones.';
+          debugPrint('Error de API: $errorMessage');
+          debugPrint('Respuesta de error completa del servidor: ${response.body}');
+          return {'status': 'error', 'message': errorMessage};
+        }
+      } else {
+        debugPrint('Error de servidor HTTP: ${response.statusCode}');
+        return {'status': 'error', 'message': 'Error de conexión con el servidor (${response.statusCode}).'};
+      }
+    } on SocketException {
+      return {'status': 'error', 'message': 'No se pudo conectar al servidor. Revisa tu conexión a internet.'};
+    } catch (e) {
+      debugPrint('Excepción general al guardar calificaciones: $e');
+      return {'status': 'error', 'message': 'Ocurrió un error inesperado al guardar calificaciones.'};
     }
   }
 }

@@ -295,7 +295,7 @@ class _PerfilScreenState extends State<PerfilScreen>
                 ),
                 const SizedBox(height: 1),
                 Text(
-                  colaborador.escolaridad ?? 'N/A',
+                  colaborador.escolaridad,
                   style:  TextStyle(fontSize: 17,  letterSpacing: .5,fontWeight: FontWeight.bold, color: colores.credLetraColor1 ),
                   overflow: TextOverflow.visible,
                 ),
@@ -308,7 +308,7 @@ class _PerfilScreenState extends State<PerfilScreen>
                 ),
                 const SizedBox(height: 5),
                 Text(
-                  colaborador.afiliacion ?? 'N/A',
+                  colaborador.afiliacion,
                   style:  TextStyle(fontSize: 17,  fontWeight: FontWeight.bold, color: colores.credLetraColor1),
                   overflow: TextOverflow.visible,
                 ),
@@ -436,7 +436,7 @@ class _PerfilScreenState extends State<PerfilScreen>
                             style: TextStyle(fontWeight: FontWeight.bold),
                           ),
                           TextSpan(
-                            text: colaborador.curp ?? 'N/A',
+                            text: colaborador.curp,
                             style: TextStyle(color: colores.credLetraColor1),
                           ),
                         ],
@@ -453,7 +453,7 @@ class _PerfilScreenState extends State<PerfilScreen>
                             style: TextStyle(fontWeight: FontWeight.bold),
                           ),
                           TextSpan(
-                            text: colaborador.escolaridad ?? 'N/A',
+                            text: colaborador.escolaridad,
                             style: TextStyle(color: colores.credLetraColor1),
                           ),
                         ],
@@ -470,7 +470,7 @@ class _PerfilScreenState extends State<PerfilScreen>
                             style: TextStyle(fontWeight: FontWeight.bold),
                           ),
                           TextSpan(
-                            text: colaborador.afiliacion ?? 'N/A',
+                            text: colaborador.afiliacion,
                             style: TextStyle(color: colores.credLetraColor1),
                           ),
                         ],
@@ -513,9 +513,9 @@ class _PerfilScreenState extends State<PerfilScreen>
           crossAxisAlignment: CrossAxisAlignment.center,
           mainAxisAlignment: MainAxisAlignment.start,
           children: [
-            if (colaborador.curp != null && colaborador.curp!.isNotEmpty)
+            if (colaborador.curp.isNotEmpty)
               QrImageView(
-                data: colaborador.curp!,
+                data: colaborador.curp,
                 version: QrVersions.auto,
                 size: 150.0,
                 backgroundColor: Colors.white,
@@ -608,9 +608,9 @@ Widget _buildBackHorizontal(ColaboradorModel colaborador, EscuelaModel escuela, 
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.start,
                 children: [
-                  if (colaborador.curp != null && colaborador.curp!.isNotEmpty)
+                  if (colaborador.curp.isNotEmpty)
                     QrImageView(
-                      data: colaborador.curp!,
+                      data: colaborador.curp,
                       version: QrVersions.auto,
                       size: 120.0,
                       backgroundColor: Colors.white,
