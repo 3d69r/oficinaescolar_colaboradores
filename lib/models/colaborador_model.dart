@@ -110,6 +110,7 @@ class MateriaModel {
   final String materia;
   final String codigoPlan;
   final String planEstudio;
+  final String nivelEducativo;
   final String codigoMateriaClase;
   final String claveModulo;
   final String clasePeriodo;
@@ -121,6 +122,7 @@ class MateriaModel {
     required this.materia,
     required this.codigoPlan,
     required this.planEstudio,
+    required this.nivelEducativo,
     required this.codigoMateriaClase,
     required this.claveModulo,
     required this.clasePeriodo,
@@ -134,6 +136,7 @@ class MateriaModel {
       materia: json['materia'] as String? ?? '',
       codigoPlan: json['codigo_plan'] as String? ?? '',
       planEstudio: json['plan_estudio'] as String? ?? '',
+      nivelEducativo: json['nivel_educativo'] as String? ?? '',
       codigoMateriaClase: json['codigo_materia_clase'] as String? ?? '',
       claveModulo: json['clave_modulo'] as String? ?? '',
       clasePeriodo: json['clase_periodo'] as String? ?? '',

@@ -36,6 +36,7 @@ class UserProvider with ChangeNotifier {
   String? _idToken;
   String? _tokenCelular;
   String? _idMateriaAlumno;
+  String? _idAlumno;
 
   double _ultimoSaldoConocido = 0.0;
   double get ultimoSaldoConocido => _ultimoSaldoConocido;
@@ -91,6 +92,7 @@ class UserProvider with ChangeNotifier {
   String? get idToken => _idToken;
   String? get tokenCelular => _tokenCelular;
   String? get idMateriaAlumno => _idMateriaAlumno;
+  String? get idAlumno => _idAlumno;
 
   String get rutaLogoEscuela => _rutaLogoEscuela;
   String? get selectedCafeteriaPeriodId => _selectedCafeteriaPeriodId;
@@ -359,6 +361,8 @@ class UserProvider with ChangeNotifier {
       }
 
       final alumnosDataUrl = Uri.parse(apiEndpoint);
+       debugPrint('--- [API CALIFICACIONES - CONSULTA] ---');
+      debugPrint('URL de la API: $alumnosDataUrl');
       
       debugPrint('UserProvider: Llamando a API de alumnos para CALIFICAR ${tipoCurso.name} (ID: $idCurso): $alumnosDataUrl');
       
@@ -368,6 +372,8 @@ class UserProvider with ChangeNotifier {
         if (response.statusCode == 200) {
 
           final rawData = json.decode(response.body);
+            debugPrint('JSON de Respuesta (Status 200): ${response.body}');
+          debugPrint('--- [FIN LOG CALIFICACIONES - CONSULTA] ---');
 
           if (rawData is List) {
             // 2. Devolvemos la lista de Map<String, dynamic> (JSON crudo)
@@ -559,7 +565,6 @@ class UserProvider with ChangeNotifier {
     required String tokenCelular,
     required String status,
   }) async {
-    // ... (la lógica es la misma)
     try {
       final DeviceInfoPlugin deviceInfo = DeviceInfoPlugin();
       String modeloMarca = '';
@@ -1301,67 +1306,78 @@ class UserProvider with ChangeNotifier {
     debugPrint('UserProvider: fetchAndLoadAllColaboradorSpecificData completado para el colaborador: $idColaborador');
   }
 
- /// Envía el estado de asistencia de todos los alumnos de un curso o club a la API.
-Future<Map<String, dynamic>> setAsistenciaClubesOMaterias({
+  /// Envía el estado de asistencia de todos los alumnos de un curso o club a la API.
+  Future<Map<String, dynamic>> setAsistenciaClubesOMaterias({
     required String idCurso,
     required TipoCurso tipoCurso,
     required Map<String, AttendanceStatus> attendanceState,
+    required List<AlumnoAsistenciaModel> alumnosLista, // ✅ Agregada para obtener id_alumno
   }) async {
     
-    // El idTokenParam sigue siendo necesario para el BODY, aunque no para la validación de SALIDA.
+    // El idTokenParam sigue siendo necesario para el BODY (aunque ya no va en el cuerpo JSON principal)
     final String idTokenParam = _idToken ?? '0'; // Usamos '0' o cadena vacía si es nulo.
 
-    // 1. ✅ MODIFICACIÓN CLAVE: Preparar los datos de asistencia como un ARRAY DE OBJETOS
+    // 1. Preparar los datos de asistencia como un ARRAY DE OBJETOS
     final List<Map<String, dynamic>> listaAsistenciaAEnviar = [];
     
+    // Nueva variable para buscar el id_alumno rápidamente (O(1))
+    final Map<String, String> mapaBusquedaIdAlumno = {
+      for (var alumno in alumnosLista) 
+        alumno.idCursoAlumno: alumno.idAlumno
+    };
+    
     attendanceState.forEach((idCursoAlumno, status) {
+      
+      // Obtener el id_alumno usando el idCursoAlumno como clave
+      final String idAlumno = mapaBusquedaIdAlumno[idCursoAlumno] ?? '0'; // '0' como valor predeterminado seguro
+
       // Usamos el ID del curso-alumno como el 'id' en el JSON
       final int id = int.tryParse(idCursoAlumno) ?? 0; 
       
       // Mantenemos los valores 1 o 0
       final String apiStatus = status == AttendanceStatus.presente ? '1' : '0';
       
+      // ✅ MODIFICACIÓN: Incluir id_alumno en el objeto JSON
       listaAsistenciaAEnviar.add({
-        'id': id,
-        'asistencia': apiStatus, // ✅ Clave 'asistencia' y valor '1' o '0'
+        'id': id, // id_curso_alu
+        'id_alumno': idAlumno, // <-- NUEVO CAMPO REQUERIDO
+        'asistencia': apiStatus, // Clave 'asistencia' y valor '1' o '0'
       });
     });
 
     // 2. Stringificar la lista de asistencia (JSON en una cadena para el body)
-    final String asistenciaDataJsonString = json.encode(listaAsistenciaAEnviar); // Ahora codificamos la lista
+    // ✅ CLAVE: Codificamos SOLO el array de asistencia para que sea el valor de un campo
+    final String asistenciaDataJsonString = json.encode(listaAsistenciaAEnviar); 
     
-    // 3. Construir los datos de la solicitud
+    // 3. Construir los datos de la solicitud como un Map<String, String> para Form-encode
     final String tipoCursoString = tipoCurso == TipoCurso.materia ? 'materia' : 'club';
+  
     final String fechaHoraApiCall = _fechaHora.isNotEmpty ? _fechaHora : generateApiFechaHora();
     final String fechaActualApiCall = generarFechaActualApi(); 
     
+    // ✅ CLAVE: Se usa Map<String, String> para Form-encode
     final Map<String, String> body = {
       'escuela': _escuela,
       'id_escuela': idEmpresa,
       'id_curso': idCurso,
+      
       'tipo_curso': tipoCursoString,
       'id_ciclo': idCiclo, 
       //'id_colaborador': _idColaborador,
       'fechahora': fechaActualApiCall, 
       //'id_token': idTokenParam, 
-      'asistencia': asistenciaDataJsonString, // El nuevo array de JSON stringificado
+      // ✅ CLAVE: El array JSON va aquí como una CADENA de texto
+      'asistencia': asistenciaDataJsonString, 
       'fecha_asistencia': fechaHoraApiCall,
     };
 
     final url = Uri.parse('${ApiConstants.apiBaseUrl}${ApiConstants.setAsistenciaClubes}');
     
     // ⭐️ LOG DE DEPURACIÓN DETALLADO ⭐️
-    debugPrint('--- [API ASISTENCIA] ---');
+    debugPrint('--- [API ASISTENCIA - FORM-ENCODE] ---');
     debugPrint('URL de API: $url');
-    debugPrint('Body (escuela): $_escuela');
-    debugPrint('Body (id_curso): $idCurso');
-    debugPrint('Body (tipo_curso): $tipoCursoString');
-    debugPrint('Body (fechahora - AAAA-MM-DD): $fechaActualApiCall');
-    debugPrint('Body (fecha_asistencia - AAAA-MM-DD HH:MM:SS): $fechaHoraApiCall');
-    
-    // ✅ LOG ACTUALIZADO: Muestra el JSON Array exacto
+    debugPrint('BODY MAP ENVIADO: $body'); 
     debugPrint('JSON ARRAY ENVIADO EN EL CAMPO "asistencia": $asistenciaDataJsonString');
-    
     debugPrint('--- [FIN LOG ASISTENCIA] ---');
 
     // 4. VALIDACIÓN DE SESIÓN (SOLO ESCUELA Y COLABORADOR REQUERIDOS)
@@ -1372,6 +1388,7 @@ Future<Map<String, dynamic>> setAsistenciaClubesOMaterias({
 
     // 5. LLAMADA HTTP
     try {
+      // ✅ CLAVE: Enviamos el Map<String, String>. http.post lo codifica automáticamente como Form-encode.
       final response = await http.post(url, body: body);
 
       if (response.statusCode == 200) {
@@ -1482,9 +1499,9 @@ Future<Map<String, dynamic>> setAsistenciaClubesOMaterias({
     // ⭐️ LOG DE DEPURACIÓN DETALLADO ⭐️
     debugPrint('--- [API CALIFICACIONES] ---');
     debugPrint('URL de API: $url');
-    debugPrint('Body (escuela): ${_escuela}');
+    debugPrint('Body (escuela): $_escuela');
     debugPrint('Body (id_curso): $idCurso');
-    debugPrint('Body (id_alumno - colaborador): $idColaborador');
+    //debugPrint('Body (id_alumno - colaborador): $idColaborador');
     debugPrint('Body (fechahora): $fechaActualApiCall');
     debugPrint('Body (calificacion length): ${calificacionesDataJsonString.length} bytes');
     

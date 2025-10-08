@@ -7,6 +7,7 @@ class AlumnoAsistenciaModel {
   final String segundoNombre;
   final String apellidoPat;
   final String apellidoMat;
+  final bool asistencia;
 
   // Propiedad calculada para simplificar la vista
   String get nombreCompleto {
@@ -25,6 +26,7 @@ class AlumnoAsistenciaModel {
     required this.segundoNombre,
     required this.apellidoPat,
     required this.apellidoMat,
+    required this.asistencia,
   });
 
   factory AlumnoAsistenciaModel.fromJson(Map<String, dynamic> json) {
@@ -38,6 +40,7 @@ class AlumnoAsistenciaModel {
       segundoNombre: json['segundo_nombre'] as String? ?? '',
       apellidoPat: json['apellido_pat'] as String? ?? '',
       apellidoMat: json['apellido_mat'] as String? ?? '',
+      asistencia: (json['asistencia'] as String? ?? '0') == '1',
     );
   }
 }

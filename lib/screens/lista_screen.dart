@@ -38,7 +38,7 @@ class _ListaScreenState extends State<ListaScreen> {
     _cargarAlumnos(); 
   }
   
-  // ✅ MÉTODO: Cargar alumnos
+  // ✅ MÉTODO: Cargar alumnos (YA CORREGIDO para usar el estado de la API)
   void _cargarAlumnos() {
     final userProvider = Provider.of<UserProvider>(context, listen: false);
     
@@ -53,9 +53,13 @@ class _ListaScreenState extends State<ListaScreen> {
       
       _alumnos = alumnos; 
       
-      // ✅ Inicializar el estado de asistencia de todos los alumnos a 'ausente' (Falta)
+      // ✅ Inicializar el estado de asistencia desde el modelo.
       for (var alumno in _alumnos) {
-        _attendanceState[alumno.idCursoAlumno] = AttendanceStatus.ausente;
+        final bool isPresente = alumno.asistencia; 
+        
+        _attendanceState[alumno.idCursoAlumno] = isPresente 
+            ? AttendanceStatus.presente 
+            : AttendanceStatus.ausente; 
       }
       return _alumnos;
     });
@@ -103,7 +107,7 @@ class _ListaScreenState extends State<ListaScreen> {
     });
   }
 
-  // ✅ MÉTODO: Enviar datos de asistencia
+  // ✅ MÉTODO: Enviar datos de asistencia (ACTUALIZADO)
   void _enviarAsistencia() async { 
     final userProvider = Provider.of<UserProvider>(context, listen: false);
 
@@ -117,6 +121,7 @@ class _ListaScreenState extends State<ListaScreen> {
         idCurso: widget.idCurso,
         tipoCurso: widget.tipoCurso,
         attendanceState: _attendanceState,
+        alumnosLista: _alumnos, // <--- CLAVE: Se pasa la lista completa de alumnos
       );
 
       // Limpiar la barra de mensajes anterior
@@ -146,8 +151,6 @@ class _ListaScreenState extends State<ListaScreen> {
       );
     }
   }
-
-  // ⭐️ La función _buildStudentCountAvatar fue eliminada.
 
   @override
   Widget build(BuildContext context) {
@@ -273,6 +276,7 @@ class _ListaScreenState extends State<ListaScreen> {
                     itemCount: alumnos.length,
                     itemBuilder: (context, index) {
                       final alumno = alumnos[index];
+                      // El estado actual ahora se basa en el mapa _attendanceState, que fue inicializado con la API.
                       final currentStatus = _attendanceState[alumno.idCursoAlumno] ?? AttendanceStatus.ausente;
                       
                       // ✅ MODIFICACIÓN CLAVE: Pasamos el índice (index)
@@ -313,16 +317,16 @@ class _ListaScreenState extends State<ListaScreen> {
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
         child: ListTile(
-          // ✅ MODIFICACIÓN CLAVE: Se reemplaza el CircleAvatar por un Text
+          // ✅ Se mantiene el contador sin CircleAvatar
           leading: SizedBox(
             width: 40, // Damos un ancho fijo para que el número no se mueva
             child: Text(
-              alumnoNumero.toString(), // Le añadimos un punto para que parezca un número de lista
+              alumnoNumero.toString(), 
               textAlign: TextAlign.center,
               style: TextStyle(
                 color: statusColor, // Mantenemos el color basado en el estado
                 fontWeight: FontWeight.bold,
-                fontSize: 16, // Lo hacemos un poco más grande
+                fontSize: 16, 
               ),
             ),
           ),

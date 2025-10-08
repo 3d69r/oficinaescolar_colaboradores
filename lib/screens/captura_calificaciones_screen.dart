@@ -14,12 +14,15 @@ import 'package:oficinaescolar_colaboradores/providers/user_provider.dart';
 import 'package:oficinaescolar_colaboradores/providers/tipo_curso.dart'; 
 
 
+
 class CapturaCalificacionesScreen extends StatefulWidget {
   final MateriaModel materiaSeleccionada;
+
 
   const CapturaCalificacionesScreen({
     super.key,
     required this.materiaSeleccionada,
+
   });
 
   @override
@@ -60,7 +63,7 @@ class _CapturaCalificacionesScreenState extends State<CapturaCalificacionesScree
     try {
       // 1. OBTENER LA ESTRUCTURA DE LA BOLETA
       final estructura = provider.boletaEncabezados.firstWhere(
-        (e) => e.nivelEducativo == materia.planEstudio,
+        (e) => e.nivelEducativo == materia.nivelEducativo,
         orElse: () => throw Exception('No se encontró la estructura de boleta para el Plan: ${materia.planEstudio}'),
       );
       
@@ -117,7 +120,8 @@ class _CapturaCalificacionesScreenState extends State<CapturaCalificacionesScree
     debugPrint('Claves de Solo Lectura: $_readonlyKeys');
   }
 
-  // Genera la celda editable/de texto (Callback pasado a los widgets modulares)
+  // ✅ MÉTODO ACTUALIZADO: Permite la edición de celdas que ya tienen valor,
+  // excepto aquellas marcadas como solo lectura (_readonlyKeys).
   DataCell _buildGradeCell(String alumnoId, String key) {
     // 1. Obtener el valor actual
     final alumnoIndex = _alumnos.indexWhere((a) => a['id_alumno'] == alumnoId);
@@ -126,10 +130,9 @@ class _CapturaCalificacionesScreenState extends State<CapturaCalificacionesScree
     }
     
     // Obtiene el valor actual del estado local (_alumnos)
-    // ✅ MODIFICACIÓN: Usamos .trim() para asegurar que no haya espacios vacíos.
-    final currentValue = _alumnos[alumnoIndex][key]?.toString()?.trim() ?? '';
+    final currentValue = _alumnos[alumnoIndex][key]?.toString().trim() ?? '';
     
-    // 2. SEGURIDAD: Si es una clave de solo lectura (ej: promedio), devuelve un guion.
+    // 2. SEGURIDAD: Si es una clave de solo lectura (ej: promedio o calificación final calculada)
     if (_readonlyKeys.contains(key)) {
       // Muestra el valor si existe, si no, un guion.
       return DataCell(Text(
@@ -139,25 +142,10 @@ class _CapturaCalificacionesScreenState extends State<CapturaCalificacionesScree
       ));
     }
     
-    // ✅ MODIFICACIÓN: LÓGICA DE INMUTABILIDAD POST-GUARDADO
-    // Si ya tiene un valor, lo mostramos como texto estático no editable.
-    if (currentValue.isNotEmpty) {
-      return DataCell(
-        Text(
-          currentValue,
-          textAlign: TextAlign.center,
-          style: const TextStyle(
-            fontWeight: FontWeight.bold, 
-            color: Colors.black54, // Color para indicar que ya está fijo
-          ),
-        ),
-      );
-    }
-    
-    // 4. Devolver la celda editable (TextFormField) - Solo si está vacía
+    // 3. Devolver la celda editable (TextFormField) - Permite la edición del valor actual
     return DataCell(
       TextFormField(
-        initialValue: currentValue,
+        initialValue: currentValue, // Muestra el valor existente de la API o la edición local
         textAlign: TextAlign.center,
         keyboardType: key.toLowerCase().contains('observa') 
             ? TextInputType.text 
@@ -260,6 +248,101 @@ class _CapturaCalificacionesScreenState extends State<CapturaCalificacionesScree
         );
     }
   }
+  
+  // ✅ NUEVO MÉTODO: Muestra el modal de éxito y recarga los datos al cerrarse
+  Future<void> _mostrarModalExito(String mensaje) async {
+    // Usamos el showDialog estándar de Flutter
+    await showDialog(
+      context: context,
+      barrierDismissible: false, // Fuerza al usuario a presionar "Aceptar"
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Guardado Exitoso', style: TextStyle(color: Colors.green)),
+          content: Text(mensaje),
+          actions: <Widget>[
+            TextButton(
+              child: const Text('Aceptar'),
+              onPressed: () {
+                Navigator.of(context).pop(); // Cierra el modal
+              },
+            ),
+          ],
+        );
+      },
+    );
+    
+    // 🚨 CLAVE: Al cerrar el modal, recargamos la data.
+    // Esto asegura que las celdas muestren los datos actualizados de la API.
+    await _loadData(); 
+  }
+
+
+  // --- LÓGICA DE GUARDADO ---
+  
+  // ✅ MÉTODO ACTUALIZADO: Maneja el guardado y el flujo del modal
+  void _sendCalificaciones() async {
+    final provider = Provider.of<UserProvider>(context, listen: false);
+    
+    // 1. Verificar si la estructura de la boleta está cargada
+    if (_estructuraBoleta == null) {
+       ScaffoldMessenger.of(context).showSnackBar(
+           const SnackBar(
+               content: Text('Error: La estructura de la boleta no se ha cargado. Inténtalo de nuevo.'),
+               backgroundColor: Colors.orange,
+           ),
+       );
+       return;
+    }
+
+    // La lista _alumnos ya tiene todos los datos actualizados, incluyendo 'id_alumno' y las calificaciones
+    final List<Map<String, dynamic>> jsonToSend = _alumnos.map((a) => a).toList(); 
+
+    // Mostrar indicador de carga (usamos una variable para poder cerrarlo)
+    final loadingSnackbar = ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Guardando calificaciones...'),
+          duration: Duration(minutes: 1), // Larga duración para cerrarla manualmente
+        ),
+    );
+    
+    try {
+      // 2. LLAMADA A LA API
+      final result = await provider.saveCalificaciones(
+        idCurso: widget.materiaSeleccionada.idMateriaClase,
+        calificacionesLista: jsonToSend,
+        estructuraBoleta: _estructuraBoleta!, 
+      );
+
+      // Ocultar el SnackBar de carga
+      loadingSnackbar.close();
+      
+      final String message = result['message'] as String;
+
+      // ✅ MANEJO DEL MODAL/ERROR
+      if (result['status'] == 'success') {
+          // Si es exitoso, mostramos el modal que se encargará de recargar los datos
+          await _mostrarModalExito(message); 
+      } else {
+          // Si hay un error, mostramos un SnackBar de error
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Error al guardar: $message'),
+              backgroundColor: Colors.red,
+            ),
+          );
+      }
+      
+    } catch (e) {
+      // Ocultar el SnackBar de carga y mostrar error de conexión/app
+      loadingSnackbar.close(); 
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error de conexión o aplicación: ${e.toString()}'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -324,65 +407,5 @@ class _CapturaCalificacionesScreenState extends State<CapturaCalificacionesScree
         child: _buildContentWidget(),
       ),
     );
-  }
-
-  // --- LÓGICA DE GUARDADO ---
-  
-  // --- LÓGICA DE GUARDADO ---
-  
-void _sendCalificaciones() async {
-    final provider = Provider.of<UserProvider>(context, listen: false);
-    
-    // 1. Verificar si la estructura de la boleta está cargada
-    if (_estructuraBoleta == null) {
-       ScaffoldMessenger.of(context).showSnackBar(
-           const SnackBar(
-               content: Text('Error: La estructura de la boleta no se ha cargado. Inténtalo de nuevo.'),
-               backgroundColor: Colors.orange,
-           ),
-       );
-       return;
-    }
-
-    // La lista _alumnos ya tiene todos los datos actualizados, incluyendo 'id_alumno' y las calificaciones
-    final List<Map<String, dynamic>> jsonToSend = _alumnos.map((a) => a).toList(); 
-
-    // Mostrar indicador de carga
-    ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Guardando calificaciones...')),
-    );
-    
-    try {
-      // 2. LLAMADA A LA API: Ahora requiere estructuraBoleta
-      final result = await provider.saveCalificaciones(
-        idCurso: widget.materiaSeleccionada.idMateriaClase,
-        calificacionesLista: jsonToSend,
-        estructuraBoleta: _estructuraBoleta!, // <-- ¡PARAMETRO ESENCIAL AGREGADO!
-      );
-
-      ScaffoldMessenger.of(context).hideCurrentSnackBar(); 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          // La API devuelve 'correcto', pero nuestro Provider lo traduce a 'success'
-          content: Text(result['message'] as String),
-          backgroundColor: result['status'] == 'success' ? Colors.green : Colors.red,
-        ),
-      );
-      
-      // ✅ Si se guarda con éxito, recargamos la data para actualizar el estado visual
-      if (result['status'] == 'success') {
-          // Si _loadData está en progreso, mostrará un indicador de carga.
-          await _loadData(); 
-      }
-      
-    } catch (e) {
-      ScaffoldMessenger.of(context).hideCurrentSnackBar(); 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error al guardar: ${e.toString()}'),
-          backgroundColor: Colors.red,
-        ),
-      );
-    }
   }
 }
