@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:oficinaescolar_colaboradores/widgets/posgrado_table_wiget.dart';
+//import 'package:oficinaescolar_colaboradores/widgets/posgrado_table_wiget.dart';
 import 'package:oficinaescolar_colaboradores/widgets/preescolar_table_widget.dart';
 import 'package:oficinaescolar_colaboradores/widgets/preparatoria_table_widget.dart';
 import 'package:oficinaescolar_colaboradores/widgets/primaria_table_widget.dart';
@@ -95,31 +95,46 @@ class _CapturaCalificacionesScreenState extends State<CapturaCalificacionesScree
   // --- LÓGICA DE NEGOCIO ---
 
   // Identifica las claves que son promedios o calculadas (Promedio, CF, etc.)
-  void _identifyReadonlyKeys(BoletaEncabezadoModel estructura) {
-    Set<String> keys = {};
-    
-    // Busca en las relaciones cualquier clave que contenga 'promedio' o 'final'
-    estructura.relaciones.values.forEach((relationString) {
-      relationString.split(',').forEach((key) {
-        final lowerKey = key.trim().toLowerCase();
-        if (lowerKey.contains('promedio') || lowerKey.contains('final') || lowerKey == 'cf') {
-          keys.add(key.trim());
-        }
-      });
-    });
+    void _identifyReadonlyKeys(BoletaEncabezadoModel estructura) {
+        Set<String> keys = {};
+        
+        estructura.relaciones.values.forEach((relationString) {
+          relationString.split(',').forEach((key) {
+            final lowerKey = key.trim().toLowerCase();
+            
+            // La condición principal de solo lectura (promedio, CF)
+            if (lowerKey.contains('promedio') || lowerKey == 'cf') { 
+              keys.add(key.trim());
+            }
+            
+            // 🚨 CAMBIO CLAVE AQUÍ
+            // Si la clave anterior 'calificacion_final' sigue siendo un riesgo de ser read-only, 
+            // mantenemos la exclusión o la eliminamos si ya no es relevante.
+            // Dado que 'calificacion' y 'observaciones' no tienen 'final', 
+            // la siguiente línea puede simplificarse para solo buscar 'final' que NO sea 'calificacion_final'.
+            
+            // Si el backend introduce 'calificacion_promedio', la primera condición lo atraparía.
+            // Si introduce 'calificacion_final', el siguiente bloque lo excluye si lo necesitas.
+            
+            if (lowerKey.contains('final') && lowerKey != 'calificacion_final') {
+                keys.add(key.trim());
+            }
 
-    // Añade la clave de 'comentarios' si el encabezado es 'PROMEDIO FINAL'
-    estructura.comentarios.entries.forEach((entry) {
-        final commentValue = entry.value.toLowerCase();
-        if (commentValue.contains('promedio') || commentValue.contains('final')) {
-             keys.add(entry.key);
-        }
-    });
+          });
+        });
 
-    _readonlyKeys = keys.toList();
-    debugPrint('Claves de Solo Lectura: $_readonlyKeys');
-  }
+        // Esta parte maneja comentarios o encabezados especiales (no afecta a 'calificacion'/'observaciones')
+        estructura.comentarios.entries.forEach((entry) {
+            final commentValue = entry.value.toLowerCase();
+            if (commentValue.contains('promedio') || commentValue.contains('final')) {
+                keys.add(entry.key);
+            }
+        });
 
+        _readonlyKeys = keys.toList();
+        // Revisa la consola: deberías ver una lista vacía o solo las claves que son *realmente* promedios.
+        debugPrint('Claves de Solo Lectura: $_readonlyKeys'); 
+    }
   // ✅ MÉTODO ACTUALIZADO: Permite la edición de celdas que ya tienen valor,
   // excepto aquellas marcadas como solo lectura (_readonlyKeys).
   DataCell _buildGradeCell(String alumnoId, String key) {
@@ -235,7 +250,7 @@ class _CapturaCalificacionesScreenState extends State<CapturaCalificacionesScree
         );
 
       case 'Programas de posgrado':
-        return PosgradoCalificacionesWidget(
+        return UniversidadCalificacionesWidget(
           alumnos: _alumnos,
           estructura: estructura,
           buildGradeCell: _buildGradeCell,

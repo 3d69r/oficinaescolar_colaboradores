@@ -310,7 +310,7 @@ class _ContactosScreenState extends State<ContactosScreen>
               'ContactosScreen: RefreshIndicator activado. Iniciando recarga forzada.',
             );
             _showSnackBar(
-              'Recargando contactos...',
+              'Recargando datos...',
               duration: const Duration(seconds: 1),
               backgroundColor: Colors.grey,
             );

@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart'; // 1. Importar Provider
+import 'package:provider/provider.dart'; 
 import 'package:oficinaescolar_colaboradores/models/boleta_encabezado_model.dart'; 
-import 'package:oficinaescolar_colaboradores/providers/user_provider.dart'; // 2. Importar UserProvider
+import 'package:oficinaescolar_colaboradores/providers/user_provider.dart'; 
 
-class PreescolarCalificacionesWidget extends StatelessWidget {
+// ⭐️ CONVERTIDO A STATEFUL WIDGET ⭐️
+class PreescolarCalificacionesWidget extends StatefulWidget {
   final List<Map<String, dynamic>> alumnos;
   final BoletaEncabezadoModel estructura;
   final DataCell Function(String, String) buildGradeCell;
@@ -11,8 +12,6 @@ class PreescolarCalificacionesWidget extends StatelessWidget {
   // Aquí usamos 'observationKeys' como el identificador de los campos editables
   final List<String> observationKeys; 
   
-  //final Color headerColor = Colors.green.shade700; // Eliminado
-
    const PreescolarCalificacionesWidget({
     super.key,
     required this.alumnos,
@@ -21,18 +20,74 @@ class PreescolarCalificacionesWidget extends StatelessWidget {
     required this.observationKeys, // Claves de los comentarios (ej: comentario_parcial_1)
   });
 
+  @override
+  State<PreescolarCalificacionesWidget> createState() => _PreescolarCalificacionesWidgetState();
+}
+
+class _PreescolarCalificacionesWidgetState extends State<PreescolarCalificacionesWidget> {
+  
+  // ⭐️ VARIABLES DE ESTADO PARA EL FILTRO ⭐️
+  late TextEditingController _searchController;
+  List<Map<String, dynamic>> _filteredAlumnos = [];
+  
+  @override
+  void initState() {
+    super.initState();
+    _searchController = TextEditingController();
+    // 1. Inicializar la lista filtrada con todos los alumnos
+    _filteredAlumnos = widget.alumnos;
+    
+    // 2. Agregar listener para actualizar la lista cada vez que cambia el texto
+    _searchController.addListener(_filterAlumnos);
+  }
+  
+  @override
+  void dispose() {
+    // 3. Limpiar controller y listener al destruir el widget
+    _searchController.removeListener(_filterAlumnos);
+    _searchController.dispose();
+    super.dispose();
+  }
+  
+  // ⭐️ MÉTODO DE FILTRADO ⭐️
+  void _filterAlumnos() {
+    // Usamos el texto de búsqueda en minúsculas y sin espacios iniciales/finales
+    final String query = _searchController.text.toLowerCase().trim();
+    
+    if (query.isEmpty) {
+      // Si la búsqueda está vacía, mostrar todos
+      setState(() {
+        _filteredAlumnos = widget.alumnos;
+      });
+      return;
+    }
+    
+    // Filtramos en base al nombre completo del alumno
+    final List<Map<String, dynamic>> results = widget.alumnos.where((alumno) {
+      final String primerNombre = alumno['primer_nombre'] as String? ?? '';
+      final String segundoNombre = alumno['segundo_nombre'] as String? ?? '';
+      final String apellidoPat = alumno['apellido_pat'] as String? ?? '';
+      final String apellidoMat = alumno['apellido_mat'] as String? ?? '';
+      
+      // Concatenamos y normalizamos el nombre para la búsqueda
+      final String nombreCompleto = '$primerNombre $segundoNombre $apellidoPat $apellidoMat'.toLowerCase().trim();
+      
+      return nombreCompleto.contains(query);
+    }).toList();
+    
+    setState(() {
+      _filteredAlumnos = results;
+    });
+  }
+
   // --- LÓGICA DE EXTRACCIÓN DE ENCABEZADOS ---
   
   List<Map<String, dynamic>> _getDynamicHeaders() {
       final List<Map<String, dynamic>> headers = [];
       
-      // Itera sobre los encabezados principales (Parcial 1, Parcial 2, Parcial 3).
-      estructura.encabezados.forEach((key, value) {
-          // 'key' es el nombre del encabezado (Ej: "Parcial 1")
-          // 'value' es la clave de la relación (Ej: "enc_relacion_1")
-
-          // Busca la clave del dato real (Ej: "comentario_parcial_1") usando la clave de relación.
-          final String relationString = estructura.relaciones[value] ?? ''; 
+      // Acceder a la estructura del widget
+      widget.estructura.encabezados.forEach((key, value) {
+          final String relationString = widget.estructura.relaciones[value] ?? ''; 
           
           final List<String> subKeys = relationString
               .split(',')
@@ -40,26 +95,25 @@ class PreescolarCalificacionesWidget extends StatelessWidget {
               .map((s) => s.trim())
               .toList();
 
-          // Solo si encontramos una clave de dato válida (Ej: 'comentario_parcial_1'), la agregamos.
           if (subKeys.isNotEmpty) {
               headers.add({
-                  'header': key, // ⭐️ USAMOS EL NOMBRE DEL ENCABEZADO ("Parcial 1") COMO TÍTULO
-                  'dataKey': subKeys.first, // USAMOS LA CLAVE DEL DATO ("comentario_parcial_1") PARA EL CAMPO
+                  'header': key, 
+                  'dataKey': subKeys.first,
               });
           }
       });
-      return headers; // Esto debe devolver una lista con 3 elementos: Parcial 1, Parcial 2, Parcial 3.
+      return headers; 
   }
   
-  // --- CONSTRUCCIÓN DE LA TABLA VERTICAL ---
+  // --- CONSTRUCCIÓN DEL WIDGET ---
   
   @override
   Widget build(BuildContext context) {
-    // 3. ACCESO AL COLOR DINÁMICO
+    // ACCESO AL COLOR DINÁMICO
     final colores = Provider.of<UserProvider>(context).colores;
     final Color dynamicHeaderColor = colores.headerColor;
     
-    if (alumnos.isEmpty) {
+    if (widget.alumnos.isEmpty) {
       return const Center(child: Text('No se encontraron alumnos asignados.'));
     }
 
@@ -74,32 +128,70 @@ class PreescolarCalificacionesWidget extends StatelessWidget {
         );
     }
 
-
-    return SingleChildScrollView(
-      scrollDirection: Axis.vertical, // Scroll vertical para los bloques de alumnos
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Padding(
-            padding: const EdgeInsets.only(bottom: 12.0),
-            child: Text(
-              'Captura de Observaciones de Preescolar',
-              // ⭐️ USAR COLOR DINÁMICO ⭐️
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: dynamicHeaderColor),
+    // El SingleChildScrollView que contiene este widget debe manejar el scroll vertical.
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      // Usamos MainAxisSize.max porque este Column sí tiene límites de altura definidos por el padre
+      // (asumimos que está directamente bajo el body o en un Expanded/SizedBox).
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(bottom: 12.0),
+          child: Text(
+            'Captura de Observaciones de Preescolar',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: dynamicHeaderColor),
+          ),
+        ),
+        
+        // ⭐️ CAMPO DE BÚSQUEDA ⭐️
+        Padding(
+          padding: const EdgeInsets.only(bottom: 16.0),
+          child: TextField(
+            controller: _searchController,
+            decoration: InputDecoration(
+              labelText: 'Filtrar por Alumno',
+              hintText: 'Escribe el nombre del alumno...',
+              prefixIcon: const Icon(Icons.search),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8.0),
+              ),
+              suffixIcon: _searchController.text.isNotEmpty
+                  ? IconButton(
+                      icon: const Icon(Icons.clear),
+                      onPressed: () {
+                        _searchController.clear();
+                        _filterAlumnos();
+                      },
+                    )
+                  : null,
             ),
           ),
-          
-          // Construcción de cada Bloque de Alumno
-          // Pasamos el color al bloque
-          ...alumnos.map((alumno) {
-            return _buildAlumnoBlock(alumno, headers, dynamicHeaderColor);
-          }).toList(),
-        ],
-      ),
+        ),
+
+        // ⭐️ LISTA DE ALUMNOS FILTRADA ⭐️
+        // No usamos Expanded ni otro SingleChildScrollView aquí.
+        
+        // Mensaje si no hay resultados
+        if (_filteredAlumnos.isEmpty)
+          Center(
+            child: Padding(
+              padding: const EdgeInsets.only(top: 20.0),
+              child: Text(
+                'No se encontró ningún alumno con el nombre "${_searchController.text}".',
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: Colors.grey, fontSize: 16),
+              ),
+            ),
+          ),
+
+        // Construcción de cada Bloque de Alumno usando la lista FILTRADA
+        ..._filteredAlumnos.map((alumno) {
+          return _buildAlumnoBlock(alumno, headers, dynamicHeaderColor);
+        }).toList(),
+      ],
     );
   }
 
-  // --- BLOQUE DE ALUMNO (Modificamos la firma) ---
+  // --- BLOQUE DE ALUMNO ---
   
   Widget _buildAlumnoBlock(Map<String, dynamic> alumno, List<Map<String, dynamic>> headers, Color headerColor) {
     final String alumnoId = alumno['id_alumno'] as String? ?? '';
@@ -124,9 +216,8 @@ class PreescolarCalificacionesWidget extends StatelessWidget {
             ),
             const Divider(),
             
-            // ⭐️ SOLO ITERA SOBRE LA LISTA DE HEADERS (3 VECES) ⭐️
+            // Itera sobre los encabezados de parciales/observaciones
             ...headers.map((header) {
-              // Pasamos el color a la sección de observación
               return _buildObservationSection(alumnoId, header, headerColor);
             }).toList(),
           ],
@@ -135,10 +226,9 @@ class PreescolarCalificacionesWidget extends StatelessWidget {
     );
   }
   
-  // --- SECCIÓN DE OBSERVACIÓN (Modificamos la firma) ---
+  // --- SECCIÓN DE OBSERVACIÓN ---
   
   Widget _buildObservationSection(String alumnoId, Map<String, dynamic> header, Color headerColor) {
-    // Usamos el nombre del encabezado (Ej: "Parcial 1") como título.
     final String displayTitle = header['header'].toString().toUpperCase(); 
     final String dataKey = header['dataKey'] as String; // Ej: "comentario_parcial_1"
     
@@ -150,7 +240,6 @@ class PreescolarCalificacionesWidget extends StatelessWidget {
           // Título del Parcial/Observación
           Text(
             displayTitle,
-            // ⭐️ USAR COLOR DINÁMICO ⭐️
             style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: headerColor),
           ),
           const SizedBox(height: 6),
@@ -166,7 +255,7 @@ class PreescolarCalificacionesWidget extends StatelessWidget {
 
   Widget _buildCommentInputField(String alumnoId, String key) {
     // Usamos el callback DataCell de la pantalla principal
-    final DataCell dataCell = buildGradeCell(alumnoId, key);
+    final DataCell dataCell = widget.buildGradeCell(alumnoId, key);
     
     return Container(
       // Altura ajustable para un campo de texto de varias líneas

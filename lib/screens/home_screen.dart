@@ -19,8 +19,7 @@ import 'perfil_screen.dart';
 import 'datos_escuela_screen.dart';
 import 'comentarios_screen.dart';
 import 'asistencia_screen.dart'; 
-//import 'materias_screen.dart'; 
-import 'subir_avisos_screen.dart'; // ✅ [NUEVO] Importar pantalla de Subir Avisos
+import 'subir_avisos_screen.dart'; 
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -48,7 +47,11 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void dispose() {
     debugPrint('HomeScreen: dispose - Limpiando recursos de HomeScreen.');
+    // Se asegura de que _userProvider se haya inicializado antes de remover el listener
+    // Acceso más directo a la variable de instancia:
+if (mounted) {
     _userProvider.autoRefreshTrigger.removeListener(_onAutoRefreshTriggered);
+}
     super.dispose();
   }
 
@@ -100,13 +103,11 @@ class _HomeScreenState extends State<HomeScreen> {
     if (colaborador.apellidoPat.isNotEmpty) {
       nameParts.add(colaborador.apellidoPat);
     }
-    /*if (colaborador.apellidoMat.isNotEmpty) {
-      nameParts.add(colaborador.apellidoMat);
-    }*/
     final fullName = nameParts.join(' ').trim();
     return fullName.isEmpty ? 'Nombre no disponible' : fullName;
   }
 
+  /// ⭐️ MÉTODO MODIFICADO PARA FORZAR LA POSICIÓN DE AVISOS ⭐️
   Map<String, dynamic> _buildDynamicMenu(BuildContext context) {
     final userProvider = Provider.of<UserProvider>(context);
     final List<String> permisos =
@@ -123,93 +124,113 @@ class _HomeScreenState extends State<HomeScreen> {
             .toList() ??
         [];
 
-    final List<Widget> dynamicPages = [];
-    final List<Widget> dynamicNavItems = [];
-    
-    // ✅ [AGREGADO] Se añade la pantalla y el ícono para subir avisos si el permiso está presente
+    // --- 1. Definir todas las páginas/ítems posibles EXCLUYENDO Avisos ---
+    final List<Widget> pagesBeforeAvisos = [];
+    final List<Widget> navItemsBeforeAvisos = [];
+    final List<Widget> pagesAfterAvisos = [];
+    final List<Widget> navItemsAfterAvisos = [];
+
+    // Items que van antes/izquierda de Avisos
     if (permisosColab.contains('Crud_Avisos')) {
-      dynamicPages.add(const SubirAvisosScreen());
-      dynamicNavItems.add(
+      pagesBeforeAvisos.add(const SubirAvisosScreen());
+      navItemsBeforeAvisos.add(
         const Icon(Icons.campaign_outlined, size: 30, color: Colors.white),
       );
     }
     if (permisos.contains('Sitios de Interes')) {
-      dynamicPages.add(WebsInteresScreen(escuela: userProvider.escuelaModel!));
-      dynamicNavItems.add(
+      pagesBeforeAvisos.add(WebsInteresScreen(escuela: userProvider.escuelaModel!));
+      navItemsBeforeAvisos.add(
         const Icon(Icons.public, size: 30, color: Colors.white),
       );
     }
     if (permisosColab.contains('Asistencia')) {
-      dynamicPages.add(const AsistenciaScreen());
-      dynamicNavItems.add(
+      pagesBeforeAvisos.add(const AsistenciaScreen());
+      navItemsBeforeAvisos.add(
         const Icon(Icons.check_circle_outline, size: 30, color: Colors.white),
       );
     }
-    /*if (permisosColab.contains('Calificar')) {
-      dynamicPages.add(const MateriasScreen());
-      dynamicNavItems.add(
-        const Icon(Icons.class_outlined, size: 30, color: Colors.white),
-      );
-    }*/
+    
+    // Items que van después/derecha de Avisos
     if (permisos.contains('Directorio')) {
-      dynamicPages.add(const ContactosScreen());
-      dynamicNavItems.add(
+      pagesAfterAvisos.add(const ContactosScreen());
+      navItemsAfterAvisos.add(
         const Icon(Icons.contact_phone, size: 30, color: Colors.white),
       );
     }
-    if (permisos.contains('Avisos')) {
-      dynamicPages.add(const AvisosView());
-      dynamicNavItems.add(
-        Stack(
-          clipBehavior: Clip.none,
-          children: [
-            const Icon(Icons.notifications, size: 30, color: Colors.white),
-            Consumer<UserProvider>(
-              builder: (context, userProvider, child) {
-                final unreadCount = userProvider.unreadAvisosCount;
-                return unreadCount > 0
-                    ? Positioned(
-                      right: -5,
-                      top: -5,
-                      child: Container(
-                        padding: const EdgeInsets.all(3),
-                        decoration: BoxDecoration(
-                          color: Colors.red,
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        constraints: const BoxConstraints(
-                          minWidth: 18,
-                          minHeight: 18,
-                        ),
-                        child: Text(
-                          '$unreadCount',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
-                      ),
-                    )
-                    : const SizedBox.shrink();
-              },
-            ),
-          ],
-        ),
-      );
-    }
     if (permisos.contains('Cafeteria')) {
-      dynamicPages.add(const CafeteriaView());
-      dynamicNavItems.add(
+      pagesAfterAvisos.add(const CafeteriaView());
+      navItemsAfterAvisos.add(
         const Icon(Icons.local_cafe, size: 30, color: Colors.white),
       );
     }
 
-    return {'pages': dynamicPages, 'items': dynamicNavItems};
+    // --- 2. Preparar el botón de Avisos ---
+    final bool hasAvisosPermission = permisos.contains('Avisos');
+    final Widget avisosPage = const AvisosView();
+    final Widget avisosNavItem = Stack(
+      clipBehavior: Clip.none,
+      children: [
+        const Icon(Icons.notifications, size: 30, color: Colors.white),
+        Consumer<UserProvider>(
+          builder: (context, userProvider, child) {
+            final unreadCount = userProvider.unreadAvisosCount;
+            return unreadCount > 0
+                ? Positioned(
+                  right: -5,
+                  top: -5,
+                  child: Container(
+                    padding: const EdgeInsets.all(3),
+                    decoration: BoxDecoration(
+                      color: Colors.red,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    constraints: const BoxConstraints(
+                      minWidth: 18,
+                      minHeight: 18,
+                    ),
+                    child: Text(
+                      '$unreadCount',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                )
+                : const SizedBox.shrink();
+          },
+        ),
+      ],
+    );
+
+    // --- 3. Calcular la posición central para Avisos ---
+    final List<Widget> tempOtherPages = [...pagesBeforeAvisos, ...pagesAfterAvisos];
+    final List<Widget> tempOtherNavItems = [...navItemsBeforeAvisos, ...navItemsAfterAvisos];
+    
+    final int finalTotalItems = tempOtherPages.length + (hasAvisosPermission ? 1 : 0);
+    int targetAvisosIndex = 0; 
+
+    if (finalTotalItems > 0 && hasAvisosPermission) {
+        if (finalTotalItems % 2 != 0) { // IMPAR (Ej: 5 items, pos 2)
+            targetAvisosIndex = (finalTotalItems / 2).floor();
+        } else { // PAR (Ej: 4 items, pos 1)
+            targetAvisosIndex = (finalTotalItems / 2).floor() - 1;
+        }
+    }
+    
+    // 4. Insertamos Avisos en la posición calculada
+    if (hasAvisosPermission) {
+        tempOtherPages.insert(targetAvisosIndex, avisosPage);
+        tempOtherNavItems.insert(targetAvisosIndex, avisosNavItem);
+    }
+    
+    // 5. Devolvemos el menú final y el índice de Avisos
+    return {'pages': tempOtherPages, 'items': tempOtherNavItems, 'avisosIndex': hasAvisosPermission ? targetAvisosIndex : -1};
   }
 
-  /// --- Método para construir el Drawer ---
+  /// --- Método para construir el Drawer (sin cambios) ---
   Widget _buildEndDrawer(BuildContext context) {
     final userProvider = Provider.of<UserProvider>(context, listen: false);
     final colaborador = userProvider.colaboradorModel;
@@ -220,9 +241,6 @@ class _HomeScreenState extends State<HomeScreen> {
         return 'Cargando...';
       }
       List<String> nameParts = [];
-      /*if (colaborador.primerNombre.isNotEmpty) {
-        nameParts.add(colaborador.primerNombre);
-      }*/
       if (colaborador.apellidoPat.isNotEmpty) {
         nameParts.add(colaborador.apellidoPat);
       }
@@ -376,9 +394,10 @@ class _HomeScreenState extends State<HomeScreen> {
     final menuData = _buildDynamicMenu(context);
     final List<Widget> dynamicPages = menuData['pages'];
     final List<Widget> dynamicNavItems = menuData['items'];
+    final int avisosIndex = menuData['avisosIndex'] ?? -1; // ⭐️ RECUPERAR EL ÍNDICE CALCULADO ⭐️
 
     if (!_isInitialPageIndexSet && dynamicPages.isNotEmpty) {
-      final avisosIndex = dynamicPages.indexWhere((page) => page is AvisosView);
+      // ⭐️ USAR EL ÍNDICE CALCULADO PARA INICIALIZAR LA PÁGINA ⭐️
       _pageIndex = (avisosIndex != -1) ? avisosIndex : 0;
       _isInitialPageIndexSet = true;
     }

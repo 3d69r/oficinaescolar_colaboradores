@@ -728,7 +728,7 @@ Widget build(BuildContext context) {
             debugPrint('AvisosView: RefreshIndicator activado. Iniciando recarga forzada.');
 
             _showSnackBar(
-              'Recargando avisos...',
+              'Recargando datos...',
               duration: const Duration(seconds: 1),
               backgroundColor: Colors.grey,
             );

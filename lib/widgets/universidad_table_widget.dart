@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart'; // 1. Importar Provider
+import 'package:provider/provider.dart'; 
 // Asegúrate de importar tu modelo de Boleta Encabezado
 import 'package:oficinaescolar_colaboradores/models/boleta_encabezado_model.dart'; 
-import 'package:oficinaescolar_colaboradores/providers/user_provider.dart'; // 2. Importar UserProvider
+import 'package:oficinaescolar_colaboradores/providers/user_provider.dart'; 
 
 class UniversidadCalificacionesWidget extends StatelessWidget {
   final List<Map<String, dynamic>> alumnos;
@@ -12,10 +12,7 @@ class UniversidadCalificacionesWidget extends StatelessWidget {
   // pero mantenemos la propiedad por consistencia.
   final List<String> readonlyKeys; 
   
-  // Eliminamos el color estático
-  // final Color headerColor = Colors.grey.shade900; 
-
-   const UniversidadCalificacionesWidget({ // Usamos const para el constructor
+   const UniversidadCalificacionesWidget({ 
     super.key,
     required this.alumnos,
     required this.estructura,
@@ -30,7 +27,7 @@ class UniversidadCalificacionesWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // 3. ACCESO AL COLOR DINÁMICO
+    // ACCESO AL COLOR DINÁMICO
     final colores = Provider.of<UserProvider>(context).colores;
     final Color dynamicHeaderColor = colores.headerColor;
     
@@ -52,7 +49,6 @@ class UniversidadCalificacionesWidget extends StatelessWidget {
         child: Column(
           children: [
             // Cabecera
-            // ⭐️ Pasar el color dinámico ⭐️
             _buildHeaderRow(headers, dynamicHeaderColor),
             
             // Filas de Alumnos
@@ -66,16 +62,15 @@ class UniversidadCalificacionesWidget extends StatelessWidget {
     );
   }
 
-  // --- LÓGICA DE ENCABEZADOS DINÁMICOS (SIN CAMBIOS) ---
+  // --- LÓGICA DE ENCABEZADOS DINÁMICOS ---
 
   List<Map<String, dynamic>> _getDynamicHeaders() {
     final List<Map<String, dynamic>> headers = [];
     
-    // 1. Encabezados principales (Solo uno o dos para Licenciatura)
-    estructura.encabezados.forEach((key, value) {
+    // 1. Encabezados principales
+    estructura.encabezados.forEach((nombreHeader, claveRelacion) { 
       
-      // La clave 'relaciones' contendrá la cadena: "calificacion_final,evalua_observaciones"
-      final String relationString = estructura.relaciones[key] ?? key; 
+      final String relationString = estructura.relaciones[claveRelacion] ?? nombreHeader; 
       
       final List<String> subHeaders = relationString
           .split(',')
@@ -83,31 +78,35 @@ class UniversidadCalificacionesWidget extends StatelessWidget {
           .map((s) => s.trim())
           .toList();
 
-      headers.add({
-        'header': value, // Ej: Calificación
-        'subHeaders': subHeaders, // Ej: [calificacion_final, evalua_observaciones]
-      });
+      if (subHeaders.isNotEmpty) {
+          headers.add({
+            'header': nombreHeader, // Ej: Calificación Final
+            'subHeaders': subHeaders, // Ej: [calificacion_final, evalua_observaciones]
+          });
+      }
     });
 
-    // 2. Comentarios/Observaciones (Si existen por separado) - Usualmente vacío en este nivel
+    // 2. Comentarios/Observaciones
     if (estructura.comentarios.isNotEmpty) {
       final String commentKey = estructura.comentarios.keys.first;
       final String commentValue = estructura.comentarios.values.first;
         
-      headers.add({
-        'header': commentValue, 
-        'subHeaders': [commentKey], 
-      });
+      if (!headers.any((h) => (h['subHeaders'] as List<String>).contains(commentKey))) {
+          headers.add({
+            'header': commentValue, 
+            'subHeaders': [commentKey], 
+          });
+      }
     }
     
     return headers;
   }
   
-  // --- CONSTRUCCIÓN DE LA CABECERA (Modificamos la firma) ---
+  // --- CONSTRUCCIÓN DE LA CABECERA ---
   
   Widget _buildHeaderRow(List<Map<String, dynamic>> headers, Color headerColor) {
-    // Para simplificar la interfaz, si solo hay un encabezado principal, lo hacemos simple
-    final bool isSimpleHeader = headers.length == 1 && headers.first['subHeaders'].length == 1;
+    // Si solo hay un encabezado (ej. "Calificación") pero con MÚLTIPLES subHeaders, la altura del encabezado del alumno debe ser 2x.
+    final bool needsDoubleHeight = headers.length == 1 && (headers.first['subHeaders'] as List<String>).length > 1;
     final double headerHeight = 50.0;
     
     return IntrinsicHeight(
@@ -117,27 +116,26 @@ class UniversidadCalificacionesWidget extends StatelessWidget {
           _buildHeaderCell(
             'ALUMNO', 
             width: NAME_CELL_WIDTH, 
-            // Si el encabezado es simple (solo un sub-encabezado), la altura es 1x
-            height: isSimpleHeader ? headerHeight : headerHeight * 2, 
-            color: headerColor // ⭐️ Color Dinámico ⭐️
+            height: needsDoubleHeight ? headerHeight * 2 : headerHeight, 
+            color: headerColor 
           ),
 
           // Encabezados Dinámicos
           ...headers.map((header) {
             final subHeaders = header['subHeaders'] as List<String>;
             
-            // Si es un encabezado simple, no anidamos en Column.
-            if (isSimpleHeader) {
+            // Caso simple (no anidado)
+            if (subHeaders.length == 1 && !needsDoubleHeight) {
                 final String displayText = subHeaders.first.replaceAll('_', ' ').toUpperCase();
                 return _buildHeaderCell(
                     displayText, 
                     width: GRADE_CELL_WIDTH, 
                     height: headerHeight, 
-                    color: headerColor, // ⭐️ Color Dinámico ⭐️
+                    color: headerColor, 
                 );
             }
 
-            // Si es un encabezado anidado (como 'Calificación' sobre dos sub-claves)
+            // Caso anidado (Licenciatura con calificacion_final y evalua_observaciones)
             return Column(
               children: [
                 // Encabezado Principal (Ej: CALIFICACIÓN)
@@ -145,7 +143,7 @@ class UniversidadCalificacionesWidget extends StatelessWidget {
                   header['header'].toString().toUpperCase(), 
                   width: subHeaders.length * GRADE_CELL_WIDTH, 
                   height: headerHeight, 
-                  color: headerColor, // ⭐️ Color Dinámico ⭐️
+                  color: headerColor, 
                 ),
                 // Sub-Encabezado (Ej: CALIFICACIÓN FINAL, EVALÚA OBSERVACIONES)
                 Row(
@@ -156,7 +154,7 @@ class UniversidadCalificacionesWidget extends StatelessWidget {
                     
                     final Color subHeaderColor = readonlyKeys.contains(subHeaderKey) 
                         ? Colors.black.withOpacity(0.9) 
-                        : headerColor.withOpacity(0.8); // ⭐️ Color Dinámico ⭐️
+                        : headerColor.withOpacity(0.8); 
 
                     return _buildHeaderCell(
                       displayText, 
@@ -175,7 +173,7 @@ class UniversidadCalificacionesWidget extends StatelessWidget {
   }
 
 
-  // --- CONSTRUCCIÓN DE LAS FILAS DE DATOS (SIN CAMBIOS) ---
+  // --- CONSTRUCCIÓN DE LAS FILAS DE DATOS (CORREGIDO PARA HACER AMBOS EDITABLES) ---
 
   Widget _buildAlumnoRow(
     Map<String, dynamic> alumno, 
@@ -212,12 +210,17 @@ class UniversidadCalificacionesWidget extends StatelessWidget {
           // 2. Celdas de Calificación Dinámicas
           ...allSubHeaderKeys.map((key) {
             
-            if (readonlyKeys.contains(key)) {
-              // Campo de solo lectura (Si se usa 'readonlyKeys')
+            // ⭐️ LÓGICA CLAVE: La columna es de solo lectura SOLAMENTE si está en la lista 'readonlyKeys'. ⭐️
+            // Si la lista 'readonlyKeys' está vacía o no contiene 'calificacion_final' ni 'evalua_observaciones',
+            // ambas columnas serán editables.
+            final bool isReadonly = readonlyKeys.contains(key);
+            
+            if (isReadonly) {
+              // Campo de solo lectura
               final String calculatedValue = alumno[key]?.toString() ?? '-';
               return _buildReadonlyCell(calculatedValue, GRADE_CELL_WIDTH, rowColor);
             } else {
-              // Campo editable
+              // Campo editable (Debe ser calificacion_final y evalua_observaciones)
               return _buildGradeCellAsContainer(buildGradeCell(alumnoId, key), GRADE_CELL_WIDTH, rowColor);
             }
           }).toList(),
@@ -226,7 +229,7 @@ class UniversidadCalificacionesWidget extends StatelessWidget {
     );
   }
 
-  // --- MÉTODOS AUXILIARES (Modificamos la firma de _buildHeaderCell) ---
+  // --- MÉTODOS AUXILIARES (Sin cambios) ---
 
   Widget _buildGradeCellAsContainer(DataCell dataCell, double width, Color color) {
     final Widget cellContent = dataCell.child; 
@@ -273,7 +276,6 @@ class UniversidadCalificacionesWidget extends StatelessWidget {
     );
   }
   
-  // Modificamos la firma para que use el color dinámico que se le pasa
   Widget _buildHeaderCell(String text, {required double width, required double height, required Color color}) {
     return SizedBox(
       width: width,
@@ -281,7 +283,7 @@ class UniversidadCalificacionesWidget extends StatelessWidget {
       child: Container(
         decoration: BoxDecoration(
           border: Border.all(color: Colors.black, width: 1.0),
-          color: color, // ⭐️ Color Dinámico ⭐️
+          color: color, 
         ),
         padding: const EdgeInsets.all(6.0),
         child: Center(

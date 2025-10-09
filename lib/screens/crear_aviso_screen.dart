@@ -221,7 +221,7 @@ class _CrearAvisoScreenState extends State<CrearAvisoScreen> {
               _buildFiltroDropdown(
                 label: 'Requiere respuesta',
                 value: _respuestaSeleccionada,
-                items: const ['Ninguna', 'Sí'],
+                items: const ['Ninguna', 'Sí o No', 'Seleccion multiple'],
                 onChanged: (String? newValue) {
                   setState(() {
                     _respuestaSeleccionada = newValue!;
