@@ -576,57 +576,71 @@ void _mostrarAviso(AvisoModel aviso) {
   /// 1. Avisos no leídos aparecen primero.
   /// 2. Avisos leídos aparecen después.
   /// 3. Dentro de cada grupo, los avisos se ordenan por fecha de forma descendente (más reciente primero).
-  List<AvisoModel> get avisosFiltrados {
+   List<AvisoModel> get avisosFiltrados {
+    // 1. Definir el punto de referencia: Hoy, a medianoche.
     final now = DateTime.now();
-
-    // Accede a la lista de avisos del UserProvider.
-    // La variable 'avisos' debe ser la lista completa de avisos
-    // sin ningún tipo de filtro previo.
+    final today = DateTime(now.year, now.month, now.day); // Hoy a 00:00:00
+    
     final List<AvisoModel> allAvisos = _userProvider.avisos;
 
-    // 1. Aplicar el filtro por fecha, estado de lectura y archivados.
-    final List<AvisoModel> filtered =
-        allAvisos.where((aviso) {
-          // Si la fecha de fin existe y es anterior a la fecha actual,
-          // el aviso se considera "archivado".
-          final bool isArchived = aviso.fechaFin.isBefore(now);
+    // 2. Aplicar los filtros de visibilidad y filtros de usuario
+    final List<AvisoModel> filtered = allAvisos.where((aviso) {
+        
+        // --- PRE-FILTRO DE VISIBILIDAD (Requerimiento del usuario) ---
+        
+        // Convertimos la fecha de inicio del aviso a medianoche para una comparación solo por día.
+        final avisoStartDate = DateTime(aviso.fecha.year, aviso.fecha.month, aviso.fecha.day);
 
-          // Condición para el filtro de fecha (sigue igual).
-          final bool pasaFecha =
-              fechaFiltro == null || aviso.fecha.isAfter(fechaFiltro!);
+        // CONDICIÓN 1: AVISO NO VISIBLE (Fecha de inicio es posterior a hoy)
+        // Ejemplo: Aviso 2025-11-10. Si hoy es 2025-10-10, esAfter devuelve TRUE.
+        if (avisoStartDate.isAfter(today)) {
+            return false; // Descartar si aún no es la fecha de inicio.
+        }
 
-          // Condición para el filtro de estado de lectura.
-          final bool pasaLectura =
-              (filtroLectura == 'Todos') ||
-              (filtroLectura == 'Leídos' && aviso.leido) ||
-              (filtroLectura == 'No leídos' && !aviso.leido);
+        // CONDICIÓN 2: AVISO ARCHIVADO (Fecha de fin es anterior a hoy)
+        // Convertimos la fecha de fin del aviso a medianoche.
+        final avisoEndDate = DateTime(aviso.fechaFin.year, aviso.fechaFin.month, aviso.fechaFin.day);
+        
+        // isBefore devuelve TRUE si la fecha del aviso es ESTRICTAMENTE anterior a hoy.
+        // Ejemplo: Hoy es 2025-10-10. Si fecha_fin es 2025-10-09, isBefore devuelve TRUE.
+        final bool isArchivedByDate = avisoEndDate.isBefore(today);
 
-          // Lógica principal:
-          if (filtroLectura == 'Archivados') {
-            // Si el filtro es 'Archivados', solo mostramos los avisos archivados.
-            return isArchived && pasaFecha;
-          } else {
+        // -------------------------------------------------------------
+        
+        // Condición para el filtro de fecha (el filtro de la UI)
+        // Ya que avisos.fecha es DateTime, la comparación es segura.
+        final bool pasaFecha =
+            fechaFiltro == null || aviso.fecha.isAfter(fechaFiltro!);
+
+        // Condición para el filtro de estado de lectura.
+        final bool pasaLectura =
+            (filtroLectura == 'Todos') ||
+            (filtroLectura == 'Leídos' && aviso.leido) ||
+            (filtroLectura == 'No leídos' && !aviso.leido);
+
+        // Lógica principal:
+        if (filtroLectura == 'Archivados') {
+            // Si el filtro es 'Archivados', solo mostramos los que cumplen esa condición.
+            return isArchivedByDate && pasaFecha;
+        } else {
             // Para 'Todos', 'Leídos' y 'No leídos', NO mostramos los avisos archivados.
-            return !isArchived && pasaFecha && pasaLectura;
-          }
-        }).toList();
+            return !isArchivedByDate && pasaFecha && pasaLectura;
+        }
+    }).toList();
 
-    // 2. Aplicar el ordenamiento personalizado.
+    // 3. Aplicar el ordenamiento personalizado.
     filtered.sort((a, b) {
-      // Si el filtro es 'Archivados', ordena por fecha de forma descendente.
-      if (filtroLectura == 'Archivados') {
+        if (filtroLectura == 'Archivados') {
+            return b.fecha.compareTo(a.fecha);
+        }
+        // Prioriza no leídos sobre leídos, luego por fecha descendente.
+        if (!a.leido && b.leido) {
+            return -1;
+        }
+        if (a.leido && !b.leido) {
+            return 1;
+        }
         return b.fecha.compareTo(a.fecha);
-      }
-
-      // Prioriza avisos no leídos sobre avisos leídos.
-      if (!a.leido && b.leido) {
-        return -1; // 'a' (no leído) va antes que 'b' (leído).
-      }
-      if (a.leido && !b.leido) {
-        return 1; // 'b' (no leído) va antes que 'a' (leído).
-      }
-      // Si ambos tienen el mismo estado de lectura, ordena por fecha descendente.
-      return b.fecha.compareTo(a.fecha);
     });
 
     return filtered;

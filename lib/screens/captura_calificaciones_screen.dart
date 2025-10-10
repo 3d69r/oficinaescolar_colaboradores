@@ -103,7 +103,7 @@ class _CapturaCalificacionesScreenState extends State<CapturaCalificacionesScree
             final lowerKey = key.trim().toLowerCase();
             
             // La condición principal de solo lectura (promedio, CF)
-            if (lowerKey.contains('promedio') || lowerKey == 'cf') { 
+            if (lowerKey.contains('promedio') || lowerKey == 'Evaluación Final') { 
               keys.add(key.trim());
             }
             
