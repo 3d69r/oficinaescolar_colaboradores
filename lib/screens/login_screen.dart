@@ -140,14 +140,14 @@ class _LoginScreenState extends State<LoginScreen> {
         idCiclo: '',
       );
 
-      /*final tokenFirebase = await FirebaseMessaging.instance.getToken();
+      final tokenFirebase = await FirebaseMessaging.instance.getToken();
 
       await userProvider.actualizarInfoToken(
         escuela: finalSchoolCode,
         idColaborador: idColaborador, // ✅ [REF] Cambiado de idPersona
         tokenCelular: tokenFirebase ?? '',
         status: 'activo',
-      );*/
+      );
 
       if (mounted) {
         Navigator.pushReplacementNamed(context, 'home');

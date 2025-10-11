@@ -1,5 +1,5 @@
 // main.dart para la app de colaboradores
-//import 'package:oficinaescolar_colaboradores/firebase_options.dart';
+import 'package:oficinaescolar_colaboradores/firebase_options.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart'; 
@@ -14,23 +14,23 @@ import 'providers/user_provider.dart';
 const double _phoneBreakpoint = 600.0;
 
 // ✅ TODO: Descomentar y habilitar cuando Firebase se configure para la app de colaboradores.
-// @pragma('vm:entry-point')
-// Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-//   await Firebase.initializeApp();
-//   debugPrint('📥 [BACKGROUND] Mensaje FCM recibido: ${message.messageId}');
-// }
+ @pragma('vm:entry-point')
+ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+   await Firebase.initializeApp();
+   debugPrint('📥 [BACKGROUND] Mensaje FCM recibido: ${message.messageId}');
+ }
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   // ✅ TODO: Descomentar y habilitar la inicialización de Firebase cuando esté lista.
-  // await Firebase.initializeApp(
-  //   options: DefaultFirebaseOptions.currentPlatform,
-  // );
+   await Firebase.initializeApp(
+     options: DefaultFirebaseOptions.currentPlatform,
+   );
 
   // ✅ TODO: Descomentar y habilitar los handlers de FCM cuando el servicio esté listo.
-  // FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
-  // await _initPushNotifications();
+   FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+   await _initPushNotifications();
 
   final UserProvider tempUserProvider = UserProvider();
   await tempUserProvider.loadUserDataFromDb();
@@ -62,31 +62,31 @@ void main() async {
 }
 
 // ✅ TODO: Descomentar y habilitar cuando Firebase se configure para la app de colaboradores.
-// Future<void> _initPushNotifications() async {
-//   FirebaseMessaging messaging = FirebaseMessaging.instance;
-//   NotificationSettings settings = await messaging.requestPermission(
-//     alert: true,
-//     badge: true,
-//     sound: true,
-//     carPlay: false,
-//     criticalAlert: false,
-//     provisional: false,
-//     announcement: false,
-//   );
-//   debugPrint('🔔 Permisos de notificaciones: ${settings.authorizationStatus}');
-//   String? token = await messaging.getToken();
-//   debugPrint('📲 Token FCM: $token');
-//   FirebaseMessaging.onMessage.listen((RemoteMessage message) {
-//     debugPrint('📥 [FOREGROUND] Mensaje FCM: ${message.notification?.title} - ${message.notification?.body}');
-//   });
-//   FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
-//     debugPrint('🟢 [OPENED APP] App abierta desde notificación FCM: ${message.messageId}');
-//   });
-//   RemoteMessage? initialMessage = await messaging.getInitialMessage();
-//   if (initialMessage != null) {
-//     debugPrint('🚀 [INITIAL MESSAGE] App iniciada desde notificación FCM terminada: ${initialMessage.messageId}');
-//   }
-// }
+ Future<void> _initPushNotifications() async {
+   FirebaseMessaging messaging = FirebaseMessaging.instance;
+   NotificationSettings settings = await messaging.requestPermission(
+     alert: true,
+     badge: true,
+     sound: true,
+     carPlay: false,
+     criticalAlert: false,
+     provisional: false,
+     announcement: false,
+   );
+   debugPrint('🔔 Permisos de notificaciones: ${settings.authorizationStatus}');
+   String? token = await messaging.getToken();
+   debugPrint('📲 Token FCM: $token');
+   FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+     debugPrint('📥 [FOREGROUND] Mensaje FCM: ${message.notification?.title} - ${message.notification?.body}');
+   });
+   FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
+     debugPrint('🟢 [OPENED APP] App abierta desde notificación FCM: ${message.messageId}');
+   });
+   RemoteMessage? initialMessage = await messaging.getInitialMessage();
+   if (initialMessage != null) {
+     debugPrint('🚀 [INITIAL MESSAGE] App iniciada desde notificación FCM terminada: ${initialMessage.messageId}');
+   }
+ }
 
 class MyApp extends StatelessWidget {
   final String initialRoute;

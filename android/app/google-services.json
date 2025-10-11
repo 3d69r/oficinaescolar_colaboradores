@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "424263278007",
+    "project_id": "oficinaescolar-colaboradores",
+    "storage_bucket": "oficinaescolar-colaboradores.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:424263278007:android:38a7184b09db8fabb61c32",
+        "android_client_info": {
+          "package_name": "com.edgargutierrez.oficinaescolar_colaboradores"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDlFKwwlyX7Evo-YvQCPlH7Vk5Rn0AM-tk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
