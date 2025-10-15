@@ -10,7 +10,7 @@ import 'package:oficinaescolar_colaboradores/providers/tipo_curso.dart';
 import 'package:oficinaescolar_colaboradores/models/colaborador_model.dart'; 
 import 'package:oficinaescolar_colaboradores/screens/lista_screen.dart';
 import 'package:oficinaescolar_colaboradores/screens/captura_calificaciones_screen.dart'; 
-import 'package:oficinaescolar_colaboradores/screens/preescolar_listado_screen.dart'; 
+//import 'package:oficinaescolar_colaboradores/screens/preescolar_listado_screen.dart'; 
 
 class AsistenciaScreen extends StatefulWidget {
   const AsistenciaScreen({super.key});
@@ -84,6 +84,7 @@ class _AsistenciaScreenState extends State<AsistenciaScreen>
     );
     _autoRefreshTimer?.cancel();
     // 5. Remover listener del Provider
+    // ignore: invalid_use_of_protected_member
     if (mounted && _userProvider.autoRefreshTrigger.hasListeners) {
       _userProvider.autoRefreshTrigger.removeListener(_autoRefreshListener);
     }

@@ -341,7 +341,7 @@ class _ContactosScreenState extends State<ContactosScreen>
           child: Padding(
             padding: const EdgeInsets.all(16.0),
             child:
-                              _userProvider.escuelaModel == null
+                    _isLoading && filteredContacts.isEmpty && _errorMessage == null
                     ? const Center(child: CircularProgressIndicator())
                     : _errorMessage != null
                     ? SingleChildScrollView(
