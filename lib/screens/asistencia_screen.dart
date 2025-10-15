@@ -59,8 +59,19 @@ class _AsistenciaScreenState extends State<AsistenciaScreen>
     // 2. Adjuntar el listener
     _userProvider.autoRefreshTrigger.addListener(_autoRefreshListener);
 
+     // 💡 [CORRECCIÓN ALTERNATIVA]: Usar condicionales de compilación de Dart.
+      bool shouldForceReload = false;
+      
+      // La web no es una plataforma de "IO" (Input/Output). 
+      // Si NO es Android, iOS, Linux, o Windows, asumimos que es Web/Desktop
+      if (Platform.isAndroid || Platform.isIOS || Platform.isLinux || Platform.isWindows) {
+        shouldForceReload = false; // Móvil/Desktop con DB local
+      } else {
+        shouldForceReload = true; // Web o plataforma sin soporte DB
+      }
+
     // 3. Carga inicial de datos (false para usar caché si es reciente)
-    _cargarDatosAsistencia(forceReload: false);
+    _cargarDatosAsistencia(forceReload: shouldForceReload);
     
     // 4. Iniciar el temporizador de auto-refresco
     _startAutoRefreshTimer();

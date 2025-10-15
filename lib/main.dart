@@ -132,3 +132,4 @@ class OrientationHandler extends StatelessWidget {
     return child;
   }
 }
+// CODIGO FUNCIONAL

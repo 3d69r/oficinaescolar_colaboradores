@@ -94,8 +94,19 @@ class _AvisosViewState extends State<AvisosView>
       // Obtiene la instancia de UserProvider. 'listen: false' previene reconstrucciones innecesarias en este punto.
       _userProvider = Provider.of<UserProvider>(context, listen: false);
 
+      // 💡 [CORRECCIÓN ALTERNATIVA]: Usar condicionales de compilación de Dart.
+      bool shouldForceReload = false;
+      
+      // La web no es una plataforma de "IO" (Input/Output). 
+      // Si NO es Android, iOS, Linux, o Windows, asumimos que es Web/Desktop
+      if (Platform.isAndroid || Platform.isIOS || Platform.isLinux || Platform.isWindows) {
+        shouldForceReload = false; // Móvil/Desktop con DB local
+      } else {
+        shouldForceReload = true; // Web o plataforma sin soporte DB
+      }
+
       // Realiza la carga inicial de avisos. No fuerza la recarga desde la API si ya hay datos en caché.
-      _loadAvisos(forceReload: false);
+      _loadAvisos(forceReload: shouldForceReload);
       initializeDateFormatting('es_ES', null);
 
       // Inicia el temporizador para auto-refrescar los avisos periódicamente.

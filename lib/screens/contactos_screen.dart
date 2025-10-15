@@ -49,7 +49,18 @@ class _ContactosScreenState extends State<ContactosScreen>
 
       _userProvider.autoRefreshTrigger.addListener(_autoRefreshListener);
 
-      _loadContactos(forceReload: false);
+      // 💡 [CORRECCIÓN ALTERNATIVA]: Usar condicionales de compilación de Dart.
+      bool shouldForceReload = false;
+      
+      // La web no es una plataforma de "IO" (Input/Output). 
+      // Si NO es Android, iOS, Linux, o Windows, asumimos que es Web/Desktop
+      if (Platform.isAndroid || Platform.isIOS || Platform.isLinux || Platform.isWindows) {
+        shouldForceReload = false; // Móvil/Desktop con DB local
+      } else {
+        shouldForceReload = true; // Web o plataforma sin soporte DB
+      }
+
+      _loadContactos(forceReload: shouldForceReload);
       _startAutoRefreshTimer();
     });
   }
@@ -330,7 +341,7 @@ class _ContactosScreenState extends State<ContactosScreen>
           child: Padding(
             padding: const EdgeInsets.all(16.0),
             child:
-                _isLoading && filteredContacts.isEmpty && _errorMessage == null
+                              _userProvider.escuelaModel == null
                     ? const Center(child: CircularProgressIndicator())
                     : _errorMessage != null
                     ? SingleChildScrollView(

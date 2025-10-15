@@ -4,12 +4,12 @@ import 'dart:convert';
 import 'package:oficinaescolar_colaboradores/models/boleta_encabezado_model.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
-import 'package:flutter/foundation.dart';
+import 'package:flutter/foundation.dart'; // Necesario para kIsWeb y defaultTargetPlatform
 
 import 'package:oficinaescolar_colaboradores/models/aviso_model.dart';
 import 'package:oficinaescolar_colaboradores/models/colores_model.dart';
 // ⭐️ IMPORTANTE: Asegúrate de que esta importación apunte a tu modelo BoletaEncabezadoModel
-import 'package:oficinaescolar_colaboradores/models/colaborador_model.dart'; 
+//import 'package:oficinaescolar_colaboradores/models/colaborador_model.dart'; 
 
 /// Clase [DatabaseHelper]
 ///
@@ -35,13 +35,38 @@ class DatabaseHelper {
 
   static final DatabaseHelper instance = DatabaseHelper._privateConstructor();
 
+  // ⭐️ NUEVO GETTER: Detecta si NO estamos en una plataforma móvil ⭐️
+  bool get _debeDeshabilitarDb {
+    // 1. Deshabilitar si es Web
+    if (kIsWeb) {
+      return true;
+    }
+    // 2. Deshabilitar si es Desktop compilado
+    return defaultTargetPlatform == TargetPlatform.windows ||
+           defaultTargetPlatform == TargetPlatform.linux ||
+           defaultTargetPlatform == TargetPlatform.macOS;
+  }
+  
   Future<Database> get database async {
+    // ⭐️ PROTECCIÓN DE ACCESO: Si está deshabilitada, no continuar ⭐️
+    if (_debeDeshabilitarDb) {
+      debugPrint('DatabaseHelper: Acceso a DB denegado (Web/Desktop).');
+      throw UnsupportedError('La base de datos SQLite está inhabilitada en esta plataforma.');
+    }
+    
     if (_database != null) return _database!;
     _database = await _initDb();
     return _database!;
   }
 
   Future<Database> _initDb() async {
+    // ⭐️ PROTECCIÓN DE INICIALIZACIÓN ⭐️
+    if (_debeDeshabilitarDb) {
+      debugPrint('DatabaseHelper: Ejecutando en Web/Desktop. Se lanza UnsupportedError para prevenir el uso de SQLite.');
+      throw UnsupportedError('La inicialización de la base de datos SQLite está restringida en plataformas Web o de escritorio en esta versión.');
+    }
+    // FIN PROTECCIÓN DE INICIALIZACIÓN
+    
     final databasePath = await getDatabasesPath();
     final path = join(databasePath, _dbName);
     debugPrint('DatabaseHelper: Ruta de la base de datos: $path');
@@ -150,15 +175,18 @@ class DatabaseHelper {
   }
 
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
-    // ✅ [REF] Se mantiene el método de migración, pero se elimina la lógica de las columnas
-    //          ya que el nuevo app usará la base de datos con el esquema final desde el inicio.
     debugPrint('DatabaseHelper: Iniciando migración de la base de datos de la versión $oldVersion a $newVersion.');
-    // No se realiza ninguna acción de migración específica en este nuevo proyecto,
-    // ya que no hay cambios de esquema desde la versión 1 a la 2 aquí.
     debugPrint('DatabaseHelper: Migración completada.');
   }
 
   Future<void> close() async {
+    // ⭐️ PROTECCIÓN ⭐️
+    if (_debeDeshabilitarDb) {
+      debugPrint('DatabaseHelper: Cierre de DB omitido (Web/Desktop).');
+      return;
+    }
+    // FIN PROTECCIÓN
+    
     final db = await instance.database;
     await db.close();
     _database = null;
@@ -166,6 +194,13 @@ class DatabaseHelper {
   }
 
   Future<void> clearAllData() async {
+    // ⭐️ PROTECCIÓN ⭐️
+    if (_debeDeshabilitarDb) {
+      debugPrint('DatabaseHelper: Limpieza de DB omitida (Web/Desktop).');
+      return;
+    }
+    // FIN PROTECCIÓN
+    
     final db = await instance.database;
     await db.delete(_schoolDataTable);
     await db.delete(_colaboradorDataTable); 
@@ -177,12 +212,18 @@ class DatabaseHelper {
     await db.delete(_tokensTable);
     // ⭐️ NUEVO: Limpiar tabla de encabezados de boleta
     await db.delete(_encabezadosBoletaTable); 
-    // ✅ [REF] Eliminadas las líneas para limpiar tablas de CFDI, pagos, cargos y materias
     debugPrint('DatabaseHelper: Todas las tablas limpiadas.');
   }
 
   // --- Métodos Genéricos para Guardar y Obtener Datos ---
   Future<void> _saveData(String tableName, String id, Map<String, dynamic> dataJson, {bool isSessionData = false}) async {
+    // ⭐️ PROTECCIÓN ⭐️
+    if (_debeDeshabilitarDb) {
+      debugPrint('DatabaseHelper: Guardado de $tableName omitido (Web/Desktop).');
+      return;
+    }
+    // FIN PROTECCIÓN
+    
     final db = await database;
     final String jsonString = json.encode(dataJson);
     final int timestamp = DateTime.now().millisecondsSinceEpoch;
@@ -200,6 +241,13 @@ class DatabaseHelper {
   }
 
   Future<void> _saveListData(String tableName, String id, List<dynamic> dataJsonList) async {
+    // ⭐️ PROTECCIÓN ⭐️
+    if (_debeDeshabilitarDb) {
+      debugPrint('DatabaseHelper: Guardado de lista $tableName omitido (Web/Desktop).');
+      return;
+    }
+    // FIN PROTECCIÓN
+    
     final db = await database;
     final String jsonString = json.encode(dataJsonList);
     final int timestamp = DateTime.now().millisecondsSinceEpoch;
@@ -213,6 +261,13 @@ class DatabaseHelper {
   }
   
   Future<Map<String, dynamic>?> _getData(String tableName, String id, {bool isSessionData = false}) async {
+    // ⭐️ PROTECCIÓN ⭐️
+    if (_debeDeshabilitarDb) {
+      debugPrint('DatabaseHelper: Obtención de datos de $tableName omitida (Web/Desktop).');
+      return null;
+    }
+    // FIN PROTECCIÓN
+    
     final db = await database;
     final List<Map<String, dynamic>> maps = await db.query(
       tableName,
@@ -253,6 +308,13 @@ class DatabaseHelper {
   
   /// Guarda la estructura de encabezados de boleta en la base de datos local.
   Future<void> saveBoletaEncabezados(List<BoletaEncabezadoModel> encabezados) async {
+    // ⭐️ PROTECCIÓN ⭐️
+    if (_debeDeshabilitarDb) {
+      debugPrint('DatabaseHelper: Guardado de encabezados omitido (Web/Desktop).');
+      return;
+    }
+    // FIN PROTECCIÓN
+    
     final db = await database;
     
     // Borrar todo antes de guardar, ya que es una configuración de lista global
@@ -283,6 +345,13 @@ class DatabaseHelper {
 
   /// Obtiene la lista de estructuras de encabezados de boleta desde la base de datos local.
   Future<List<BoletaEncabezadoModel>> getBoletaEncabezados() async {
+    // ⭐️ PROTECCIÓN ⭐️
+    if (_debeDeshabilitarDb) {
+      debugPrint('DatabaseHelper: Obtención de encabezados omitida (Web/Desktop).');
+      return [];
+    }
+    // FIN PROTECCIÓN
+    
     final db = await database;
     final List<Map<String, dynamic>> maps = await db.query(_encabezadosBoletaTable);
 
@@ -303,6 +372,13 @@ class DatabaseHelper {
   }
 
   Future<void> saveAvisosData(String cacheId, List<AvisoModel> avisos) async {
+    // ⭐️ PROTECCIÓN ⭐️
+    if (_debeDeshabilitarDb) {
+      debugPrint('DatabaseHelper: Guardado de avisos omitido (Web/Desktop).');
+      return;
+    }
+    // FIN PROTECCIÓN
+    
     final db = await database;
     await db.delete(
       _individualAvisosTable,
@@ -324,6 +400,13 @@ class DatabaseHelper {
   }
 
   Future<List<AvisoModel>> getAvisosData(String cacheId) async {
+    // ⭐️ PROTECCIÓN ⭐️
+    if (_debeDeshabilitarDb) {
+      debugPrint('DatabaseHelper: Obtención de avisos omitida (Web/Desktop).');
+      return [];
+    }
+    // FIN PROTECCIÓN
+    
     final db = await database;
     final List<Map<String, dynamic>> maps = await db.query(
       _individualAvisosTable,
@@ -341,6 +424,13 @@ class DatabaseHelper {
   }
 
   Future<void> updateAvisoReadStatus(String idCalendario, String cacheId, bool isRead) async {
+    // ⭐️ PROTECCIÓN ⭐️
+    if (_debeDeshabilitarDb) {
+      debugPrint('DatabaseHelper: Actualización de estado de lectura de aviso omitida (Web/Desktop).');
+      return;
+    }
+    // FIN PROTECCIÓN
+    
     final db = await database;
     await db.update(
       _individualAvisosTable,
@@ -352,6 +442,13 @@ class DatabaseHelper {
   }
 
   Future<void> updateAvisoWithImageCache(AvisoModel aviso, String cacheId) async {
+    // ⭐️ PROTECCIÓN ⭐️
+    if (_debeDeshabilitarDb) {
+      debugPrint('DatabaseHelper: Actualización de caché de imagen de aviso omitida (Web/Desktop).');
+      return;
+    }
+    // FIN PROTECCIÓN
+    
     final db = await database;
     await db.update(
       _individualAvisosTable,
@@ -367,6 +464,13 @@ class DatabaseHelper {
   }
 
   Future<void> updateAvisoRespuesta(String idCalendario, String cacheId, String respuesta) async {
+    // ⭐️ PROTECCIÓN ⭐️
+    if (_debeDeshabilitarDb) {
+      debugPrint('DatabaseHelper: Actualización de respuesta de aviso omitida (Web/Desktop).');
+      return;
+    }
+    // FIN PROTECCIÓN
+    
     final db = await database;
     await db.update(
       _individualAvisosTable,
@@ -376,8 +480,6 @@ class DatabaseHelper {
     );
   }
   
-  // ✅ [REF] Eliminados los métodos para CFDI, Pagos Realizados, Cargos Pendientes y Materias
-
   Future<void> saveArticulosCafData(String id, List<dynamic> dataJsonList) async {
     await _saveListData(_articulosCafDataTable, id, dataJsonList);
   }
@@ -386,6 +488,13 @@ class DatabaseHelper {
   }
   
   Future<void> saveCafeteriaData(String id, double saldoActual, List<dynamic> dataJsonList) async {
+    // ⭐️ PROTECCIÓN ⭐️
+    if (_debeDeshabilitarDb) {
+      debugPrint('DatabaseHelper: Guardado de datos de cafetería omitido (Web/Desktop).');
+      return;
+    }
+    // FIN PROTECCIÓN
+    
     final db = await database;
     final String jsonString = json.encode(dataJsonList);
     final int timestamp = DateTime.now().millisecondsSinceEpoch;
@@ -404,6 +513,13 @@ class DatabaseHelper {
   }
 
   Future<Map<String, dynamic>?> getCafeteriaData(String id) async {
+    // ⭐️ PROTECCIÓN ⭐️
+    if (_debeDeshabilitarDb) {
+      debugPrint('DatabaseHelper: Obtención de datos de cafetería omitida (Web/Desktop).');
+      return null;
+    }
+    // FIN PROTECCIÓN
+    
     final db = await database;
     final List<Map<String, dynamic>> maps = await db.query(
       _cafeteriaMovimientosDataTable,
@@ -432,6 +548,13 @@ class DatabaseHelper {
   }
   
   Future<void> saveColoresData(Colores colores) async {
+    // ⭐️ PROTECCIÓN ⭐️
+    if (_debeDeshabilitarDb) {
+      debugPrint('DatabaseHelper: Guardado de colores omitido (Web/Desktop).');
+      return;
+    }
+    // FIN PROTECCIÓN
+    
     final db = await database;
     await db.insert(
       _coloresAppTable,
@@ -442,6 +565,13 @@ class DatabaseHelper {
   }
 
   Future<Colores?> getColoresData() async {
+    // ⭐️ PROTECCIÓN ⭐️
+    if (_debeDeshabilitarDb) {
+      debugPrint('DatabaseHelper: Obtención de colores omitida (Web/Desktop).');
+      return null;
+    }
+    // FIN PROTECCIÓN
+    
     final db = await database;
     final List<Map<String, dynamic>> maps = await db.query(_coloresAppTable, where: 'id = ?', whereArgs: [1]);
 
@@ -454,6 +584,13 @@ class DatabaseHelper {
   }
   
   Future<void> saveTokens(String id, String idToken, String fcmToken) async {
+    // ⭐️ PROTECCIÓN ⭐️
+    if (_debeDeshabilitarDb) {
+      debugPrint('DatabaseHelper: Guardado de tokens omitido (Web/Desktop).');
+      return;
+    }
+    // FIN PROTECCIÓN
+    
     final db = await database;
     await db.insert(
       _tokensTable,
@@ -464,6 +601,13 @@ class DatabaseHelper {
   }
 
   Future<Map<String, dynamic>?> getTokens(String id) async {
+    // ⭐️ PROTECCIÓN ⭐️
+    if (_debeDeshabilitarDb) {
+      debugPrint('DatabaseHelper: Obtención de tokens omitida (Web/Desktop).');
+      return null;
+    }
+    // FIN PROTECCIÓN
+    
     final db = await database;
     final List<Map<String, dynamic>> maps = await db.query(
       _tokensTable,

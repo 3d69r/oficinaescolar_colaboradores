@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'dart:async';
 import 'package:provider/provider.dart';
@@ -61,7 +63,18 @@ class _CafeteriaViewState extends State<CafeteriaView>
 
       _userProvider.autoRefreshTrigger.addListener(_autoRefreshListener);
 
-      _loadAllCafeteriaData(forceReload: false);
+      // 💡 [CORRECCIÓN ALTERNATIVA]: Usar condicionales de compilación de Dart.
+      bool shouldForceReload = false;
+      
+      // La web no es una plataforma de "IO" (Input/Output). 
+      // Si NO es Android, iOS, Linux, o Windows, asumimos que es Web/Desktop
+      if (Platform.isAndroid || Platform.isIOS || Platform.isLinux || Platform.isWindows) {
+        shouldForceReload = false; // Móvil/Desktop con DB local
+      } else {
+        shouldForceReload = true; // Web o plataforma sin soporte DB
+      }
+
+      _loadAllCafeteriaData(forceReload: shouldForceReload);
 
       _startAutoRefreshTimer();
     });
