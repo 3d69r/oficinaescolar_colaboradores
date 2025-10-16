@@ -1,4 +1,5 @@
 // main.dart para la app de colaboradores
+import 'package:intl/date_symbol_data_local.dart';
 import 'package:oficinaescolar_colaboradores/firebase_options.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
@@ -22,6 +23,14 @@ const double _phoneBreakpoint = 600.0;
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  try {
+      await initializeDateFormatting('es', null);
+  } catch (e) {
+      // Manejo de error si la inicialización falla por alguna razón (poco probable)
+      debugPrint('Error al inicializar formato de fecha: $e');
+      await initializeDateFormatting(); // Intenta la inicialización por defecto
+  }
 
   // ✅ TODO: Descomentar y habilitar la inicialización de Firebase cuando esté lista.
    await Firebase.initializeApp(

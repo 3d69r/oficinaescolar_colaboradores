@@ -5,7 +5,7 @@ import 'dart:io'; // Se mantiene por si hay otros usos, aunque la llamada API se
 import 'package:flutter_html/flutter_html.dart';
 import 'package:oficinaescolar_colaboradores/models/colores_model.dart';
 import 'package:provider/provider.dart';
-import 'package:intl/date_symbol_data_local.dart'; // ¡Nueva importación necesaria!
+//import 'package:intl/date_symbol_data_local.dart'; // ¡Nueva importación necesaria!
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 
 // Importa tus constantes de API y tu provider
@@ -107,7 +107,7 @@ class _AvisosViewState extends State<AvisosView>
 
       // Realiza la carga inicial de avisos. No fuerza la recarga desde la API si ya hay datos en caché.
       _loadAvisos(forceReload: shouldForceReload);
-      initializeDateFormatting('es_ES', null);
+      //initializeDateFormatting('es_ES', null);
 
       // Inicia el temporizador para auto-refrescar los avisos periódicamente.
       _startAutoRefreshTimer();

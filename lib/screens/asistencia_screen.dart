@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'dart:async';
@@ -25,7 +26,7 @@ class _AsistenciaScreenState extends State<AsistenciaScreen>
   // Estado para controlar la opción seleccionada (null, 'materia' o 'clubes')
   String? _selectedOption; 
   
-  // ⭐️ VARIABLES DE GESTIÓN DE RECARGA ⭐️
+  //  VARIABLES DE GESTIÓN DE RECARGA 
   bool _isLoading = false; 
   String? _errorMessage; 
   DateTime? _lastManualRefreshTime; 
@@ -59,16 +60,17 @@ class _AsistenciaScreenState extends State<AsistenciaScreen>
     // 2. Adjuntar el listener
     _userProvider.autoRefreshTrigger.addListener(_autoRefreshListener);
 
-     // 💡 [CORRECCIÓN ALTERNATIVA]: Usar condicionales de compilación de Dart.
-      bool shouldForceReload = false;
+     // 💡 [SOLUCIÓN]: Usar kIsWeb para verificar la plataforma
+     bool shouldForceReload = false;
       
-      // La web no es una plataforma de "IO" (Input/Output). 
-      // Si NO es Android, iOS, Linux, o Windows, asumimos que es Web/Desktop
-      if (Platform.isAndroid || Platform.isIOS || Platform.isLinux || Platform.isWindows) {
-        shouldForceReload = false; // Móvil/Desktop con DB local
-      } else {
-        shouldForceReload = true; // Web o plataforma sin soporte DB
-      }
+     // ⭐️ VERIFICACIÓN DE PLATAFORMA CORREGIDA ⭐️
+     if (kIsWeb) {
+        // Es Web, forzamos la recarga si no tenemos caché local (DB)
+        shouldForceReload = true; 
+     } else {
+        // Es una plataforma con soporte IO (Móvil/Desktop)
+        shouldForceReload = false; 
+     }
 
     // 3. Carga inicial de datos (false para usar caché si es reciente)
     _cargarDatosAsistencia(forceReload: shouldForceReload);
