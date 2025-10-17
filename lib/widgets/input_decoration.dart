@@ -8,9 +8,9 @@ class InputDecorations {
   }) {
     return InputDecoration(
       enabledBorder: UnderlineInputBorder(
-      borderSide: BorderSide(color: Colors.indigoAccent)),
+      borderSide: BorderSide(color: Colors.black)),
         focusedBorder: UnderlineInputBorder(
-          borderSide: BorderSide(color: Colors.indigoAccent, width: 3)),
+          borderSide: BorderSide(color: Colors.black, width: 3)),
           hintText: hintext,
           labelText: labeltext,
           prefixIcon: icono,

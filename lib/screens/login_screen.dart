@@ -140,6 +140,15 @@ class _LoginScreenState extends State<LoginScreen> {
         idCiclo: '',
       );
 
+      await userProvider.saveColaboradorSessionToPrefs(
+        idColaborador: idColaborador,
+        idEmpresa: idEmpresa,
+        email: emailController.text.trim(),
+        escuela: finalSchoolCode,
+        fechaHora: sessionFechaHora,
+        idCiclo: '',
+      );
+
       final tokenFirebase = await FirebaseMessaging.instance.getToken();
 
       await userProvider.actualizarInfoToken(

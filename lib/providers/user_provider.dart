@@ -22,6 +22,7 @@ import 'package:oficinaescolar_colaboradores/models/articulo_model.dart';
 import 'package:oficinaescolar_colaboradores/models/colores_model.dart';
 import 'package:oficinaescolar_colaboradores/providers/tipo_curso.dart';
 import 'package:oficinaescolar_colaboradores/screens/lista_screen.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class UserProvider with ChangeNotifier {
   // --- Datos de Sesión y Control (Variables Privadas) ---
@@ -149,33 +150,79 @@ class UserProvider with ChangeNotifier {
   }
 
   Future<void> loadUserDataFromDb() async {
-    debugPrint('UserProvider: Intentando cargar datos de usuario desde la base de datos...');
-    final cachedData = await DatabaseHelper.instance.getSessionData('session_data');
-    if (cachedData != null) {
-      final sessionJson = cachedData['data_json'] as Map<String, dynamic>;
-      _idColaborador = sessionJson['idColaborador'] ?? ''; // ✅ [REF] Cambiado de idAlumno
-      _idEmpresa = sessionJson['idEmpresa'] ?? '';
-      _email = sessionJson['email'] ?? '';
-      _escuela = sessionJson['escuela'] ?? '';
-      _fechaHora = sessionJson['fechaHora'] ?? '';
-      _idCiclo = sessionJson['idCiclo'] ?? '';
-      
-      if (_idColaborador.isNotEmpty) {
-        final tokenData = await DatabaseHelper.instance.getTokens(_idColaborador);
-        if (tokenData != null) {
-          _idToken = tokenData['id_token'] ?? '';
-          _fcmToken = tokenData['token_celular'] ?? '';
-          debugPrint('UserProvider: Tokens cargados desde la base de datos (idToken: $_idToken)');
-        } else {
-          debugPrint('UserProvider: No se encontraron tokens en la base de datos.');
-        }
-      }
-      debugPrint('UserProvider: Datos de usuario cargados desde la base de datos.');
-    } else {
-      debugPrint('UserProvider: No se encontraron datos de usuario en la base de datos.');
-    }
-    notifyListeners();
+  debugPrint('UserProvider: Intentando cargar datos de usuario desde la base de datos...');
+
+  final cachedData = await DatabaseHelper.instance.getSessionData('session_data');
+  bool dataLoaded = false;
+  Map<String, dynamic> sessionJson = {};
+
+  // 1. INTENTO DE CARGA DESDE DB LOCAL (Móvil)
+  if (cachedData != null) {
+    sessionJson = cachedData['data_json'] as Map<String, dynamic>;
+    debugPrint('UserProvider: Datos de colaborador cargados desde la base de datos (Móvil).');
+    dataLoaded = true;
   }
+
+  // 2. FALLBACK A SHARED_PREFERENCES (Web/Fallback)
+  if (!dataLoaded) {
+    final prefs = await SharedPreferences.getInstance();
+
+    // Reconstruir sessionJson a partir de SharedPreferences
+    sessionJson = {
+      'idColaborador': prefs.getString('idColaborador') ?? '',
+      'idEmpresa': prefs.getString('idEmpresa') ?? '',
+      'email': prefs.getString('email') ?? '',
+      'escuela': prefs.getString('escuela') ?? '',
+      'idCiclo': prefs.getString('idCiclo') ?? '',
+      'fechaHora': prefs.getString('fechaHora') ?? '',
+      // Tokens (si se guardaron)
+      'idToken': prefs.getString('idToken') ?? '', 
+      'fcmToken': prefs.getString('fcmToken') ?? '',
+    };
+
+    // Verificar si la sesión esencial está presente
+    if (sessionJson['idColaborador'].isNotEmpty) {
+      debugPrint('UserProvider: Datos de colaborador cargados desde SharedPreferences (Web/Fallback).');
+      dataLoaded = true;
+    } else {
+      debugPrint('UserProvider: No se encontraron datos de usuario en la base de datos ni en SharedPreferences.');
+    }
+  }
+
+  // 3. ASIGNACIÓN FINAL Y LÓGICA DE TOKENS
+  if (dataLoaded) {
+    // Asignar variables internas del Provider desde sessionJson
+    _idColaborador = sessionJson['idColaborador'] ?? '';
+    _idEmpresa = sessionJson['idEmpresa'] ?? '';
+    _email = sessionJson['email'] ?? '';
+    _escuela = sessionJson['escuela'] ?? '';
+    _fechaHora = sessionJson['fechaHora'] ?? '';
+    _idCiclo = sessionJson['idCiclo'] ?? '';
+    
+    // Si manejas más variables específicas del colaborador, inclúyelas aquí.
+
+    // 🔑 Lógica de Tokens: Intentar DB, sino usar el dato del sessionJson (SharedPreferences)
+    if (_idColaborador.isNotEmpty) {
+      final tokenData = await DatabaseHelper.instance.getTokens(_idColaborador);
+      
+      if (tokenData != null) {
+        // Carga exitosa desde DB (Móvil)
+        _idToken = tokenData['id_token'] ?? '';
+        _fcmToken = tokenData['token_celular'] ?? '';
+        debugPrint('UserProvider: Tokens cargados desde la base de datos (DB).');
+      } else if (sessionJson['idToken'] != null && sessionJson['idToken'].isNotEmpty) {
+        // Usar tokens recuperados de SharedPreferences (Web)
+        _idToken = sessionJson['idToken'] ?? '';
+        _fcmToken = sessionJson['fcmToken'] ?? '';
+        debugPrint('UserProvider: Tokens cargados desde SharedPreferences (Web).');
+      } else {
+        debugPrint('UserProvider: No se encontraron tokens.');
+      }
+    }
+  }
+
+  notifyListeners();
+}
 
   Future<void> _saveSessionData() async {
     await DatabaseHelper.instance.saveSessionData(
@@ -192,22 +239,67 @@ class UserProvider with ChangeNotifier {
     debugPrint('UserProvider: Datos de sesión guardados en la base de datos.');
   }
 
+  // En UserProvider class:
+
+/// Guarda la sesión del colaborador en SharedPreferences para persistencia web
+Future<void> saveColaboradorSessionToPrefs({
+  required String idColaborador,
+  required String idEmpresa,
+  required String email,
+  required String escuela,
+  required String idCiclo,
+  required String fechaHora,
+  String? idToken, // Opcional, si se guarda aparte
+  String? fcmToken, // Opcional, si se guarda aparte
+}) async {
+  final prefs = await SharedPreferences.getInstance();
+
+  await prefs.setString('idColaborador', idColaborador);
+  await prefs.setString('idEmpresa', idEmpresa);
+  await prefs.setString('email', email);
+  await prefs.setString('escuela', escuela);
+  await prefs.setString('idCiclo', idCiclo);
+  await prefs.setString('fechaHora', fechaHora);
+  
+  // Guardar tokens si se proporcionan (asumiendo que los recibes en el login)
+  if (idToken != null) await prefs.setString('idToken', idToken);
+  if (fcmToken != null) await prefs.setString('fcmToken', fcmToken);
+
+  debugPrint('UserProvider: Sesión de Colaborador guardada en SharedPreferences.');
+}
+
   Future<void> setUserData({
-    required String idColaborador, // ✅ [REF] Cambiado de idAlumno
+    required String idColaborador,
     required String idEmpresa,
     required String email,
     required String escuela,
     required String idCiclo,
     required String fechaHora,
   }) async {
-    _idColaborador = idColaborador; // ✅ [REF] Cambiado de idAlumno
+    // 1. Asignar variables internas
+    _idColaborador = idColaborador;
     _idEmpresa = idEmpresa;
     _email = email;
     _escuela = escuela;
     _idCiclo = idCiclo;
     _fechaHora = fechaHora;
 
+    // 2. Guardar en la DB Local (Móvil)
     await _saveSessionData();
+
+    // ⭐️ 3. GUARDAR PERSISTENTEMENTE EN SHARED_PREFERENCES (Web/Fallback)
+    await saveColaboradorSessionToPrefs(
+      idColaborador: idColaborador,
+      idEmpresa: idEmpresa,
+      email: email,
+      escuela: escuela,
+      idCiclo: idCiclo,
+      fechaHora: fechaHora,
+      // Si manejas los tokens en el login, pásalos aquí:
+       idToken: _idToken, 
+       fcmToken: _fcmToken,
+    );
+    
     debugPrint('UserProvider: Datos de sesión establecidos.');
     notifyListeners();
   }
