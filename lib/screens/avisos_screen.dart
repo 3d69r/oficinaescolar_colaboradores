@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -5,6 +6,7 @@ import 'dart:async';
 import 'dart:io'; // Se mantiene por si hay otros usos, aunque la llamada API se mueva
 import 'package:flutter_html/flutter_html.dart';
 import 'package:oficinaescolar_colaboradores/models/colores_model.dart';
+import 'package:pdfx/pdfx.dart';
 import 'package:provider/provider.dart';
 //import 'package:intl/date_symbol_data_local.dart'; // ¡Nueva importación necesaria!
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
@@ -14,7 +16,7 @@ import 'package:oficinaescolar_colaboradores/config/api_constants.dart';
 import 'package:oficinaescolar_colaboradores/providers/user_provider.dart';
 import 'package:oficinaescolar_colaboradores/models/aviso_model.dart';
 import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
-import 'package:url_launcher/url_launcher.dart';
+//import 'package:url_launcher/url_launcher.dart';
 
 /// Clase [AvisosView]
 ///
@@ -44,13 +46,30 @@ class AvisosView extends StatefulWidget {
 /// (por ejemplo, dentro de un [TabBarView]).
 class _AvisosViewState extends State<AvisosView>
     with AutomaticKeepAliveClientMixin {
-  // ELIMINADO: static const String _kReadAvisosKey = 'readAvisosCalendarIds';
-  // ELIMINADO: Set<String> _readAvisosIds = {};
+      /// Método auxiliar para descargar el PDF como bytes y crear el controlador de pdfx para la web.
+Future<PdfControllerPinch> _loadPdfForWeb(String url) async {
+  try {
+    // Usamos Dio para descargar el PDF como una lista de bytes
+    final response = await Dio().get<List<int>>(
+      url,
+      options: Options(responseType: ResponseType.bytes),
+    );
 
-  // Propiedades del estado que controlan la UI y los datos.
-  // No es necesario mantener una copia separada de los avisos aquí,
-  // se accederá directamente a la lista en [_userProvider].
-  // List<AvisoModel> avisos = []; // Se usará directamente _userProvider.avisos
+    if (response.statusCode == 200 && response.data != null) {
+      // Creamos el documento a partir de los bytes
+      final document = PdfDocument.openData(response.data! as FutureOr<Uint8List>);
+      // Devolvemos el controlador necesario para PdfViewPinch
+      return PdfControllerPinch(document: document);
+    } else {
+      throw Exception('Fallo al descargar el PDF. Status: ${response.statusCode}');
+    }
+  } catch (e) {
+    debugPrint('Error al cargar PDF en web con pdfx: $e');
+    // En caso de error, puedes devolver un controlador de documento vacío o un error.
+    final emptyDocument = PdfDocument.openData(Uint8List(0));
+    return PdfControllerPinch(document: emptyDocument);
+  }
+}
 
   /// Filtro actual para el estado de lectura de los avisos ('Todos', 'Leídos', 'No leídos').
   String filtroLectura = 'Todos';
@@ -382,43 +401,25 @@ void _mostrarAviso(AvisoModel aviso) {
                                   final String extension = resourcePath.split('.').last.toLowerCase();
 
                                   // Lógica de visualización: PDF o imagen (Implementación condicional)
-                      if (extension == 'pdf') {
-                        if (kIsWeb) {
-                          // 🟢 WEB: Usar el navegador para visualizar el PDF
-                          return Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              const Text(
-                                'El archivo es un PDF. Haz clic para abrirlo en una nueva pestaña.',
-                                textAlign: TextAlign.center,
-                                style: TextStyle(fontSize: 16),
-                              ),
-                              const SizedBox(height: 10),
-                              ElevatedButton.icon(
-                                onPressed: () async {
-                                  // Usamos launchUrl para abrir el PDF en una nueva pestaña del navegador.
-                                  final uri = Uri.parse(resourcePath);
-                                  if (await canLaunchUrl(uri)) {
-                                    await launchUrl(uri, mode: LaunchMode.platformDefault);
-                                  } else {
-                                    // Muestra un SnackBar si no se puede abrir la URL.
-                                    _showSnackBar('No se pudo abrir el PDF: $resourcePath');
-                                  }
-                                },
-                                icon: const Icon(Icons.picture_as_pdf),
-                                label: const Text('Ver PDF'),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: colores.botonesColor,
-                                  foregroundColor: Colors.white,
-                                ),
-                              ),
-                            ],
-                          );
-                        } else {
-                          // 🔵 MÓVIL: Mantiene la lógica de SfPdfViewer.file
-                          return SfPdfViewer.file(File(resourcePath));
-                        }
-                      } else if (['jpg', 'jpeg', 'png', 'gif'].contains(extension)) {
+                                  if (extension == 'pdf') {
+                                      if (kIsWeb) {
+                                          // 🟢 WEB: Usar pdfx.PdfViewPinch cargando el PDF desde la URL
+                                          return FutureBuilder<PdfControllerPinch>(
+                                              future: _loadPdfForWeb(resourcePath),
+                                              builder: (context, snapshot) {
+                                                  if (snapshot.connectionState == ConnectionState.done && snapshot.hasData) {
+                                                      return PdfViewPinch(
+                                                          controller: snapshot.data!,
+                                                      );
+                                                  }
+                                                  return const Center(child: CircularProgressIndicator());
+                                              },
+                                          );
+                                      } else {
+                                          // 🔵 MÓVIL: Usar SfPdfViewer.file con la ruta de caché local (syncfusion)
+                                          return SfPdfViewer.file(File(resourcePath));
+                                      }
+                                  } else if (['jpg', 'jpeg', 'png', 'gif'].contains(extension)) {
                                     return InteractiveViewer(
                                       panEnabled: true,
                                       minScale: 1.0,

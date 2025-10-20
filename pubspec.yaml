@@ -36,6 +36,7 @@ dependencies:
   font_awesome_flutter: ^10.9.0  
   syncfusion_flutter_pdfviewer: ^31.1.18
   qr_flutter: ^4.1.0
+  pdfx: ^2.9.2
 
   path: any
 dev_dependencies:
