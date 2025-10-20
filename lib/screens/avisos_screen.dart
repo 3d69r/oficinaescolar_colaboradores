@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'dart:async';
@@ -276,284 +277,301 @@ class _AvisosViewState extends State<AvisosView>
   /// [aviso]: El [AvisoModel] cuyos detalles se mostrarán.
 // Tu método _mostrarAviso modificado
 void _mostrarAviso(AvisoModel aviso) {
-  // Si el aviso no ha sido leído, lo marca como leído.
-  if (!aviso.leido) {
-    _userProvider.markAvisoAsRead(aviso.idCalendario);
-  }
+    // Si el aviso no ha sido leído, lo marca como leído.
+    if (!aviso.leido) {
+      _userProvider.markAvisoAsRead(aviso.idCalendario);
+    }
 
-  _selectedOption = null;
+    _selectedOption = null;
 
-  showDialog(
-    context: context,
-    builder: (BuildContext context) {
-      final screenWidth = MediaQuery.of(context).size.width;
-      final screenHeight = MediaQuery.of(context).size.height;
-      final dialogWidth = screenWidth * 0.90;
-      final dialogHeight = screenHeight * 0.95;
-      final userProvider = Provider.of<UserProvider>(context, listen: false);
-      final colores = userProvider.colores;
-      final List<String> opciones =
-          [aviso.opcion1, aviso.opcion2, aviso.opcion3, aviso.opcion4, aviso.opcion5]
-              .whereType<String>()
-              .where((s) => s.isNotEmpty)
-              .toList();
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        final screenWidth = MediaQuery.of(context).size.width;
+        final screenHeight = MediaQuery.of(context).size.height;
+        final dialogWidth = screenWidth * 0.90;
+        final dialogHeight = screenHeight * 0.95;
+        final userProvider = Provider.of<UserProvider>(context, listen: false);
+        final colores = userProvider.colores;
+        final List<String> opciones =
+            [aviso.opcion1, aviso.opcion2, aviso.opcion3, aviso.opcion4, aviso.opcion5]
+                .whereType<String>()
+                .where((s) => s.isNotEmpty)
+                .toList();
 
-      return Dialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(15),
-        ),
-        insetPadding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 10.0),
-        backgroundColor: Colors.white,
-        child: ConstrainedBox(
-          constraints: BoxConstraints(
-            minWidth: dialogWidth,
-            maxWidth: dialogWidth,
-            minHeight: dialogHeight,
-            maxHeight: dialogHeight,
+        return Dialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(15),
           ),
-          child: Column(
-            mainAxisSize: MainAxisSize.max,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // --- Encabezado ---
-              Container(
-                padding: const EdgeInsets.symmetric(vertical: 15.0, horizontal: 20.0),
-                decoration: BoxDecoration(
-                  color: colores.headerColor,
-                  borderRadius: const BorderRadius.only(
-                    topLeft: Radius.circular(15),
-                    topRight: Radius.circular(15),
-                  ),
-                ),
-                child: Text(
-                  aviso.titulo,
-                  style: const TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-              ),
-
-              // --- Contenido scrollable dentro de Expanded ---
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.all(10.0),
-                  child: Column(
-                    children: [
-                      Text(
-                        DateFormat('EEEE d \'de\' MMMM \'del\' yyyy', 'es_ES').format(aviso.fecha),
-                        style: const TextStyle(fontSize: 14, color: Colors.black),
-                      ),
-                      const SizedBox(height: 5),
-                      const Divider(color: Colors.grey, thickness: 0.5),
-                      const SizedBox(height: 10),
-                      CustomPaint(
-                        size: Size(dialogWidth * 0.6, 5),
-                        painter: _SharpLinePainter(),
-                      ),
-                      CustomPaint(
-                        size: Size(dialogWidth * 0.6, 5),
-                        painter: _SharpLinePainter(),
-                      ),
-
-                      // Contenido del aviso: imagen, PDF o texto
-                      if (aviso.archivo != null && aviso.archivo!.isNotEmpty)
-                        Expanded(
-                          child: Align(
-                            alignment: Alignment.topCenter,
-                            child: FutureBuilder<String?>(
-                              future: userProvider.getAvisoImagePath(aviso),
-                              builder: (BuildContext context, AsyncSnapshot<String?> snapshot) {
-                                if (snapshot.connectionState == ConnectionState.waiting) {
-                                  return const Center(child: CircularProgressIndicator());
-                                }
-
-                                if (!snapshot.hasData || snapshot.data == null) {
-                                  return SingleChildScrollView(
-                                    child: Html(data: aviso.comentario),
-                                  );
-                                }
-                                
-                                final String filePath = snapshot.data!;
-                                final String extension = filePath.split('.').last.toLowerCase();
-
-                                // Lógica de visualización: PDF o imagen
-                                if (extension == 'pdf') {
-                                  // **[MODIFICACIÓN]** Usamos el widget de Syncfusion
-                                  return SfPdfViewer.file(File(filePath));
-                                } else if (['jpg', 'jpeg', 'png', 'gif'].contains(extension)) {
-                                  return InteractiveViewer(
-                                    panEnabled: true,
-                                    minScale: 1.0,
-                                    maxScale: 4.0,
-                                    child: SizedBox(
-                                      width: double.infinity,
-                                      child: Image.file(
-                                        File(filePath),
-                                        fit: BoxFit.contain,
-                                        errorBuilder: (context, error, stackTrace) {
-                                          return const Text('No se pudo cargar la imagen.', textAlign: TextAlign.center);
-                                        },
-                                      ),
-                                    ),
-                                  );
-                                } else {
-                                  return SingleChildScrollView(
-                                    child: Html(data: aviso.comentario),
-                                  );
-                                }
-                              },
-                            ),
-                          ),
-                        )
-                      else
-                        Expanded(
-                          child: SingleChildScrollView(
-                            child: Align(
-                              alignment: Alignment.topLeft,
-                              child: Html(data: aviso.comentario),
-                            ),
-                          ),
-                        ),
-                      
-                      // --- Formulario de respuesta condicional ---
-                      if (aviso.tipoRespuesta != null &&
-                          (aviso.tipoRespuesta!.toLowerCase() == 'siono' ||
-                              aviso.tipoRespuesta!.toLowerCase() == 'seleccion'))
-                        StatefulBuilder(
-                          builder: (BuildContext context, StateSetter setStateForm) {
-                            return Padding(
-                              padding: const EdgeInsets.only(top: 20.0),
-                              child: Column(
-                                children: [
-                                  const Text(
-                                    'Por favor, responde a este aviso:',
-                                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                                  ),
-                                  const SizedBox(height: 10),
-                                  if (aviso.tipoRespuesta!.toLowerCase() == 'siono')
-                                    Row(
-                                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                                      children: [
-                                        ElevatedButton(
-                                          onPressed: aviso.segRespuesta != null && aviso.segRespuesta!.isNotEmpty
-                                              ? null
-                                              : () {
-                                                  setStateForm(() {
-                                                    _selectedOption = 'Sí';
-                                                  });
-                                                },
-                                          style: ElevatedButton.styleFrom(
-                                            backgroundColor: _selectedOption == 'Sí' ? colores.botonesColor : Colors.grey.shade200,
-                                            foregroundColor: _selectedOption == 'Sí' ? Colors.white : Colors.black,
-                                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                                          ),
-                                          child: const Text('Sí'),
-                                        ),
-                                        ElevatedButton(
-                                          onPressed: aviso.segRespuesta != null && aviso.segRespuesta!.isNotEmpty
-                                              ? null
-                                              : () {
-                                                  setStateForm(() {
-                                                    _selectedOption = 'No';
-                                                  });
-                                                },
-                                          style: ElevatedButton.styleFrom(
-                                            backgroundColor: _selectedOption == 'No' ? colores.botonesColor : Colors.grey.shade200,
-                                            foregroundColor: _selectedOption == 'No' ? Colors.white : Colors.black,
-                                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                                          ),
-                                          child: const Text('No'),
-                                        ),
-                                      ],
-                                    )
-                                  else if (aviso.tipoRespuesta!.toLowerCase() == 'seleccion')
-                                    Column(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: opciones.map((opcion) {
-                                        return RadioListTile<String>(
-                                          title: Text(opcion),
-                                          value: opcion,
-                                          groupValue: aviso.segRespuesta != null && aviso.segRespuesta!.isNotEmpty
-                                              ? aviso.segRespuesta
-                                              : _selectedOption,
-                                          onChanged: aviso.segRespuesta != null && aviso.segRespuesta!.isNotEmpty
-                                              ? null
-                                              : (String? value) {
-                                                  setStateForm(() {
-                                                    _selectedOption = value;
-                                                  });
-                                                },
-                                          activeColor: colores.botonesColor,
-                                        );
-                                      }).toList(),
-                                    ),
-                                  const SizedBox(height: 15),
-                                  if (aviso.segRespuesta == null || aviso.segRespuesta!.isEmpty)
-                                    ElevatedButton(
-                                      onPressed: _selectedOption != null
-                                          ? () async {
-                                              if (_selectedOption != null) {
-                                                await _userProvider.markAvisoAsRead(
-                                                  aviso.idCalendario,
-                                                  respuesta: _selectedOption,
-                                                );
-                                                if (mounted) Navigator.of(context).pop();
-                                              }
-                                            }
-                                          : null,
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor: colores.botonesColor,
-                                        foregroundColor: Colors.white,
-                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                                        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 30),
-                                      ),
-                                      child: const Text('Enviar Respuesta'),
-                                    )
-                                  else
-                                    Text(
-                                      'Ya has respondido este aviso: "${aviso.segRespuesta}"',
-                                      style: TextStyle(
-                                        color: colores.botonesColor,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                ],
-                              ),
-                            );
-                          },
-                        ),
-                    ],
-                  ),
-                ),
-              ),
-
-              // --- Botón "Cerrar" al fondo del modal ---
-              Padding(
-                padding: const EdgeInsets.all(20.0),
-                child: SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: colores.botonesColor,
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 30),
+          insetPadding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 10.0),
+          backgroundColor: Colors.white,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              minWidth: dialogWidth,
+              maxWidth: dialogWidth,
+              minHeight: dialogHeight,
+              maxHeight: dialogHeight,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.max,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // --- Encabezado ---
+                Container(
+                  padding: const EdgeInsets.symmetric(vertical: 15.0, horizontal: 20.0),
+                  decoration: BoxDecoration(
+                    color: colores.headerColor,
+                    borderRadius: const BorderRadius.only(
+                      topLeft: Radius.circular(15),
+                      topRight: Radius.circular(15),
                     ),
-                    child: const Text('Cerrar', style: TextStyle(fontSize: 16)),
+                  ),
+                  child: Text(
+                    aviso.titulo,
+                    style: const TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                    textAlign: TextAlign.center,
                   ),
                 ),
-              ),
-            ],
+
+                // --- Contenido scrollable dentro de Expanded ---
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.all(10.0),
+                    child: Column(
+                      children: [
+                        Text(
+                          DateFormat('EEEE d \'de\' MMMM \'del\' yyyy', 'es_ES').format(aviso.fecha),
+                          style: const TextStyle(fontSize: 14, color: Colors.black),
+                        ),
+                        const SizedBox(height: 5),
+                        const Divider(color: Colors.grey, thickness: 0.5),
+                        const SizedBox(height: 10),
+                        CustomPaint(
+                          size: Size(dialogWidth * 0.6, 5),
+                          painter: _SharpLinePainter(),
+                        ),
+                        CustomPaint(
+                          size: Size(dialogWidth * 0.6, 5),
+                          painter: _SharpLinePainter(),
+                        ),
+
+                        // Contenido del aviso: imagen, PDF o texto
+                        if (aviso.archivo != null && aviso.archivo!.isNotEmpty)
+                          Expanded(
+                            child: Align(
+                              alignment: Alignment.topCenter,
+                              child: FutureBuilder<String?>(
+                                future: userProvider.getAvisoImagePath(aviso),
+                                builder: (BuildContext context, AsyncSnapshot<String?> snapshot) {
+                                  if (snapshot.connectionState == ConnectionState.waiting) {
+                                    return const Center(child: CircularProgressIndicator());
+                                  }
+
+                                  if (!snapshot.hasData || snapshot.data == null || snapshot.data!.isEmpty) {
+                                    return SingleChildScrollView(
+                                      child: Html(data: aviso.comentario),
+                                    );
+                                  }
+                                  
+                                  // ⭐️ INICIO DEL CÓDIGO MODIFICADO PARA COMPATIBILIDAD WEB/MÓVIL ⭐️
+                                  final String resourcePath = snapshot.data!;
+                                  final String extension = resourcePath.split('.').last.toLowerCase();
+
+                                  // Lógica de visualización: PDF o imagen (Implementación condicional)
+                                  if (extension == 'pdf') {
+                                    if (kIsWeb) {
+                                      // 🟢 WEB: Usar SfPdfViewer.network y la URL de red
+                                      return SfPdfViewer.network(resourcePath); 
+                                    } else {
+                                      // 🔵 MÓVIL: Usar SfPdfViewer.file y la ruta de caché local
+                                      return SfPdfViewer.file(File(resourcePath));
+                                    }
+                                  } else if (['jpg', 'jpeg', 'png', 'gif'].contains(extension)) {
+                                    return InteractiveViewer(
+                                      panEnabled: true,
+                                      minScale: 1.0,
+                                      maxScale: 4.0,
+                                      child: SizedBox(
+                                        width: double.infinity,
+                                        // 🛑 Implementación Condicional
+                                        child: kIsWeb
+                                            ? Image.network( // 🟢 WEB: Usar Image.network y la URL de red
+                                                resourcePath,
+                                                fit: BoxFit.contain,
+                                                errorBuilder: (context, error, stackTrace) {
+                                                  return const Text('No se pudo cargar la imagen (Web).', textAlign: TextAlign.center);
+                                                },
+                                              )
+                                            : Image.file( // 🔵 MÓVIL: Usar Image.file y la ruta local
+                                                File(resourcePath),
+                                                fit: BoxFit.contain,
+                                                errorBuilder: (context, error, stackTrace) {
+                                                  return const Text('No se pudo cargar la imagen (Móvil).', textAlign: TextAlign.center);
+                                                },
+                                              ),
+                                      ),
+                                    );
+                                  } else {
+                                    // Fallback para tipos de archivo no soportados o si solo hay texto HTML
+                                    return SingleChildScrollView(
+                                      child: Html(data: aviso.comentario),
+                                    );
+                                  }
+                                  // ⭐️ FIN DEL CÓDIGO MODIFICADO ⭐️
+                                },
+                              ),
+                            ),
+                          )
+                        else
+                          Expanded(
+                            child: SingleChildScrollView(
+                              child: Align(
+                                alignment: Alignment.topLeft,
+                                child: Html(data: aviso.comentario),
+                              ),
+                            ),
+                          ),
+                        
+                        // --- Formulario de respuesta condicional ---
+                        if (aviso.tipoRespuesta != null &&
+                            (aviso.tipoRespuesta!.toLowerCase() == 'siono' ||
+                                aviso.tipoRespuesta!.toLowerCase() == 'seleccion'))
+                          StatefulBuilder(
+                            builder: (BuildContext context, StateSetter setStateForm) {
+                              return Padding(
+                                padding: const EdgeInsets.only(top: 20.0),
+                                child: Column(
+                                  children: [
+                                    const Text(
+                                      'Por favor, responde a este aviso:',
+                                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                                    ),
+                                    const SizedBox(height: 10),
+                                    if (aviso.tipoRespuesta!.toLowerCase() == 'siono')
+                                      Row(
+                                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                                        children: [
+                                          ElevatedButton(
+                                            onPressed: aviso.segRespuesta != null && aviso.segRespuesta!.isNotEmpty
+                                                ? null
+                                                : () {
+                                                    setStateForm(() {
+                                                      _selectedOption = 'Sí';
+                                                    });
+                                                  },
+                                            style: ElevatedButton.styleFrom(
+                                              backgroundColor: _selectedOption == 'Sí' ? colores.botonesColor : Colors.grey.shade200,
+                                              foregroundColor: _selectedOption == 'Sí' ? Colors.white : Colors.black,
+                                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                            ),
+                                            child: const Text('Sí'),
+                                          ),
+                                          ElevatedButton(
+                                            onPressed: aviso.segRespuesta != null && aviso.segRespuesta!.isNotEmpty
+                                                ? null
+                                                : () {
+                                                    setStateForm(() {
+                                                      _selectedOption = 'No';
+                                                    });
+                                                  },
+                                            style: ElevatedButton.styleFrom(
+                                              backgroundColor: _selectedOption == 'No' ? colores.botonesColor : Colors.grey.shade200,
+                                              foregroundColor: _selectedOption == 'No' ? Colors.white : Colors.black,
+                                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                            ),
+                                            child: const Text('No'),
+                                          ),
+                                        ],
+                                      )
+                                    else if (aviso.tipoRespuesta!.toLowerCase() == 'seleccion')
+                                      Column(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: opciones.map((opcion) {
+                                          return RadioListTile<String>(
+                                            title: Text(opcion),
+                                            value: opcion,
+                                            groupValue: aviso.segRespuesta != null && aviso.segRespuesta!.isNotEmpty
+                                                ? aviso.segRespuesta
+                                                : _selectedOption,
+                                            onChanged: aviso.segRespuesta != null && aviso.segRespuesta!.isNotEmpty
+                                                ? null
+                                                : (String? value) {
+                                                    setStateForm(() {
+                                                      _selectedOption = value;
+                                                    });
+                                                  },
+                                            activeColor: colores.botonesColor,
+                                          );
+                                        }).toList(),
+                                      ),
+                                    const SizedBox(height: 15),
+                                    if (aviso.segRespuesta == null || aviso.segRespuesta!.isEmpty)
+                                      ElevatedButton(
+                                        onPressed: _selectedOption != null
+                                            ? () async {
+                                                if (_selectedOption != null) {
+                                                  await _userProvider.markAvisoAsRead(
+                                                    aviso.idCalendario,
+                                                    respuesta: _selectedOption,
+                                                  );
+                                                  if (mounted) Navigator.of(context).pop();
+                                                }
+                                              }
+                                            : null,
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: colores.botonesColor,
+                                          foregroundColor: Colors.white,
+                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 30),
+                                        ),
+                                        child: const Text('Enviar Respuesta'),
+                                      )
+                                    else
+                                      Text(
+                                        'Ya has respondido este aviso: "${aviso.segRespuesta}"',
+                                        style: TextStyle(
+                                          color: colores.botonesColor,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              );
+                            },
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+
+                // --- Botón "Cerrar" al fondo del modal ---
+                Padding(
+                  padding: const EdgeInsets.all(20.0),
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: colores.botonesColor,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 30),
+                      ),
+                      child: const Text('Cerrar', style: TextStyle(fontSize: 16)),
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
-        ),
-      );
-    },
-  );
-}
+        );
+      },
+    );
+  }
 
   /// Función auxiliar para eliminar etiquetas HTML y truncar el texto si es necesario.
   ///

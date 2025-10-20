@@ -2,6 +2,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'package:http/http.dart' as http;
@@ -993,11 +994,21 @@ Future<void> saveColaboradorSessionToPrefs({
   }
 
   Future<String?> getAvisoImagePath(AvisoModel aviso) async {
-    // ... (este método no cambia)
     if (aviso.archivo == null || aviso.archivo!.isEmpty) {
       return null;
     }
+
     final imageUrl = '${ApiConstants.assetsBaseUrl}${aviso.archivo}';
+
+    // ⭐️ CAMBIO CLAVE 1: Devolver URL de red si es la web
+    if (kIsWeb) {
+      debugPrint('UserProvider: Devolviendo URL de red para Web: $imageUrl');
+      return imageUrl; // 🛑 Devuelve la URL de red completa
+    }
+
+    // ----------------------------------------------------
+    // Lógica de Caché Móvil (solo se ejecuta si NO es Web)
+    // ----------------------------------------------------
     final now = DateTime.now();
     final bool isCacheExpired = aviso.imagenCacheTimestamp != null
         ? now.difference(aviso.imagenCacheTimestamp!).inDays > 7
@@ -1017,14 +1028,14 @@ Future<void> saveColaboradorSessionToPrefs({
       aviso.imagenLocalPath = fileInfo.file.path;
       aviso.imagenCacheTimestamp = now;
 
-      final String cacheId = '${_idEmpresa}_$_idColaborador'; // ✅ [REF] Cambiado de idAlumno
+      final String cacheId = '${_idEmpresa}_$_idColaborador';
       await DatabaseHelper.instance.updateAvisoWithImageCache(aviso, cacheId);
-      return fileInfo.file.path;
+      return fileInfo.file.path; // 🛑 Devuelve la ruta local para móvil
     } catch (e) {
       debugPrint('UserProvider: Error al descargar la imagen: $e');
       return null;
     }
-  }
+}
 
   Future<List<AvisoModel>> fetchAndLoadAvisosData({bool forceRefresh = false}) async {
     final String escuelaCode = _escuela;
