@@ -532,7 +532,7 @@ class _AsistenciaScreenState extends State<AsistenciaScreen>
       return ListTile(
           title: Text(title),
           subtitle: Text(subtitle),
-          trailing: const Icon(Icons.arrow_forward_ios, color: Colors.white,),
+          trailing: const Icon(Icons.arrow_forward_ios, color: Colors.black,),
           onTap: () {
               Navigator.push(
                   context, 

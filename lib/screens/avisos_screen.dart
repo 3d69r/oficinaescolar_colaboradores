@@ -14,6 +14,7 @@ import 'package:oficinaescolar_colaboradores/config/api_constants.dart';
 import 'package:oficinaescolar_colaboradores/providers/user_provider.dart';
 import 'package:oficinaescolar_colaboradores/models/aviso_model.dart';
 import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 /// Clase [AvisosView]
 ///
@@ -377,20 +378,47 @@ void _mostrarAviso(AvisoModel aviso) {
                                     );
                                   }
                                   
-                                  // ⭐️ INICIO DEL CÓDIGO MODIFICADO PARA COMPATIBILIDAD WEB/MÓVIL ⭐️
                                   final String resourcePath = snapshot.data!;
                                   final String extension = resourcePath.split('.').last.toLowerCase();
 
                                   // Lógica de visualización: PDF o imagen (Implementación condicional)
-                                  if (extension == 'pdf') {
-                                    if (kIsWeb) {
-                                      // 🟢 WEB: Usar SfPdfViewer.network y la URL de red
-                                      return SfPdfViewer.network(resourcePath); 
-                                    } else {
-                                      // 🔵 MÓVIL: Usar SfPdfViewer.file y la ruta de caché local
-                                      return SfPdfViewer.file(File(resourcePath));
-                                    }
-                                  } else if (['jpg', 'jpeg', 'png', 'gif'].contains(extension)) {
+                      if (extension == 'pdf') {
+                        if (kIsWeb) {
+                          // 🟢 WEB: Usar el navegador para visualizar el PDF
+                          return Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Text(
+                                'El archivo es un PDF. Haz clic para abrirlo en una nueva pestaña.',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(fontSize: 16),
+                              ),
+                              const SizedBox(height: 10),
+                              ElevatedButton.icon(
+                                onPressed: () async {
+                                  // Usamos launchUrl para abrir el PDF en una nueva pestaña del navegador.
+                                  final uri = Uri.parse(resourcePath);
+                                  if (await canLaunchUrl(uri)) {
+                                    await launchUrl(uri, mode: LaunchMode.platformDefault);
+                                  } else {
+                                    // Muestra un SnackBar si no se puede abrir la URL.
+                                    _showSnackBar('No se pudo abrir el PDF: $resourcePath');
+                                  }
+                                },
+                                icon: const Icon(Icons.picture_as_pdf),
+                                label: const Text('Ver PDF'),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: colores.botonesColor,
+                                  foregroundColor: Colors.white,
+                                ),
+                              ),
+                            ],
+                          );
+                        } else {
+                          // 🔵 MÓVIL: Mantiene la lógica de SfPdfViewer.file
+                          return SfPdfViewer.file(File(resourcePath));
+                        }
+                      } else if (['jpg', 'jpeg', 'png', 'gif'].contains(extension)) {
                                     return InteractiveViewer(
                                       panEnabled: true,
                                       minScale: 1.0,
