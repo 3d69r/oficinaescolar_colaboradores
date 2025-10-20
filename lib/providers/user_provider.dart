@@ -138,15 +138,76 @@ class UserProvider with ChangeNotifier {
   }
 
   Future<void> loadAppColorsFromDb() async {
-    // ... (este método no cambia)
     debugPrint('UserProvider: Intentando cargar colores desde la base de datos...');
-    _colores = await DatabaseHelper.instance.getColoresData();
-    notifyListeners();
-    if (_colores != null) {
-      debugPrint('UserProvider: Colores cargados desde la base de datos.');
+    
+    // 1. INTENTO DE CARGA DESDE DB LOCAL (Móvil)
+    _colores = await DatabaseHelper.instance.getColoresData(); 
+
+    // 2. FALLBACK A SHARED_PREFERENCES (Web/Fallback)
+    if (_colores == null) {
+      final Map<String, dynamic> prefsData = await _loadColorsFromPrefs();
+      
+      // Verificamos si al menos el color principal se cargó de SharedPreferences
+      if (prefsData['app_color_header'] != null && prefsData['app_color_header'].isNotEmpty) {
+        try {
+            _colores = Colores.fromMap(prefsData); 
+            debugPrint('UserProvider: Colores cargados desde SharedPreferences (Web/Fallback).');
+        } catch (e) {
+            // Manejar un posible error de formato si la data de prefs es incorrecta
+            debugPrint('Error al parsear colores desde SharedPreferences: $e');
+        }
+        
+      } else {
+        debugPrint('UserProvider: No se encontraron colores en la base de datos ni en SharedPreferences.');
+      }
     } else {
-      debugPrint('UserProvider: No se encontraron colores en la base de datos.');
+      debugPrint('UserProvider: Colores cargados desde la base de datos (Móvil).');
     }
+    
+    notifyListeners(); 
+  }
+
+  // Función auxiliar para leer todos los colores de SharedPreferences
+  Future<Map<String, dynamic>> _loadColorsFromPrefs() async {
+    final prefs = await SharedPreferences.getInstance();
+    final Map<String, dynamic> colorData = {};
+
+    const colorKeys = [
+      'app_color_header', 'app_color_footer', 'app_color_background', 
+      'app_color_botones', 'app_color_es_degradado', 'app_cred_color_header_1', 
+      'app_cred_color_header_2', 'app_cred_color_letra_1', 'app_cred_color_letra_2', 
+      'app_cred_color_background_1', 'app_cred_color_background_2', 'app_campos_credencial'
+    ];
+
+    // Cargar cada clave
+    for (var key in colorKeys) {
+      colorData[key] = prefs.getString(key);
+    }
+    
+    // Devolvemos el mapa. Si 'app_color_header' es nulo, significa que no hay data guardada.
+    return colorData;
+  }
+  /// Guarda TODOS los colores y datos de credencial en SharedPreferences para persistencia web
+  /// Se llama desde el onPressed de la pantalla de código de escuela.
+  Future<void> saveColorsToPrefs(Map<String, dynamic> response) async {
+    final prefs = await SharedPreferences.getInstance();
+    
+    // Lista de todas las claves de color/diseño que vienen en la respuesta
+    const colorKeys = [
+      'app_color_header', 'app_color_footer', 'app_color_background', 
+      'app_color_botones', 'app_color_es_degradado', 'app_cred_color_header_1', 
+      'app_cred_color_header_2', 'app_cred_color_letra_1', 'app_cred_color_letra_2', 
+      'app_cred_color_background_1', 'app_cred_color_background_2', 'app_campos_credencial'
+    ];
+    
+    // Guardar cada clave en SharedPreferences
+    for (var key in colorKeys) {
+      // Usamos ?.toString() para asegurar que guardamos cadenas
+      final valueToSave = response[key]?.toString() ?? '';
+      await prefs.setString(key, valueToSave);
+    }
+    
+    debugPrint('UserProvider: Todos los colores y configuraciones de diseño guardados en SharedPreferences.');
   }
 
   Future<void> loadUserDataFromDb() async {

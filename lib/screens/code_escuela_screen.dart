@@ -208,57 +208,71 @@ class _CodeEscuelaScreenState extends State<CodeEscuelaScreen> {
                             ),
                           ),
                           onPressed: () async {
-                            final codigo = _codigoController.text.trim();
-                            if (codigo.isEmpty ||
-                                !_formKey.currentState!.validate()) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text(
-                                    'Ingrese un código de escuela válido',
-                                  ),
-                                  backgroundColor: Colors.red,
-                                  behavior: SnackBarBehavior.floating,
-                                ),
-                              );
-                              return;
-                            }
+  final codigo = _codigoController.text.trim();
+  if (codigo.isEmpty ||
+      !_formKey.currentState!.validate()) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          'Ingrese un código de escuela válido',
+        ),
+        backgroundColor: Colors.red,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+    return;
+  }
 
-                            setState(() {
-                              _isLoading = true;
-                            });
+  setState(() {
+    _isLoading = true;
+  });
 
-                            await notificarFirebase();
+  await notificarFirebase();
 
-                            final response = await validarCodigoEscuela(codigo);
+  // Asumimos que 'response' es un Map<String, dynamic> con todos los datos de color de la API
+  final response = await validarCodigoEscuela(codigo);
 
-                            // --- INICIO DE LA MODIFICACIÓN ---
-                            if (response != null) {
-                              // 1. Obtener una referencia al UserProvider.
-                              //    Usamos listen: false porque solo queremos llamar a un método, no reconstruir el widget.
-                              final userProvider = Provider.of<UserProvider>(
-                                context,
-                                listen: false,
-                              );
+  // --- INICIO DE LA MODIFICACIÓN ---
+  if (response != null) {
+    // 1. Obtener una referencia al UserProvider.
+    final userProvider = Provider.of<UserProvider>(
+      context,
+      listen: false,
+    );
 
-                              // 2. Llamar al nuevo método para procesar y guardar los colores.
-                              //    Aquí es donde verás los prints en la consola.
-                              await userProvider.processAndSaveSchoolColors(
-                                response,
-                              );
+    // 2. Procesar, asignar a la memoria del Provider, y guardar en la DB (para móvil)
+    await userProvider.processAndSaveSchoolColors(
+      response,
+    );
 
-                              // 3. Navegar a la pantalla de login, sabiendo que los colores ya están en el provider.
-                              Navigator.pushReplacementNamed(
-                                context,
-                                'login',
-                                arguments: {'codigo': codigo},
-                              );
-                            }
-                            // --- FIN DE LA MODIFICACIÓN ---
+    // ⭐️ 3. PASO CLAVE: Guardar persistentemente todos los colores en SharedPreferences (Web)
+    //    Esto utiliza el método que creamos para guardar todos los campos de color/diseño.
+    await userProvider.saveColorsToPrefs(response);
 
-                            setState(() {
-                              _isLoading = false;
-                            });
-                          },
+    // 4. Navegar a la pantalla de login
+    Navigator.pushReplacementNamed(
+      context,
+      'login',
+      arguments: {'codigo': codigo},
+    );
+  } else {
+    // Manejar el caso donde la validación del código falla (response es null)
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          'El código de escuela es inválido o la API falló.',
+        ),
+        backgroundColor: Colors.red,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+  // --- FIN DE LA MODIFICACIÓN ---
+
+  setState(() {
+    _isLoading = false;
+  });
+},
                         ),
                   ],
                 ),
