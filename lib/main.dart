@@ -12,6 +12,7 @@ import 'package:oficinaescolar_colaboradores/services/api_client.dart';
 import 'package:provider/provider.dart';
 import 'providers/user_provider.dart';
 
+
 const double _phoneBreakpoint = 600.0;
 
 // ✅ TODO: Descomentar y habilitar cuando Firebase se configure para la app de colaboradores.
@@ -23,7 +24,7 @@ const double _phoneBreakpoint = 600.0;
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-
+  
   try {
       await initializeDateFormatting('es', null);
   } catch (e) {
