@@ -8,6 +8,7 @@ import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:device_info_plus/device_info_plus.dart';
+import 'dart:io' show Platform;
 
 import 'package:oficinaescolar_colaboradores/data/database_helper.dart';
 import 'package:oficinaescolar_colaboradores/config/api_constants.dart';
@@ -212,79 +213,79 @@ class UserProvider with ChangeNotifier {
   }
 
   Future<void> loadUserDataFromDb() async {
-  debugPrint('UserProvider: Intentando cargar datos de usuario desde la base de datos...');
+    debugPrint('UserProvider: Intentando cargar datos de usuario desde la base de datos...');
 
-  final cachedData = await DatabaseHelper.instance.getSessionData('session_data');
-  bool dataLoaded = false;
-  Map<String, dynamic> sessionJson = {};
+    final cachedData = await DatabaseHelper.instance.getSessionData('session_data');
+    bool dataLoaded = false;
+    Map<String, dynamic> sessionJson = {};
 
-  // 1. INTENTO DE CARGA DESDE DB LOCAL (Móvil)
-  if (cachedData != null) {
-    sessionJson = cachedData['data_json'] as Map<String, dynamic>;
-    debugPrint('UserProvider: Datos de colaborador cargados desde la base de datos (Móvil).');
-    dataLoaded = true;
-  }
-
-  // 2. FALLBACK A SHARED_PREFERENCES (Web/Fallback)
-  if (!dataLoaded) {
-    final prefs = await SharedPreferences.getInstance();
-
-    // Reconstruir sessionJson a partir de SharedPreferences
-    sessionJson = {
-      'idColaborador': prefs.getString('idColaborador') ?? '',
-      'idEmpresa': prefs.getString('idEmpresa') ?? '',
-      'email': prefs.getString('email') ?? '',
-      'escuela': prefs.getString('escuela') ?? '',
-      'idCiclo': prefs.getString('idCiclo') ?? '',
-      'fechaHora': prefs.getString('fechaHora') ?? '',
-      // Tokens (si se guardaron)
-      'idToken': prefs.getString('idToken') ?? '', 
-      'fcmToken': prefs.getString('fcmToken') ?? '',
-    };
-
-    // Verificar si la sesión esencial está presente
-    if (sessionJson['idColaborador'].isNotEmpty) {
-      debugPrint('UserProvider: Datos de colaborador cargados desde SharedPreferences (Web/Fallback).');
+    // 1. INTENTO DE CARGA DESDE DB LOCAL (Móvil)
+    if (cachedData != null) {
+      sessionJson = cachedData['data_json'] as Map<String, dynamic>;
+      debugPrint('UserProvider: Datos de colaborador cargados desde la base de datos (Móvil).');
       dataLoaded = true;
-    } else {
-      debugPrint('UserProvider: No se encontraron datos de usuario en la base de datos ni en SharedPreferences.');
     }
-  }
 
-  // 3. ASIGNACIÓN FINAL Y LÓGICA DE TOKENS
-  if (dataLoaded) {
-    // Asignar variables internas del Provider desde sessionJson
-    _idColaborador = sessionJson['idColaborador'] ?? '';
-    _idEmpresa = sessionJson['idEmpresa'] ?? '';
-    _email = sessionJson['email'] ?? '';
-    _escuela = sessionJson['escuela'] ?? '';
-    _fechaHora = sessionJson['fechaHora'] ?? '';
-    _idCiclo = sessionJson['idCiclo'] ?? '';
-    
-    // Si manejas más variables específicas del colaborador, inclúyelas aquí.
+    // 2. FALLBACK A SHARED_PREFERENCES (Web/Fallback)
+    if (!dataLoaded) {
+      final prefs = await SharedPreferences.getInstance();
 
-    // 🔑 Lógica de Tokens: Intentar DB, sino usar el dato del sessionJson (SharedPreferences)
-    if (_idColaborador.isNotEmpty) {
-      final tokenData = await DatabaseHelper.instance.getTokens(_idColaborador);
-      
-      if (tokenData != null) {
-        // Carga exitosa desde DB (Móvil)
-        _idToken = tokenData['id_token'] ?? '';
-        _fcmToken = tokenData['token_celular'] ?? '';
-        debugPrint('UserProvider: Tokens cargados desde la base de datos (DB).');
-      } else if (sessionJson['idToken'] != null && sessionJson['idToken'].isNotEmpty) {
-        // Usar tokens recuperados de SharedPreferences (Web)
-        _idToken = sessionJson['idToken'] ?? '';
-        _fcmToken = sessionJson['fcmToken'] ?? '';
-        debugPrint('UserProvider: Tokens cargados desde SharedPreferences (Web).');
+      // Reconstruir sessionJson a partir de SharedPreferences
+      sessionJson = {
+        'idColaborador': prefs.getString('idColaborador') ?? '',
+        'idEmpresa': prefs.getString('idEmpresa') ?? '',
+        'email': prefs.getString('email') ?? '',
+        'escuela': prefs.getString('escuela') ?? '',
+        'idCiclo': prefs.getString('idCiclo') ?? '',
+        'fechaHora': prefs.getString('fechaHora') ?? '',
+        // Tokens (si se guardaron)
+        'idToken': prefs.getString('idToken') ?? '', 
+        'fcmToken': prefs.getString('fcmToken') ?? '',
+      };
+
+      // Verificar si la sesión esencial está presente
+      if (sessionJson['idColaborador'].isNotEmpty) {
+        debugPrint('UserProvider: Datos de colaborador cargados desde SharedPreferences (Web/Fallback).');
+        dataLoaded = true;
       } else {
-        debugPrint('UserProvider: No se encontraron tokens.');
+        debugPrint('UserProvider: No se encontraron datos de usuario en la base de datos ni en SharedPreferences.');
       }
     }
-  }
 
-  notifyListeners();
-}
+    // 3. ASIGNACIÓN FINAL Y LÓGICA DE TOKENS
+    if (dataLoaded) {
+      // Asignar variables internas del Provider desde sessionJson
+      _idColaborador = sessionJson['idColaborador'] ?? '';
+      _idEmpresa = sessionJson['idEmpresa'] ?? '';
+      _email = sessionJson['email'] ?? '';
+      _escuela = sessionJson['escuela'] ?? '';
+      _fechaHora = sessionJson['fechaHora'] ?? '';
+      _idCiclo = sessionJson['idCiclo'] ?? '';
+      
+      // Si manejas más variables específicas del colaborador, inclúyelas aquí.
+
+      // 🔑 Lógica de Tokens: Intentar DB, sino usar el dato del sessionJson (SharedPreferences)
+      if (_idColaborador.isNotEmpty) {
+        final tokenData = await DatabaseHelper.instance.getTokens(_idColaborador);
+        
+        if (tokenData != null) {
+          // Carga exitosa desde DB (Móvil)
+          _idToken = tokenData['id_token'] ?? '';
+          _fcmToken = tokenData['token_celular'] ?? '';
+          debugPrint('UserProvider: Tokens cargados desde la base de datos (DB).');
+        } else if (sessionJson['idToken'] != null && sessionJson['idToken'].isNotEmpty) {
+          // Usar tokens recuperados de SharedPreferences (Web)
+          _idToken = sessionJson['idToken'] ?? '';
+          _fcmToken = sessionJson['fcmToken'] ?? '';
+          debugPrint('UserProvider: Tokens cargados desde SharedPreferences (Web).');
+        } else {
+          debugPrint('UserProvider: No se encontraron tokens.');
+        }
+      }
+    }
+
+    notifyListeners();
+  }
 
   Future<void> _saveSessionData() async {
     await DatabaseHelper.instance.saveSessionData(
@@ -301,7 +302,10 @@ class UserProvider with ChangeNotifier {
     debugPrint('UserProvider: Datos de sesión guardados en la base de datos.');
   }
 
-  // En UserProvider class:
+  // Nuevo método para asignación en memoria (Web)
+  void setFcmTokenForWeb(String token) {
+      _fcmToken = token;
+  }
 
 /// Guarda la sesión del colaborador en SharedPreferences para persistencia web
 Future<void> saveColaboradorSessionToPrefs({
@@ -715,29 +719,41 @@ Future<void> saveColaboradorSessionToPrefs({
 
   Future<void> actualizarInfoToken({
     required String escuela,
-    required String idColaborador, // ✅ [REF] Cambiado de idAlumno
+    required String idColaborador,
     required String tokenCelular,
     required String status,
   }) async {
     try {
       final DeviceInfoPlugin deviceInfo = DeviceInfoPlugin();
       String modeloMarca = '';
-      String sistemaOperativo = '';
+      String? sistemaOperativo = '';
 
-      if (Platform.isAndroid) {
+      // 🛑 CORRECCIÓN CLAVE: Usar kIsWeb para la lógica de plataforma.
+      if (kIsWeb) {
+        // ✅ WEB: Usamos la información del navegador
+        final WebBrowserInfo webInfo = await deviceInfo.webBrowserInfo;
+        modeloMarca = webInfo.browserName.name.toUpperCase();
+        sistemaOperativo = webInfo.platform;
+        
+      } else if (Platform.isAndroid) {
+        // 🔵 MÓVIL/DESKTOP: Android (Usando dart:io)
         final androidInfo = await deviceInfo.androidInfo;
         modeloMarca = '${androidInfo.manufacturer} ${androidInfo.model}';
         sistemaOperativo = 'Android ${androidInfo.version.release}';
+
       } else if (Platform.isIOS) {
+        // 🔵 MÓVIL/DESKTOP: iOS (Usando dart:io)
         final iosInfo = await deviceInfo.iosInfo;
         modeloMarca = '${iosInfo.name} ${iosInfo.model}';
         sistemaOperativo = 'iOS ${iosInfo.systemVersion}';
       }
 
+      // ... (El resto del código HTTP es el mismo) ...
+
       final url = Uri.parse('${ApiConstants.apiBaseUrl}${ApiConstants.updateInfoTokenEndpoint}');
       final body = {
         'escuela': escuela,
-        'id_persona': idColaborador, // ✅ [REF] Cambiado de id_persona
+        'id_persona': idColaborador,
         'token_celular': tokenCelular,
         'status': status,
         if (status == 'activo') ...{
@@ -756,12 +772,20 @@ Future<void> saveColaboradorSessionToPrefs({
         final String idToken = responseData['id_token']?.toString() ?? '';
         _idToken = idToken;
         _tokenCelular = tokenCelular;
+        
+        // 🛑 CORRECCIÓN CLAVE: Lógica de Persistencia
         if (_idToken != null && _idToken!.isNotEmpty) {
-          await DatabaseHelper.instance.saveTokens(idColaborador, _idToken!, _tokenCelular!);
-          debugPrint('UserProvider: Tokens guardados en la base de datos local.');
+            // SOLO EN MÓVIL: Intentar guardar en la base de datos (SQLite)
+            if (!kIsWeb) {
+                await DatabaseHelper.instance.saveTokens(idColaborador, _idToken!, _tokenCelular!);
+                debugPrint('UserProvider: Tokens guardados en la base de datos local.');
+            } else {
+                debugPrint('UserProvider: Tokens actualizados en memoria (Web).');
+            }
         } else {
-          debugPrint('El ID Token retornado está vacío o es nulo.');
+            debugPrint('El ID Token retornado está vacío o es nulo.');
         }
+
         notifyListeners();
       } else {
         debugPrint('Error actualizando token: ${response.statusCode}');
@@ -1328,14 +1352,14 @@ Future<void> saveColaboradorSessionToPrefs({
 
   // ✅ [REF] Eliminado el método fetchAndLoadMateriasData
 
-  Future<void> markAvisoAsRead(String idCalendario, {String? respuesta}) async {
-    // ... (este método no cambia, solo su uso)
+ Future<void> markAvisoAsRead(String idCalendario, {String? respuesta}) async {
     if (_escuela.isEmpty || _idEmpresa.isEmpty || _idColaborador.isEmpty) {
       debugPrint('UserProvider: Datos de sesión incompletos para marcar aviso o enviar respuesta.');
       return;
     }
      final String idTokenParam = _idToken ?? '0'; 
     final Map<String, String> body = {
+      // ... (cuerpo de la petición HTTP) ...
       'escuela': _escuela,
       'id_calendario': idCalendario,
       'id_alumno':'0',
@@ -1346,6 +1370,9 @@ Future<void> saveColaboradorSessionToPrefs({
     };
 
     final url = Uri.parse('${ApiConstants.apiBaseUrl}${ApiConstants.setAvisoLeidoEndpoint}');
+
+    debugPrint('➡️ API Petición POST a: $url');
+    debugPrint('➡️ Parámetros BODY enviados: $body');
     
     try {
       final response = await http.post(url, body: body);
@@ -1353,15 +1380,21 @@ Future<void> saveColaboradorSessionToPrefs({
       if (response.statusCode == 200) {
         debugPrint('Aviso $idCalendario marcado como leído y/o respuesta enviada.');
         final avisoIndex = _avisos.indexWhere((a) => a.idCalendario == idCalendario);
+        
         if (avisoIndex != -1) {
-          final dbHelper = DatabaseHelper.instance;
-          final cacheId = '${idEmpresa}_$idColaborador'; // ✅ [REF] Cambiado de idAlumno
+          
+          // 🚀 LÓGICA DE PERSISTENCIA CONDICIONAL
+          if (!kIsWeb) {
+              final dbHelper = DatabaseHelper.instance;
+              final cacheId = '${_idEmpresa}_$_idColaborador';
 
-         // 1. Marcar como leído en la base de datos
-          await dbHelper.updateAvisoReadStatus(idCalendario, cacheId, true);
+              // Marcar como leído y guardar respuesta en la base de datos (SOLO EN MÓVIL)
+              await dbHelper.updateAvisoReadStatus(idCalendario, cacheId, true);
+              await dbHelper.updateAvisoRespuesta(idCalendario, cacheId, respuesta ?? '');
+          }
+          // ------------------------------------------
 
-          // 2. Guardar la respuesta si existe
-          await dbHelper.updateAvisoRespuesta(idCalendario, cacheId, respuesta ?? '');
+          // 2. Actualizar el estado en memoria (_avisos)
           final currentAviso = _avisos[avisoIndex];
           _avisos[avisoIndex] = AvisoModel(
             idCalendario: currentAviso.idCalendario,
@@ -1371,10 +1404,10 @@ Future<void> saveColaboradorSessionToPrefs({
             fecha: currentAviso.fecha,
             fechaFin: currentAviso.fechaFin,
             archivo: currentAviso.archivo,
-            leido: true,
+            leido: true, // ✅ Actualizado en memoria
             seccion: currentAviso.seccion,
             tipoRespuesta: currentAviso.tipoRespuesta,
-            segRespuesta: respuesta ?? '',
+            segRespuesta: respuesta ?? '', // ✅ Actualizado en memoria
             opcion1: currentAviso.opcion1,
             opcion2: currentAviso.opcion2,
             opcion3: currentAviso.opcion3,
@@ -1390,6 +1423,7 @@ Future<void> saveColaboradorSessionToPrefs({
       }
     } catch (e) {
       debugPrint('Excepción al marcar aviso: $e');
+      // 🛑 NOTA: Si ves errores de CORS en la web, se capturarán aquí
     }
   }
 

@@ -1,4 +1,3 @@
-// main.dart para la app de colaboradores
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:oficinaescolar_colaboradores/firebase_options.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -18,7 +17,10 @@ const double _phoneBreakpoint = 600.0;
 // ✅ TODO: Descomentar y habilitar cuando Firebase se configure para la app de colaboradores.
  @pragma('vm:entry-point')
  Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-   await Firebase.initializeApp();
+   // La inicialización de Firebase es necesaria para handlers en segundo plano
+   await Firebase.initializeApp(
+     options: DefaultFirebaseOptions.currentPlatform,
+   );
    debugPrint('📥 [BACKGROUND] Mensaje FCM recibido: ${message.messageId}');
  }
 
@@ -33,17 +35,26 @@ void main() async {
       await initializeDateFormatting(); // Intenta la inicialización por defecto
   }
 
-  // ✅ TODO: Descomentar y habilitar la inicialización de Firebase cuando esté lista.
+  // ✅ Inicialización de Firebase.
    await Firebase.initializeApp(
      options: DefaultFirebaseOptions.currentPlatform,
    );
 
-  // ✅ TODO: Descomentar y habilitar los handlers de FCM cuando el servicio esté listo.
+  // ✅ Habilitación de handlers de FCM.
    FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
-   await _initPushNotifications();
+   
+   // 🚀 CAMBIO 1: Capturamos el token devuelto.
+   final String? fcmTokenFromFirebase = await _initPushNotifications(); 
 
   final UserProvider tempUserProvider = UserProvider();
   await tempUserProvider.loadUserDataFromDb();
+  
+  // 🚀 CAMBIO 2: Asignamos el token FCM al Provider en memoria antes de runApp().
+  if (fcmTokenFromFirebase != null) {
+      // NOTA: Debes implementar este método en UserProvider: setFcmTokenForWeb(String token)
+      tempUserProvider.setFcmTokenForWeb(fcmTokenFromFirebase); 
+      debugPrint('main.dart: FCM Token asignado al UserProvider en memoria.');
+  }
 
   String initialRoute;
   if (tempUserProvider.idColaborador.isNotEmpty) {
@@ -61,7 +72,7 @@ void main() async {
           value: tempUserProvider,
         ),
         ProxyProvider<UserProvider, ApiClient>(
-          update: (_, userProvider, _) => ApiClient(userProvider),
+          update: (_, userProvider, __) => ApiClient(userProvider), // Corregido: '__' para el tercer argumento
         ),
       ],
       child: MyApp(
@@ -71,8 +82,8 @@ void main() async {
   );
 }
 
-// ✅ TODO: Descomentar y habilitar cuando Firebase se configure para la app de colaboradores.
- Future<void> _initPushNotifications() async {
+// ✅ CAMBIO 3: La función ahora devuelve el token.
+ Future<String?> _initPushNotifications() async {
    FirebaseMessaging messaging = FirebaseMessaging.instance;
    NotificationSettings settings = await messaging.requestPermission(
      alert: true,
@@ -84,8 +95,10 @@ void main() async {
      announcement: false,
    );
    debugPrint('🔔 Permisos de notificaciones: ${settings.authorizationStatus}');
-   String? token = await messaging.getToken();
+   
+   String? token = await messaging.getToken(); // Token obtenido
    debugPrint('📲 Token FCM: $token');
+   
    FirebaseMessaging.onMessage.listen((RemoteMessage message) {
      debugPrint('📥 [FOREGROUND] Mensaje FCM: ${message.notification?.title} - ${message.notification?.body}');
    });
@@ -96,6 +109,8 @@ void main() async {
    if (initialMessage != null) {
      debugPrint('🚀 [INITIAL MESSAGE] App iniciada desde notificación FCM terminada: ${initialMessage.messageId}');
    }
+   
+   return token; // 👈 Devolvemos el token
  }
 
 class MyApp extends StatelessWidget {
@@ -142,4 +157,3 @@ class OrientationHandler extends StatelessWidget {
     return child;
   }
 }
-// CODIGO FUNCIONAL
