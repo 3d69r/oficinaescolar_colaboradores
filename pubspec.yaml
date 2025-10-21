@@ -32,7 +32,7 @@ dependencies:
   flutter_cache_manager: ^3.4.1
   auto_size_text: ^3.0.0
   flutter_html_table: ^3.0.0
-  flutter_pdfview: ^1.4.2-beta.1
+  
   font_awesome_flutter: ^10.9.0  
   syncfusion_flutter_pdfviewer: ^31.1.18
   qr_flutter: ^4.1.0

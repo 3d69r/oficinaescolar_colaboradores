@@ -1035,7 +1035,7 @@ Future<void> saveColaboradorSessionToPrefs({
       debugPrint('UserProvider: Error al descargar la imagen: $e');
       return null;
     }
-}
+  }
 
   Future<List<AvisoModel>> fetchAndLoadAvisosData({bool forceRefresh = false}) async {
     final String escuelaCode = _escuela;

@@ -382,14 +382,25 @@ class _AvisosViewState extends State<AvisosView>
                                     final String extension = resourcePath.split('.').last.toLowerCase();
 
                                     // Lógica de visualización: PDF o imagen
-                                  if (extension == 'pdf') {
-                                    // 🌟 SOLUCIÓN PDF: Usar SfPdfViewer.network para Web y Móvil (si es URL)
+                                if (extension == 'pdf') {
+                                  // 🚀 LÓGICA DE PDF MODIFICADA para usar Syncfusion en Web y Móvil
+                                  if (kIsWeb) {
+                                    // WEB: Usa la URL de red.
                                     return SfPdfViewer.network(
-                                    resourcePath,
-                                    canShowHyperlinkDialog: true,
-                                    enableDocumentLinkAnnotation: true,
+                                      resourcePath,
+                                      canShowHyperlinkDialog: true,
+                                      enableDocumentLinkAnnotation: true,
+                                    );
+                                  } else {
+                                    // MÓVIL: Usa la ruta de archivo local (asumiendo que getAvisoImagePath 
+                                    // devolvió la ruta local en móvil).
+                                    return SfPdfViewer.file(
+                                      File(resourcePath),
+                                      canShowHyperlinkDialog: true,
+                                      enableDocumentLinkAnnotation: true,
                                     );
                                   }
+                                }
                                     else if (['jpg', 'jpeg', 'png', 'gif'].contains(extension)) {
                                       return InteractiveViewer(
                                         panEnabled: true,
