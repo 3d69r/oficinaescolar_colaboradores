@@ -140,15 +140,6 @@ class _LoginScreenState extends State<LoginScreen> {
         idCiclo: '',
       );
 
-      await userProvider.saveColaboradorSessionToPrefs(
-        idColaborador: idColaborador,
-        idEmpresa: idEmpresa,
-        email: emailController.text.trim(),
-        escuela: finalSchoolCode,
-        fechaHora: sessionFechaHora,
-        idCiclo: '',
-      );
-
       final tokenFirebase = await FirebaseMessaging.instance.getToken();
 
       await userProvider.actualizarInfoToken(
@@ -157,6 +148,19 @@ class _LoginScreenState extends State<LoginScreen> {
         tokenCelular: tokenFirebase ?? '',
         status: 'activo',
       );
+
+      await userProvider.saveColaboradorSessionToPrefs(
+        idColaborador: idColaborador,
+        idEmpresa: idEmpresa,
+        email: emailController.text.trim(),
+        escuela: finalSchoolCode,
+        fechaHora: sessionFechaHora,
+        idCiclo: '',
+        idToken: userProvider.idToken, // ¡Ahora tiene el token correcto!
+        fcmToken: tokenFirebase,
+      );
+
+      
 
       if (mounted) {
         Navigator.pushReplacementNamed(context, 'home');

@@ -212,7 +212,7 @@ class UserProvider with ChangeNotifier {
     debugPrint('UserProvider: Todos los colores y configuraciones de diseño guardados en SharedPreferences.');
   }
 
-  Future<void> loadUserDataFromDb() async {
+    Future<void> loadUserDataFromDb() async {
     debugPrint('UserProvider: Intentando cargar datos de usuario desde la base de datos...');
 
     final cachedData = await DatabaseHelper.instance.getSessionData('session_data');
@@ -326,10 +326,8 @@ Future<void> saveColaboradorSessionToPrefs({
   await prefs.setString('escuela', escuela);
   await prefs.setString('idCiclo', idCiclo);
   await prefs.setString('fechaHora', fechaHora);
-  
-  // Guardar tokens si se proporcionan (asumiendo que los recibes en el login)
-  if (idToken != null) await prefs.setString('idToken', idToken);
-  if (fcmToken != null) await prefs.setString('fcmToken', fcmToken);
+  await prefs.setString('idToken', idToken ?? ''); 
+  await prefs.setString('fcmToken', fcmToken ?? '');
 
   debugPrint('UserProvider: Sesión de Colaborador guardada en SharedPreferences.');
 }
@@ -341,6 +339,8 @@ Future<void> saveColaboradorSessionToPrefs({
     required String escuela,
     required String idCiclo,
     required String fechaHora,
+    String? idToken, 
+    String? fcmToken,
   }) async {
     // 1. Asignar variables internas
     _idColaborador = idColaborador;
@@ -349,6 +349,8 @@ Future<void> saveColaboradorSessionToPrefs({
     _escuela = escuela;
     _idCiclo = idCiclo;
     _fechaHora = fechaHora;
+    if (idToken != null) _idToken = idToken; 
+    if (fcmToken != null) _fcmToken = fcmToken;
 
     // 2. Guardar en la DB Local (Móvil)
     await _saveSessionData();
@@ -362,8 +364,8 @@ Future<void> saveColaboradorSessionToPrefs({
       idCiclo: idCiclo,
       fechaHora: fechaHora,
       // Si manejas los tokens en el login, pásalos aquí:
-       idToken: _idToken, 
-       fcmToken: _fcmToken,
+       idToken: idToken,
+      fcmToken: fcmToken,
     );
     
     debugPrint('UserProvider: Datos de sesión establecidos.');
