@@ -580,6 +580,26 @@ Future<void> saveColaboradorSessionToPrefs({
     }
   }
 
+  Future<void> _clearColaboradorPrefs() async {
+    final prefs = await SharedPreferences.getInstance();
+
+    // 🛑 CRÍTICO: Eliminar las claves de sesión principales del colaborador
+    await prefs.remove('idColaborador');
+    await prefs.remove('idEmpresa');
+    await prefs.remove('email');
+    await prefs.remove('escuela');
+    await prefs.remove('idCiclo');
+    await prefs.remove('fechaHora');
+    
+    // 🔑 CRÍTICO: Eliminar los tokens
+    await prefs.remove('idToken');
+    await prefs.remove('fcmToken');
+    
+    // (Añade aquí cualquier otra clave que uses en saveColaboradorSessionToPrefs)
+
+    //appLog('UserProvider: SharedPreferences del Colaborador limpiado.');
+  } 
+
   Future<void> clearUserData() async {
     _idColaborador = ''; // ✅ [REF] Cambiado de _idAlumno
     _idEmpresa = '';
@@ -611,6 +631,9 @@ Future<void> saveColaboradorSessionToPrefs({
     notifyListeners();
 
     await DatabaseHelper.instance.clearAllData();
+
+    // 2. 🚀 CRÍTICO: Limpiar Shared Preferences (Web/Fallback)
+    await _clearColaboradorPrefs();
     debugPrint('UserProvider: Datos de usuario y base de datos local limpiados.');
   }
 
