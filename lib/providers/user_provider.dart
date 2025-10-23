@@ -426,6 +426,87 @@ Future<void> saveColaboradorSessionToPrefs({
     }
   }
 
+  Future<Map<String, dynamic>> uploadCalificacionesArchivos({
+    required String idAlumno,
+    required String idSalon,
+    required Map<String, String?> selectedFilePaths, // Clave: campo_archivo (ej: archivo_calif_1), Valor: ruta_local_archivo
+  }) async {
+    final String escuelaCode = _escuela;
+    final String apiEndpoint = ApiConstants.uploadFileCalificacion; // Asumo que tienes esta constante definida
+
+    if (escuelaCode.isEmpty || idAlumno.isEmpty || idSalon.isEmpty) {
+      return {'status': 'error', 'message': 'Datos de sesión o alumno/salón incompletos.'};
+    }
+    
+    debugPrint('UserProvider: Preparando subida de archivos para Alumno: $idAlumno, Salón: $idSalon');
+
+    try {
+      // 1. Crear la solicitud Multipart
+      var request = http.MultipartRequest(
+        'POST',
+        Uri.parse(apiEndpoint),
+      );
+
+      // 2. Agregar parámetros de texto requeridos (Form-Encoded)
+      request.fields['escuela'] = escuelaCode;
+      request.fields['id_alumno'] = idAlumno;
+      request.fields['id_salon'] = idSalon;
+
+      // 3. Agregar los archivos opcionales (archivo_calif_#)
+      bool hasFilesToUpload = false;
+      for (final entry in selectedFilePaths.entries) {
+        final String campoArchivo = entry.key; // ej: 'archivo_calif_1'
+        final String? localPath = entry.value;
+
+        if (localPath != null && localPath.isNotEmpty) {
+          final file = File(localPath);
+          if (await file.exists()) {
+            hasFilesToUpload = true;
+            
+            // Adjuntar el archivo al request
+            request.files.add(
+              await http.MultipartFile.fromPath(
+                campoArchivo, // Nombre del campo en el API (archivo_calif_1, etc.)
+                localPath,
+                filename: '${campoArchivo}_${idAlumno}_${DateTime.now().millisecondsSinceEpoch}.pdf',
+              ),
+            );
+            debugPrint('Adjuntando archivo: $campoArchivo desde $localPath');
+          } else {
+            debugPrint('Advertencia: Archivo local no encontrado en la ruta: $localPath');
+          }
+        }
+      }
+
+      if (!hasFilesToUpload) {
+        // Si no hay archivos seleccionados, podemos optar por cancelar o enviar solo los campos de texto
+        // Aquí asumiremos que la llamada es innecesaria si no hay archivos nuevos.
+        return {'status': 'warning', 'message': 'No se seleccionó ningún archivo nuevo para subir.'};
+      }
+      
+      // 4. Enviar la solicitud
+      final streamedResponse = await request.send();
+      final response = await http.Response.fromStream(streamedResponse);
+      
+      debugPrint('Respuesta de subida HTTP Status: ${response.statusCode}');
+
+      if (response.statusCode == 200) {
+        // 5. Procesar la respuesta
+        final rawData = json.decode(response.body) as Map<String, dynamic>;
+        
+        // La respuesta del JSON incluye status y message.
+        return rawData; 
+      } else {
+        // Error HTTP no 200 (ej: 404, 500)
+        return {'status': 'error', 'message': 'Error de servidor: ${response.statusCode}'};
+      }
+    } on SocketException {
+      return {'status': 'error', 'message': 'Fallo de conexión a internet.'};
+    } on Exception catch (e) {
+      return {'status': 'error', 'message': 'Excepción al subir archivo: ${e.toString()}'};
+    }
+  }
+
   Future<List<AlumnoAsistenciaModel>> fetchAlumnosPorCurso({
       required String idCurso,
       required TipoCurso tipoCurso,
@@ -773,12 +854,10 @@ Future<void> saveColaboradorSessionToPrefs({
         sistemaOperativo = 'iOS ${iosInfo.systemVersion}';
       }
 
-      // ... (El resto del código HTTP es el mismo) ...
-
       final url = Uri.parse('${ApiConstants.apiBaseUrl}${ApiConstants.updateInfoTokenEndpoint}');
       final body = {
         'escuela': escuela,
-        'id_persona': idColaborador,
+        'id_colaborador': idColaborador,
         'token_celular': tokenCelular,
         'status': status,
         if (status == 'activo') ...{
