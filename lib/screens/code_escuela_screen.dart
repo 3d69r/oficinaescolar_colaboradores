@@ -26,103 +26,114 @@ class _CodeEscuelaScreenState extends State<CodeEscuelaScreen> {
     super.dispose();
   }
 
-   // ✅ [NUEVO] Método para llamar a la API de notificar_firebase
+  // ✅ [NUEVO] Método para llamar a la API de notificar_firebase
   Future<void> notificarFirebase() async {
-  final apiClient = Provider.of<ApiClient>(context, listen: false);
-  final url = ApiConstants.getNotificarFirebaseUrl();
+    final apiClient = Provider.of<ApiClient>(context, listen: false);
+    final url = ApiConstants.getNotificarFirebaseUrl();
 
-  try {
-    final response = await apiClient.get(url);
+    try {
+      final response = await apiClient.get(url);
 
-    // ✅ Imprimimos la respuesta completa para el debug
-    print('Respuesta de notificar_firebase:');
-    print('StatusCode: ${response.statusCode}');
-    print('Headers: ${response.headers}');
-    print('Body: ${response.body}');
+      // ✅ MANTENEMOS ESTO PARA EL DEBUG DE CONSOLA
+      print('Respuesta de notificar_firebase:');
+      print('StatusCode: ${response.statusCode}');
+      print('Headers: ${response.headers}');
+      print('Body: ${response.body}');
 
-    if (response.statusCode == 200) {
-      // ✅ [NUEVO] Decodificamos el cuerpo JSON de la respuesta
-      try {
-        final Map<String, dynamic> responseData = jsonDecode(response.body);
-        final String? message = responseData['message'];
+      if (response.statusCode == 200) {
+        // ✅ [NUEVO] Decodificamos el cuerpo JSON de la respuesta
+        try {
+          final Map<String, dynamic> responseData = jsonDecode(response.body);
+          final String? message = responseData['message'];
 
-        if (message != null) {
-          debugPrint('Mensaje de la API: $message');
+          if (message != null) {
+            debugPrint('Mensaje de la API: $message');
+          }
+
+          debugPrint('Notificación a Firebase procesada exitosamente.');
+        } on FormatException catch (e) {
+          // Maneja el caso en que la respuesta no sea un JSON válido
+          debugPrint('Error: La respuesta de la API no es un JSON válido: $e');
         }
-
-        debugPrint('Notificación a Firebase procesada exitosamente.');
-      } on FormatException catch (e) {
-        // Maneja el caso en que la respuesta no sea un JSON válido
-        debugPrint('Error: La respuesta de la API no es un JSON válido: $e');
+      } else {
+        debugPrint(
+            'Error en la llamada a la API. Código de estado: ${response.statusCode}');
       }
-    } else {
-      debugPrint('Error en la llamada a la API. Código de estado: ${response.statusCode}');
+    } catch (e) {
+      debugPrint('Excepción al llamar a notificar_firebase: $e');
     }
-  } catch (e) {
-    debugPrint('Excepción al llamar a notificar_firebase: $e');
   }
-}
 
   Future<Map<String, dynamic>?> validarCodigoEscuela(String codigo) async {
-  final url = Uri.parse(
-    'https://oficinaescolar.com/ws_oficinae/index.php/api/validate_escuela',
-  );
-
-  try {
-    final response = await http.post(
-      url,
-      headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-      body: {'escuela': codigo},
+    final url = Uri.parse(
+      'https://oficinaescolar.com/ws_oficinae/index.php/api/validate_escuela',
     );
 
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      if (data['status'] == 'success') {
-        return data;
-      } else {
-        if (!mounted) return null;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('Escuela no encontrada'),
-            backgroundColor: Colors.red,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-        return null;
-      }
-    } else {
-      if (!mounted) return null;
+    // Definimos el mensaje de error genérico y seguro para el usuario.
+    const String errorGenerico = 'Código de escuela inválido.';
+    const String errorConexion = 'Verifica tu conexión a internet.';
+
+    // Función auxiliar para mostrar el SnackBar de error de forma segura.
+    void mostrarErrorUsuario(String mensaje) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Error en el servidor, intenta más tarde.'),
+        SnackBar(
+          content: Text(mensaje),
           backgroundColor: Colors.red,
           behavior: SnackBarBehavior.floating,
         ),
       );
+    }
+
+    try {
+      final response = await http.post(
+        url,
+        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+        body: {'escuela': codigo},
+      );
+
+      // 1. Respuesta exitosa (HTTP 200)
+      if (response.statusCode == 200) {
+        try {
+          final data = jsonDecode(response.body);
+          if (data['status'] == 'success') {
+            return data;
+          } else {
+            // Error de negocio: La API dice que no se encontró la escuela.
+            // Mensaje simple y no técnico.
+            debugPrint(
+                'API Response Error: ${data['message'] ?? 'Escuela no encontrada en la API'}');
+            mostrarErrorUsuario('Escuela no encontrada');
+            return null;
+          }
+        } on FormatException catch (e) {
+          // Error técnico: El cuerpo de la respuesta no es un JSON válido.
+          debugPrint('Error de JSON Decode: $e');
+          mostrarErrorUsuario(errorGenerico);
+          return null;
+        }
+      } else {
+        // 2. Error de servidor (HTTP no 200: 400, 500, etc.)
+        // No mostramos el código de estado al usuario.
+        debugPrint(
+            'Error de servidor HTTP. Código: ${response.statusCode}. Body: ${response.body}');
+        mostrarErrorUsuario('Error al conectar con el servicio. Intenta más tarde.');
+        return null;
+      }
+    } on SocketException {
+      // 3. Error de conexión (DNS lookup failed, host unreachable, etc.)
+      debugPrint('Excepción de Socket: Falló la conexión de red.');
+      mostrarErrorUsuario(errorConexion);
+      return null;
+    } catch (e) {
+      // 4. Cualquier otra excepción (Timeout, error en la URL, etc.)
+      // Evitamos mostrar el objeto 'e' que puede contener información técnica.
+      debugPrint('Excepción inesperada en validarCodigoEscuela: $e');
+      mostrarErrorUsuario(errorGenerico);
       return null;
     }
-  } on SocketException {
-    if (!mounted) return null;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Verifica tu conexión a internet e inténtalo de nuevo.'),
-        backgroundColor: Colors.red,
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
-    return null;
-  } catch (e) {
-    if (!mounted) return null;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Ocurrió un error inesperado: $e'),
-        backgroundColor: Colors.red,
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
-    return null;
   }
-}
+
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
@@ -192,88 +203,74 @@ class _CodeEscuelaScreenState extends State<CodeEscuelaScreen> {
                     _isLoading
                         ? const CircularProgressIndicator()
                         : MaterialButton(
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          disabledColor: Colors.grey,
-                          color: Colors.indigoAccent,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 80,
-                              vertical: 15,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
                             ),
-                            child: const Text(
-                              'Ingresar',
-                              style: TextStyle(color: Colors.white),
+                            disabledColor: Colors.grey,
+                            color: Colors.indigoAccent,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 80,
+                                vertical: 15,
+                              ),
+                              child: const Text(
+                                'Ingresar',
+                                style: TextStyle(color: Colors.white),
+                              ),
                             ),
+                            onPressed: () async {
+                              final codigo = _codigoController.text.trim();
+                              if (codigo.isEmpty ||
+                                  !_formKey.currentState!.validate()) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text(
+                                      'Ingrese un código de escuela válido',
+                                    ),
+                                    backgroundColor: Colors.red,
+                                    behavior: SnackBarBehavior.floating,
+                                  ),
+                                );
+                                return;
+                              }
+
+                              setState(() {
+                                _isLoading = true;
+                              });
+
+                              await notificarFirebase();
+
+                              final response =
+                                  await validarCodigoEscuela(codigo);
+
+                              if (response != null) {
+                                // Éxito en la validación
+                                final userProvider = Provider.of<UserProvider>(
+                                  context,
+                                  listen: false,
+                                );
+
+                                await userProvider.processAndSaveSchoolColors(
+                                  response,
+                                );
+
+                                await userProvider.saveColorsToPrefs(response);
+
+                                Navigator.pushReplacementNamed(
+                                  context,
+                                  'login',
+                                  arguments: {'codigo': codigo},
+                                );
+                              } else {
+                                // El error ya fue mostrado por la función
+                                // validarCodigoEscuela, solo evitamos la navegación.
+                              }
+
+                              setState(() {
+                                _isLoading = false;
+                              });
+                            },
                           ),
-                          onPressed: () async {
-  final codigo = _codigoController.text.trim();
-  if (codigo.isEmpty ||
-      !_formKey.currentState!.validate()) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text(
-          'Ingrese un código de escuela válido',
-        ),
-        backgroundColor: Colors.red,
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
-    return;
-  }
-
-  setState(() {
-    _isLoading = true;
-  });
-
-  await notificarFirebase();
-
-  // Asumimos que 'response' es un Map<String, dynamic> con todos los datos de color de la API
-  final response = await validarCodigoEscuela(codigo);
-
-  // --- INICIO DE LA MODIFICACIÓN ---
-  if (response != null) {
-    // 1. Obtener una referencia al UserProvider.
-    final userProvider = Provider.of<UserProvider>(
-      context,
-      listen: false,
-    );
-
-    // 2. Procesar, asignar a la memoria del Provider, y guardar en la DB (para móvil)
-    await userProvider.processAndSaveSchoolColors(
-      response,
-    );
-
-    // ⭐️ 3. PASO CLAVE: Guardar persistentemente todos los colores en SharedPreferences (Web)
-    //    Esto utiliza el método que creamos para guardar todos los campos de color/diseño.
-    await userProvider.saveColorsToPrefs(response);
-
-    // 4. Navegar a la pantalla de login
-    Navigator.pushReplacementNamed(
-      context,
-      'login',
-      arguments: {'codigo': codigo},
-    );
-  } else {
-    // Manejar el caso donde la validación del código falla (response es null)
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text(
-          'El código de escuela es inválido o la API falló.',
-        ),
-        backgroundColor: Colors.red,
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
-  }
-  // --- FIN DE LA MODIFICACIÓN ---
-
-  setState(() {
-    _isLoading = false;
-  });
-},
-                        ),
                   ],
                 ),
               ),

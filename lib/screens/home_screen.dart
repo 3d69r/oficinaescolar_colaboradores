@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:curved_navigation_bar/curved_navigation_bar.dart';
+import 'package:oficinaescolar_colaboradores/screens/asistencia_calificacion_archivos_screen.dart';
 import 'package:oficinaescolar_colaboradores/screens/webs_interes_screen.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
@@ -110,6 +111,12 @@ if (mounted) {
   /// ⭐️ MÉTODO MODIFICADO PARA FORZAR LA POSICIÓN DE AVISOS ⭐️
   Map<String, dynamic> _buildDynamicMenu(BuildContext context) {
     final userProvider = Provider.of<UserProvider>(context);
+    // 1. Obtener la cadena cruda de permisos
+    final String? rawAppPermisos = userProvider.escuelaModel?.appPermisos;
+
+    // ⭐️ AÑADIR IMPRESIÓN DE DEPURACIÓN AQUÍ ⭐️
+    debugPrint('DEBUG PERMISOS: Contenido crudo de app_permisos: $rawAppPermisos');
+
     final List<String> permisos =
         userProvider.escuelaModel?.appPermisos
             .split(',')
@@ -149,6 +156,14 @@ if (mounted) {
         const Icon(Icons.check_circle_outline, size: 30, color: Colors.white),
       );
     }
+
+    if (permisos.contains('ArchivoCalificaciones')) { 
+      pagesBeforeAvisos.add(const AsistenciaCalificacionArchivoScreen());
+      navItemsBeforeAvisos.add(
+        const Icon(Icons.archive, size:30, color: Colors.white),
+      );
+    }
+
     
     // Items que van después/derecha de Avisos
     if (permisos.contains('Directorio')) {
@@ -164,6 +179,7 @@ if (mounted) {
       );
     }
 
+    
     // --- 2. Preparar el botón de Avisos ---
     final bool hasAvisosPermission = permisos.contains('Avisos');
     final Widget avisosPage = const AvisosView();

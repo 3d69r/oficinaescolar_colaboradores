@@ -1,3 +1,4 @@
+import 'package:oficinaescolar_colaboradores/models/alumno_salon_model.dart';
 import 'package:oficinaescolar_colaboradores/models/boleta_encabezado_model.dart';
 
 class ColaboradorModel {
@@ -10,6 +11,8 @@ class ColaboradorModel {
   final List<ClubModel> materiasClubes;
    // ⭐️ NUEVA PROPIEDAD: Lista de estructuras de boleta
   final List<BoletaEncabezadoModel> encabezadosBoleta;
+
+  final List<AlumnoSalonModel> alumnosSalon;
 
   // Propiedades de 'persona_data'
   final String idColaborador;
@@ -34,6 +37,7 @@ class ColaboradorModel {
     required this.materiasData,
     required this.materiasClubes,
     required this.encabezadosBoleta,
+    required this.alumnosSalon,
     required this.idColaborador,
     required this.nombre,
     required this.apellidoPat,
@@ -79,6 +83,13 @@ class ColaboradorModel {
           ? (json['encabezados_boleta'] as List<dynamic>)
               .whereType<Map<String, dynamic>>()
               .map((e) => BoletaEncabezadoModel.fromJson(e))
+              .toList()
+          : [],
+
+          alumnosSalon: (json['alumnos_salon'] is List)
+          ? (json['alumnos_salon'] as List<dynamic>)
+              .whereType<Map<String, dynamic>>()
+              .map((e) => AlumnoSalonModel.fromJson(e))
               .toList()
           : [],
           

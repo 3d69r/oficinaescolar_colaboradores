@@ -13,6 +13,7 @@ import 'dart:io' show Platform;
 import 'package:oficinaescolar_colaboradores/data/database_helper.dart';
 import 'package:oficinaescolar_colaboradores/config/api_constants.dart';
 import 'package:oficinaescolar_colaboradores/models/alumno_asistencia_model.dart';
+import 'package:oficinaescolar_colaboradores/models/alumno_salon_model.dart';
 import 'package:oficinaescolar_colaboradores/models/boleta_encabezado_model.dart';
 import 'package:oficinaescolar_colaboradores/models/comentario_model.dart';
 import 'package:oficinaescolar_colaboradores/models/escuela_model.dart';
@@ -112,7 +113,8 @@ class UserProvider with ChangeNotifier {
   List<Articulo> get articulosCaf => _articulosCaf;
   List<Map<String, dynamic>> get cafeteriaMovimientos => _cafeteriaMovimientos;
   ColaboradorModel? get currentColaboradorDetails => _currentColaboradorDetails; // ✅ [REF] Cambiado de currentAlumnoDetails
-    
+  List<AlumnoSalonModel> _alumnosSalon = [];
+
   // Getter para acceder a la configuración de la boleta
   List<BoletaEncabezadoModel> get boletaEncabezados => _boletaEncabezados;
 
@@ -372,6 +374,37 @@ Future<void> saveColaboradorSessionToPrefs({
     notifyListeners();
   }
 
+  Map<String, List<AlumnoSalonModel>> get groupedAlumnosBySalon {
+    // 1. Obtener los datos (seguro contra nulos)
+    final List<AlumnoSalonModel> alumnos = colaboradorModel?.alumnosSalon ?? [];
+    if (alumnos.isEmpty) return {};
+
+    final Map<String, List<AlumnoSalonModel>> salones = {};
+
+    // 2. Agrupar alumnos por el nombre del salón
+    for (var alumno in alumnos) {
+      if (salones.containsKey(alumno.salon)) {
+        salones[alumno.salon]!.add(alumno);
+      } else {
+        salones[alumno.salon] = [alumno];
+      }
+    }
+
+    // 3. Ordenamiento (Mejora de UX)
+    // a. Ordenar alumnos dentro de cada salón por nombre completo
+    salones.forEach((key, value) {
+      // Nota: Asume que AlumnoSalonModel tiene el getter nombreCompleto
+      value.sort((a, b) => a.nombreCompleto.toLowerCase().compareTo(b.nombreCompleto.toLowerCase()));
+    });
+    
+    // b. Ordenar los salones alfabéticamente
+    final sortedKeys = salones.keys.toList()..sort();
+    
+    final sortedSalones = {for (var key in sortedKeys) key: salones[key]!};
+
+    return sortedSalones;
+}
+
   Future<void> enviarComentario(Comentario comentario) async {
     // ... (este método no cambia, solo su uso)
     if (_escuela.isEmpty || _idColaborador.isEmpty) {
@@ -432,19 +465,22 @@ Future<void> saveColaboradorSessionToPrefs({
     required Map<String, String?> selectedFilePaths, // Clave: campo_archivo (ej: archivo_calif_1), Valor: ruta_local_archivo
   }) async {
     final String escuelaCode = _escuela;
-    final String apiEndpoint = ApiConstants.uploadFileCalificacion; // Asumo que tienes esta constante definida
-
+    
+    // ⭐️ CORRECCIÓN CLAVE: CONCATENAR la URL base y el endpoint ⭐️
+    final String fullApiUrl = 
+        '${ApiConstants.apiBaseUrl}${ApiConstants.uploadFileCalificacion}';
+    
     if (escuelaCode.isEmpty || idAlumno.isEmpty || idSalon.isEmpty) {
       return {'status': 'error', 'message': 'Datos de sesión o alumno/salón incompletos.'};
     }
     
-    debugPrint('UserProvider: Preparando subida de archivos para Alumno: $idAlumno, Salón: $idSalon');
+    debugPrint('UserProvider: Preparando subida de archivos a $fullApiUrl para Alumno: $idAlumno, Salón: $idSalon');
 
     try {
       // 1. Crear la solicitud Multipart
       var request = http.MultipartRequest(
         'POST',
-        Uri.parse(apiEndpoint),
+        Uri.parse(fullApiUrl),
       );
 
       // 2. Agregar parámetros de texto requeridos (Form-Encoded)
@@ -452,8 +488,18 @@ Future<void> saveColaboradorSessionToPrefs({
       request.fields['id_alumno'] = idAlumno;
       request.fields['id_salon'] = idSalon;
 
+      // ⭐️ IMPRESIÓN DE DEPURACIÓN DE PARÁMETROS DE TEXTO ⭐️
+      debugPrint('DEBUG SUBIDA: Parámetros de Texto:');
+      request.fields.forEach((key, value) {
+        debugPrint('  - $key: $value');
+      });
+      
       // 3. Agregar los archivos opcionales (archivo_calif_#)
       bool hasFilesToUpload = false;
+      
+      // ⭐️ IMPRESIÓN DE DEPURACIÓN DE ARCHIVOS A ADJUNTAR ⭐️
+      debugPrint('DEBUG SUBIDA: Archivos a Adjuntar:');
+      
       for (final entry in selectedFilePaths.entries) {
         final String campoArchivo = entry.key; // ej: 'archivo_calif_1'
         final String? localPath = entry.value;
@@ -471,7 +517,7 @@ Future<void> saveColaboradorSessionToPrefs({
                 filename: '${campoArchivo}_${idAlumno}_${DateTime.now().millisecondsSinceEpoch}.pdf',
               ),
             );
-            debugPrint('Adjuntando archivo: $campoArchivo desde $localPath');
+            debugPrint('  - Campo API: $campoArchivo, Ruta Local: $localPath'); // Imprime el archivo antes de adjuntar
           } else {
             debugPrint('Advertencia: Archivo local no encontrado en la ruta: $localPath');
           }
@@ -479,8 +525,6 @@ Future<void> saveColaboradorSessionToPrefs({
       }
 
       if (!hasFilesToUpload) {
-        // Si no hay archivos seleccionados, podemos optar por cancelar o enviar solo los campos de texto
-        // Aquí asumiremos que la llamada es innecesaria si no hay archivos nuevos.
         return {'status': 'warning', 'message': 'No se seleccionó ningún archivo nuevo para subir.'};
       }
       
@@ -987,6 +1031,18 @@ Future<void> saveColaboradorSessionToPrefs({
     return null;
   }
 
+  void _procesarAlumnosSalon(Map<String, dynamic> rawData) {
+    // 'alumnos_salon' es la clave que esperamos en el JSON completo
+    final rawAlumnosSalon = rawData['alumnos_salon'] as List<dynamic>? ?? [];
+    
+    // Convertimos cada mapa a AlumnoSalonModel y actualizamos la lista de estado
+    _alumnosSalon = rawAlumnosSalon
+        .map((e) => AlumnoSalonModel.fromJson(e as Map<String, dynamic>))
+        .toList();
+
+    debugPrint('UserProvider: Se procesaron ${_alumnosSalon.length} registros de alumnos por salón.');
+}
+
   Future<ColaboradorModel?> fetchAndLoadColaboradorData({bool forceRefresh = false}) async {
     final String escuelaCode = _escuela;
     final String idColaborador = _idColaborador;
@@ -1023,6 +1079,8 @@ Future<void> saveColaboradorSessionToPrefs({
         tempColaboradorModel = ColaboradorModel.fromJson(colaboradorJsonData!);
         _colaboradorModel = tempColaboradorModel;
         _currentColaboradorDetails = tempColaboradorModel;
+
+        _procesarAlumnosSalon(colaboradorJsonData);
 
         // ⭐️ Actualizar la variable del Provider con la data del modelo, si existe en caché
         if (tempColaboradorModel.encabezadosBoleta.isNotEmpty) {

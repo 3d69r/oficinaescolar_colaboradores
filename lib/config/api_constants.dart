@@ -47,6 +47,9 @@ class ApiConstants {
   // endpoint para enviar calificaciones 
   static const String setMateriasCalif = 'set_materias_calif';
 
+  // endpoint para subir archivos de calificaciones 
+  static const String uploadFileCalificacion = 'upload_file_calificacion';
+
   //Duración minima en la que se debe de recargar la información entre cambio de pestaña
   static const int minutosRecarga = 10;
 
