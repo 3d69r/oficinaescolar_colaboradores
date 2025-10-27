@@ -1,21 +1,18 @@
 // archivos_calificaciones_screen.dart
 import 'package:flutter/material.dart';
+import 'package:oficinaescolar_colaboradores/config/api_constants.dart';
 import 'package:provider/provider.dart';
-// import 'dart:async'; // Ya no es necesario
-// import 'dart:io';   // Ya no es necesario
+import 'dart:io'; 
+import 'package:url_launcher/url_launcher.dart'; 
 
-// ⭐️ IMPORTACIÓN REAL DE FILE_PICKER ⭐️
 import 'package:file_picker/file_picker.dart'; 
+// import 'package:shared_preferences/shared_preferences.dart'; // ❌ Eliminada
 
 import 'package:oficinaescolar_colaboradores/providers/user_provider.dart';
-// import 'package:oficinaescolar_colaboradores/providers/tipo_curso.dart'; // Ya no es necesario
-// import 'package:oficinaescolar_colaboradores/models/colaborador_model.dart'; // Ya no es necesario
 import 'package:oficinaescolar_colaboradores/models/alumno_salon_model.dart'; 
-// Eliminada la referencia a MateriaModel si es que estaba importada
 
 class ArchivosCalificacionesScreen extends StatefulWidget {
   
-  // ⭐️ MODIFICACIÓN: ELIMINADA MateriaModel, ahora requiere Salón y Alumnos ⭐️
   final String salonSeleccionado;
   final List<AlumnoSalonModel> alumnosSalon;
 
@@ -31,30 +28,24 @@ class ArchivosCalificacionesScreen extends StatefulWidget {
 
 class _ArchivosCalificacionesScreenState extends State<ArchivosCalificacionesScreen> {
   
-  // Lista que contendrá solo los alumnos que pertenecen al salón seleccionado
   List<AlumnoSalonModel> _alumnosDelSalon = [];
-  
-  // Mapa para rastrear los archivos PDF seleccionados localmente antes de subir
   final Map<String, String?> _selectedFilePaths = {};
-  
   bool _isLoading = true;
   
-  // String? _errorMessage; 
+  // static const String _persistenciaKey = 'archivos_calificaciones_urls'; // ❌ Eliminada
 
   @override
   void initState() {
     super.initState();
-    // ⭐️ LÓGICA SIMPLIFICADA: Usar los alumnos que ya vienen ⭐️
     _cargarAlumnosDelSalon();
   }
 
   /// Asigna y ordena los alumnos proporcionados por la vista anterior.
-  void _cargarAlumnosDelSalon() {
-    
-    // Usamos la lista de alumnos pasada en el constructor
+  void _cargarAlumnosDelSalon() async { 
     List<AlumnoSalonModel> alumnos = widget.alumnosSalon;
     
-    // Ordenar por nombre
+    // ❌ Eliminada la llamada a _sincronizar_con_shared_preferences(alumnos);
+
     alumnos.sort((a, b) => a.nombreCompleto.toLowerCase().compareTo(b.nombreCompleto.toLowerCase()));
 
     if (mounted) {
@@ -63,138 +54,312 @@ class _ArchivosCalificacionesScreenState extends State<ArchivosCalificacionesScr
         _isLoading = false;
       });
     }
-    // ⚠️ ELIMINADO: Método _filtrarAlumnosPorMateria ya no existe
   }
   
-  // ⭐️ MODIFICACIÓN CLAVE: Implementación real de la selección de archivos ⭐️
-  /// Abre el selector de archivos (PDF) y almacena la ruta local.
-  void _seleccionarArchivo(String idCicloAlumno, String campoArchivo) async {
-    final key = '${idCicloAlumno}_$campoArchivo';
+  // ❌ Eliminado el método _sincronizar_con_shared_preferences
+  /*
+  Future<void> _sincronizar_con_shared_preferences(List<AlumnoSalonModel> alumnos) async {
+    final prefs = await SharedPreferences.getInstance();
+    final String? jsonString = prefs.getString(_persistenciaKey);
+    // ... (resto del código de sincronización)
+  }
+  */
+
+  // ❌ Eliminado el método _guardar_archivos_en_shared_preferences
+  /*
+  Future<void> _guardar_archivos_en_shared_preferences() async {
+    final prefs = await SharedPreferences.getInstance();
+    // ... (resto del código de guardado)
+  }
+  */
+  
+  String _getFileNameFromPath(String? path) {
+      if (path == null || path.isEmpty) return 'Archivo';
+      final lastSeparator = path.lastIndexOf('/');
+      if (lastSeparator == -1) return path;
+      return path.substring(lastSeparator + 1);
+  }
+
+  // ⭐️ MODIFICACIÓN CLAVE: Subida instantánea al seleccionar ⭐️
+  /// Abre el selector de archivos (PDF), almacena la ruta local y llama a la subida inmediata.
+  void _seleccionarArchivo(AlumnoSalonModel alumno, String campoArchivo) async {
+    final key = '${alumno.idCicloAlumno}_$campoArchivo';
 
     FilePickerResult? result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
-        allowedExtensions: ['pdf'], // Solo permitir archivos PDF
+        allowedExtensions: ['pdf'], 
         allowMultiple: false,
     );
 
     if (result != null && result.files.single.path != null) {
         final filePath = result.files.single.path!;
         
+        // 1. Guardar la ruta seleccionada temporalmente
         if (mounted) {
             setState(() {
                 _selectedFilePaths[key] = filePath;
             });
         }
         
-        ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-                content: Text('Archivo seleccionado: ${result.files.single.name}'), 
-                backgroundColor: Colors.green,
-                duration: const Duration(seconds: 3),
-            ),
-        );
+        // 2. Llamar inmediatamente a la función de subida para ESTE archivo
+         _enviarArchivos(alumno, campoArchivo, filePath);
+        
     } else {
-        // El usuario canceló la selección o la ruta es nula
+        // Mantiene el estado en caso de cancelación.
+    }
+  }
+
+  // ⭐️ MÉTODO MODIFICADO PARA USAR 'nombre_archivo' DE LA API ⭐️
+  void _enviarArchivos(
+    AlumnoSalonModel alumno, 
+    String campoArchivo, 
+    String localPath
+  ) async { 
+      final userProvider = Provider.of<UserProvider>(context, listen: false);
+      final key = '${alumno.idCicloAlumno}_$campoArchivo';
+
+      if (!await File(localPath).exists()) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Error: Archivo local no encontrado.'), backgroundColor: Colors.red),
+        );
+        return;
+      }
+      
+      final Map<String, String?> filesToSend = {campoArchivo: localPath};
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Subiendo ${_getFileNameFromPath(localPath)}...'), duration: const Duration(seconds: 20)),
+      );
+
+      try {
+          final result = await userProvider.uploadCalificacionesArchivos(
+              idAlumno: alumno.idAlumno,
+              idSalon: alumno.idSalon, 
+              selectedFilePaths: filesToSend,
+          );
+          
+          // Imprime el resultado completo de la API para depuración
+          print('✅ Respuesta de la API para campo $campoArchivo: $result');
+          
+          ScaffoldMessenger.of(context).hideCurrentSnackBar(); 
+          
+          // El status de éxito es ahora 'correcto', no 'success' (según tu log)
+          final bool isSuccess = (result['status'] == 'correcto') || 
+                                 (result['message'] == 'Información enviada correctamente!!');
+          
+          ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                  content: Text(result['message'] as String),
+                  backgroundColor: isSuccess ? Colors.green : Colors.red,
+              ),
+          );
+          
+          if (isSuccess) {
+              
+              final String newUrlOrName;
+              
+              // 🚨 CAMBIO CLAVE: Usa 'nombre_archivo' si está disponible
+              if (result.containsKey('nombre_archivo') && result['nombre_archivo'] is String) {
+                // Usamos el nombre que retorna la API: 1e9f34d014ae7ddc5e043cd91df14b72.pdf
+                newUrlOrName = result['nombre_archivo'] as String; 
+                
+              // ❌ Eliminamos la clave antigua 'correcto del archivo' que ya no existe
+              // ❌ Eliminamos el fallback a 'url' ya que el nombre_archivo es el definitivo
+
+              } else {
+                 // Fallback si la clave 'nombre_archivo' no se encuentra (debería ser raro)
+                newUrlOrName = _getFileNameFromPath(localPath); 
+              }
+              
+              // El valor almacenado es el que se usa en el botón y para visualizar
+              alumno.archivosCalificacion[campoArchivo] = newUrlOrName;
+              
+              setState(() {
+                  _selectedFilePaths.remove(key);
+                  _alumnosDelSalon = List.from(_alumnosDelSalon);
+              });
+          }
+
+      } catch (e) {
+          ScaffoldMessenger.of(context).hideCurrentSnackBar(); 
+          print('❌ Error inesperado en _enviarArchivos: $e');
+          ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Error inesperado al subir: $e'), backgroundColor: Colors.red),
+          );
+      }
+  }
+
+  // ⭐️ MÉTODO MODIFICADO: Quitar Archivo (Añadida llamada a la API de eliminación) ⭐️
+  void _quitarArchivo(String idCicloAlumno, String campoArchivo) async {
+    if (!mounted) return;
+
+    final alumno = _alumnosDelSalon.firstWhere(
+      (a) => a.idCicloAlumno == idCicloAlumno,
+      orElse: () => _alumnosDelSalon.first,
+    );
+    
+    // El nombre del archivo que se va a eliminar es el que está guardado
+    final String archivoAEliminar = alumno.archivosCalificacion[campoArchivo] ?? '';
+    
+    if (archivoAEliminar.isEmpty) {
+        // Si no hay URL/Nombre, solo se limpia localmente si es necesario (ya debería estar limpio)
+        if (mounted) {
+            setState(() {
+              alumno.archivosCalificacion[campoArchivo] = '';
+              _alumnosDelSalon = List.from(_alumnosDelSalon);
+            });
+        }
         ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-                content: Text('Selección de archivo cancelada.'), 
-                backgroundColor: Colors.grey,
+                content: Text('No hay archivo para eliminar.'), 
+                backgroundColor: Colors.blueGrey,
                 duration: Duration(seconds: 2),
+            ),
+        );
+        return;
+    }
+    
+    ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+            content: Text('Eliminando archivo: ${_getFileNameFromPath(archivoAEliminar)}...'), 
+            duration: const Duration(seconds: 20),
+        ),
+    );
+
+    final userProvider = Provider.of<UserProvider>(context, listen: false);
+
+    try {
+        // 1. Llamada a la API de Eliminación
+        final result = await userProvider.deleteCalificacionesArchivo(
+            idAlumno: alumno.idAlumno,
+            idSalon: alumno.idSalon, 
+            campoAActualizar: campoArchivo,
+            archivoAEliminar: archivoAEliminar,
+            // 'escuela' y 'id_empresa' deben ser manejados dentro del UserProvider
+        );
+        
+        ScaffoldMessenger.of(context).hideCurrentSnackBar(); 
+
+        // 2. Verificar éxito de la API
+        final bool isSuccess = (result['status'] == 'success') || 
+                               (result['status'] == 'correcto') || // Soporte para tu status
+                               (result['message'] != null); // Asumiendo que cualquier respuesta con mensaje es éxito
+
+        if (isSuccess && mounted) {
+            // 3. Limpiar el estado local si la eliminación en el servidor fue exitosa
+            alumno.archivosCalificacion[campoArchivo] = '';
+            
+            setState(() {
+              _alumnosDelSalon = List.from(_alumnosDelSalon);
+            });
+
+            ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                    content: Text(result['message'] ?? 'Archivo eliminado correctamente.'), 
+                    backgroundColor: Colors.green,
+                    duration: const Duration(seconds: 2),
+                ),
+            );
+        } else if (mounted) {
+            // Error reportado por la API
+            ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                    content: Text(result['message'] ?? 'Error al eliminar el archivo.'), 
+                    backgroundColor: Colors.red,
+                ),
+            );
+        }
+
+    } catch (e) {
+        ScaffoldMessenger.of(context).hideCurrentSnackBar(); 
+        print('❌ Error al llamar a delete_file_calificacion: $e');
+        ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+                content: Text('Error de conexión o inesperado al eliminar: $e'), 
+                backgroundColor: Colors.red,
             ),
         );
     }
   }
 
-  // ⭐️ MÉTODO AÑADIDO: Quitar el archivo seleccionado localmente ⭐️
-  /// Quita la ruta local seleccionada para un campo específico, permitiendo al usuario volver a seleccionar.
-  void _quitarArchivo(String idCicloAlumno, String campoArchivo) {
-      final key = '${idCicloAlumno}_$campoArchivo';
-      if (mounted) {
-          setState(() {
-              _selectedFilePaths.remove(key);
-          });
-      }
-      ScaffoldMessenger.of(context).showSnackBar(
+  // ⭐️ MÉTODO MODIFICADO: Abre URL completa construida con ApiConstants.assetsBaseUrl ⭐️
+  void _visualizarPDF(String url) async {
+    final String urlBaseServidor = ApiConstants.assetsBaseUrl;
+    
+    if (url.isEmpty || urlBaseServidor.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-              content: Text('Archivo local eliminado. Seleccione uno nuevo.'),
-              backgroundColor: Colors.blueGrey,
-              duration: Duration(seconds: 2),
+            content: Text('Error: No se puede obtener la ruta del archivo o la URL base del servidor.'),
+            backgroundColor: Colors.red,
           ),
-      );
-  }
+        );
+        return;
+    }
+    
+    final String baseLimpia = urlBaseServidor.endsWith('/') 
+                              ? urlBaseServidor.substring(0, urlBaseServidor.length - 1) 
+                              : urlBaseServidor;
+    
+    final String rutaLimpia = url.startsWith('/') ? url.substring(1) : url;
 
-  // ⭐️ NUEVA FUNCIÓN: Extrae el nombre del archivo de la ruta completa ⭐️
-  /// Extrae el nombre del archivo del path completo.
-  String _getFileNameFromPath(String? path) {
-      if (path == null || path.isEmpty) return 'Archivo';
-      final lastSeparator = path.lastIndexOf('/');
-      if (lastSeparator == -1) return path; // Si no hay '/', devuelve el path completo
-      return path.substring(lastSeparator + 1);
+    final String urlCompleta = '$baseLimpia/$rutaLimpia'; 
+
+    final Uri uri = Uri.parse(urlCompleta);
+    
+    if (!urlCompleta.startsWith('http')) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error al construir la URL. Resultado: $urlCompleta'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+    }
+
+    if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('No se pudo abrir el PDF. URL: $urlCompleta'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
   
-  /// Llama al provider para subir los archivos seleccionados de un alumno específico.
-  void _enviarArchivos(AlumnoSalonModel alumno) async { 
-      final userProvider = Provider.of<UserProvider>(context, listen: false);
-      
-      // 1. Recopilar solo los archivos que tienen una ruta local seleccionada
-      final Map<String, String?> filesToSend = {};
-      final String alumnoIdCiclo = alumno.idCicloAlumno;
-      
-      for (final campo in alumno.archivosCalificacion.keys) {
-          final key = '${alumnoIdCiclo}_$campo';
-          if (_selectedFilePaths.containsKey(key)) {
-              // Copiamos la ruta local seleccionada (el valor es String?)
-              filesToSend[campo] = _selectedFilePaths[key]; 
-          }
-      }
-      
-      if (filesToSend.isEmpty) {
-          ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('No hay archivos seleccionados para subir.'), backgroundColor: Colors.orange),
-          );
-          return;
-      }
-
-      ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Subiendo archivos, por favor espere...'), duration: Duration(seconds: 10)),
-      );
-
-      try {
-          // 2. Llamada al provider para el Multipart upload
-          final result = await userProvider.uploadCalificacionesArchivos(
-              idAlumno: alumno.idAlumno,
-              // ⚠️ Importante: Usamos el campo 'salon' como idSalon para la API
-              idSalon: alumno.idSalon, 
-              selectedFilePaths: filesToSend,
-          );
+  // ⭐️ NUEVO MÉTODO: Mostrar el Modal de Acciones ⭐️
+  void _mostrarModalAcciones(AlumnoSalonModel alumno, String campoArchivo) {
+    
+    final String currentUrlOrName = alumno.archivosCalificacion[campoArchivo] ?? '';
+    final bool isUploaded = currentUrlOrName.isNotEmpty;
+    
+    final userProvider = Provider.of<UserProvider>(context, listen: false);
+    
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return _AccionesArchivoModal(
+          alumno: alumno,
+          campoArchivo: campoArchivo,
+          isUploaded: isUploaded,
+          currentUrlOrName: currentUrlOrName,
+          colores: userProvider.colores,
           
-          ScaffoldMessenger.of(context).hideCurrentSnackBar(); 
-          ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                  content: Text(result['message'] as String),
-                  backgroundColor: result['status'] == 'success' ? Colors.green : Colors.red,
-              ),
-          );
-          
-          // 3. Manejo de éxito
-          if (result['status'] == 'success') {
-              // Limpiar las rutas locales que se subieron con éxito
-              setState(() {
-                  filesToSend.keys.forEach((campo) {
-                      _selectedFilePaths.remove('${alumnoIdCiclo}_$campo');
-                  });
-              });
-              
-              // ⚠️ Recargar datos del colaborador para que el ColaboradorModel se actualice con las nuevas URLs
-              await userProvider.fetchAndLoadColaboradorData(forceRefresh: true);
-          }
-
-      } catch (e) {
-          ScaffoldMessenger.of(context).hideCurrentSnackBar(); 
-          ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Error inesperado al subir: $e'), backgroundColor: Colors.red),
-          );
-      }
+          // Callbacks que reusan la lógica existente
+          onSeleccionarArchivo: () {
+            Navigator.of(context).pop();
+            _seleccionarArchivo(alumno, campoArchivo);
+          },
+          onVisualizar: () {
+            Navigator.of(context).pop();
+            _visualizarPDF(currentUrlOrName);
+          },
+          onEliminar: () {
+            Navigator.of(context).pop();
+            _quitarArchivo(alumno.idCicloAlumno, campoArchivo);
+          },
+        );
+      },
+    );
   }
 
 
@@ -203,14 +368,12 @@ class _ArchivosCalificacionesScreenState extends State<ArchivosCalificacionesScr
     final userProvider = Provider.of<UserProvider>(context);
     final Color headerColor = userProvider.colores.headerColor;
     
-    // Obtener los nombres de los campos de archivo (ej: 'archivo_calif_1')
     final AlumnoSalonModel? firstAlumno = _alumnosDelSalon.isNotEmpty ? _alumnosDelSalon.first : null;
     final List<String> camposArchivo = firstAlumno?.archivosCalificacion.keys.toList() ?? [];
 
     return Scaffold(
       appBar: AppBar(
         title: Text(
-          // ⭐️ TÍTULO MODIFICADO: Muestra el nombre del salón ⭐️
           widget.salonSeleccionado,
           style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
         ),
@@ -222,7 +385,6 @@ class _ArchivosCalificacionesScreenState extends State<ArchivosCalificacionesScr
           : _alumnosDelSalon.isEmpty
               ? Center(
                   child: Text(
-                    // ⭐️ MENSAJE MODIFICADO ⭐️
                     'No hay alumnos asignados a este salón para subir archivos de calificación.',
                     textAlign: TextAlign.center,
                     style: TextStyle(color: Colors.grey.shade600, fontSize: 16),
@@ -232,10 +394,9 @@ class _ArchivosCalificacionesScreenState extends State<ArchivosCalificacionesScr
     );
   }
   
-  // ✅ WIDGET: Construir la lista de alumnos con los campos dinámicos y la opción de subir
+  // ✅ WIDGET MODIFICADO: Lógica para mostrar Subir Directo o Acciones
   Widget _buildAlumnoList(UserProvider userProvider, List<String> camposArchivo) {
     
-    // ⚠️ Usamos _alumnosDelSalon en lugar de _alumnosFiltrados
     return ListView.builder(
       padding: const EdgeInsets.all(12.0),
       itemCount: _alumnosDelSalon.length,
@@ -251,7 +412,6 @@ class _ArchivosCalificacionesScreenState extends State<ArchivosCalificacionesScr
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Nombre y Salón del Alumno
                 Text(
                   '${alumnoNumero}. ${alumno.nombreCompleto} (${alumno.salon})',
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
@@ -263,22 +423,15 @@ class _ArchivosCalificacionesScreenState extends State<ArchivosCalificacionesScr
                 
                 // ⭐️ Campos de Archivo Dinámicos ⭐️
                 ...camposArchivo.map((campo) {
-                  final String key = '${alumno.idCicloAlumno}_$campo';
-                  final String? localPath = _selectedFilePaths[key];
-                  // Obtener el estado actual (si existe una URL)
-                  final String currentUrl = alumno.archivosCalificacion[campo] ?? ''; 
-                  
-                  // ⭐️ NUEVA LÓGICA PARA EL ESTADO DEL BOTÓN ⭐️
-                  final bool isLocallySelected = localPath != null;
-                  final bool isAlreadyUploaded = currentUrl.isNotEmpty && !isLocallySelected;
+                  final String currentUrlOrName = alumno.archivosCalificacion[campo] ?? ''; 
+                  final bool isUploaded = currentUrlOrName.isNotEmpty;
                   
                   return Padding(
                     padding: const EdgeInsets.symmetric(vertical: 6.0),
                     child: Row(
                       children: [
-                        // Título del Campo (ej: Archivo Calif 1)
                         Expanded(
-                          flex: 3,
+                          flex: isUploaded ? 3 : 2, // Menor espacio si solo hay un botón
                           child: Text(
                             campo.replaceAll('_', ' ').toUpperCase(),
                             style: const TextStyle(fontWeight: FontWeight.w500),
@@ -286,81 +439,225 @@ class _ArchivosCalificacionesScreenState extends State<ArchivosCalificacionesScr
                         ),
                         const SizedBox(width: 8),
                         
-                        // Botón de Acción (Seleccionar/Ver/Reemplazar)
-                        Expanded(
-                          // ⭐️ AJUSTE DE FLEX ⭐️
-                          flex: isLocallySelected ? 3 : 4,
-                          child: ElevatedButton.icon(
-                            onPressed: () => _seleccionarArchivo(alumno.idCicloAlumno, campo),
-                            icon: isLocallySelected 
-                                  ? const Icon(Icons.file_copy) // Icono verde para archivo cargado
-                                  : isAlreadyUploaded
-                                    ? const Icon(Icons.refresh) // Sugerir reemplazar
-                                    : const Icon(Icons.attach_file),
-                            label: Text(
-                              // ⭐️ TEXTO MODIFICADO: Muestra el nombre real del archivo ⭐️
-                              isLocallySelected 
-                                ? _getFileNameFromPath(localPath) // <-- ¡CAMBIO AQUÍ!
-                                : isAlreadyUploaded ? 'Ver/Cambiar' : 'Seleccionar PDF',
-                              overflow: TextOverflow.ellipsis,
+                        // ⭐️ LÓGICA CLAVE: Condición para mostrar "Subir" o "Acciones" ⭐️
+                        if (isUploaded) ...[
+                            // Si ya está subido, muestra el estado y el botón de acciones
+                            Expanded(
+                              flex: 3, 
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  color: Colors.green.shade50,
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(
+                                    color: Colors.green,
+                                    width: 1,
+                                  ),
+                                ),
+                                padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+                                child: Row(
+                                  children: [
+                                    const Icon(Icons.check_circle, color: Colors.green, size: 18),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Text(
+                                        _getFileNameFromPath(currentUrlOrName),
+                                        overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(
+                                          color: Colors.green.shade800,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
                             ),
+                            
+                            const SizedBox(width: 8),
+
+                            // Botón de ACCIONES
+                            Expanded(
+                              flex: 2,
+                              child: ElevatedButton(
+                                onPressed: () => _mostrarModalAcciones(alumno, campo),
+                                child: const Text('Acciones', style: TextStyle(color: Colors.white)),
+                                style: ElevatedButton.styleFrom(
+                                    backgroundColor: userProvider.colores.botonesColor,
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 12),
+                                    elevation: 2,
+                                ),
+                              ),
+                            ),
+                        ] else // Si NO está subido (isUploaded es false), muestra el botón de subir directo
+                        
+                        Expanded(
+                          flex: 2, // Toma el espacio completo restante
+                          child: ElevatedButton.icon(
+                            onPressed: () => _seleccionarArchivo(alumno, campo),
+                            icon: const Icon(Icons.cloud_upload, color: Colors.white),
+                            label: const Text('Pendiente (Subir)', style: TextStyle(color: Colors.white)),
                             style: ElevatedButton.styleFrom(
-                                // ⭐️ COLOR MODIFICADO (Verde si está cargado localmente) ⭐️
-                                backgroundColor: isLocallySelected 
-                                    ? Colors.green 
-                                    : userProvider.colores.botonesColor,
-                                foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                              backgroundColor: userProvider.colores.botonesColor,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 12),
+                              elevation: 2,
                             ),
                           ),
                         ),
-                        
-                        // ⭐️ Botón para QUITAR (Solo si localPath != null) ⭐️
-                        if (isLocallySelected) 
-                          SizedBox(
-                            width: 40, 
-                            child: IconButton(
-                              icon: const Icon(Icons.cancel, color: Colors.red),
-                              tooltip: 'Quitar archivo seleccionado localmente',
-                              onPressed: () => _quitarArchivo(alumno.idCicloAlumno, campo),
-                            ),
-                          ) 
-                        else 
-                          const SizedBox(width: 40), // Espacio para mantener la alineación
-                        
-                        // ⭐️ Icono de Estado MODIFICADO: Se elimina el warning amarillo ⭐️
-                        /*SizedBox(
-                          width: 40,
-                          child: (currentUrl.isNotEmpty)
-                              ? const Icon(Icons.cloud_done, color: Colors.green) // Ya subido
-                              : const Icon(Icons.cloud_off, color: Colors.red), // Faltante (sin archivo subido, ni pendiente con warning)
-                        ),*/
                       ],
                     ),
                   );
                 }).toList(),
-                
-                const SizedBox(height: 10),
-
-                // Botón principal de SUBIDA por alumno
-                Align(
-                    alignment: Alignment.centerRight,
-                    child: ElevatedButton.icon(
-                        onPressed: () => _enviarArchivos(alumno), // Llama al método con el alumno
-                        icon: const Icon(Icons.cloud_upload),
-                        label: const Text('Subir Archivos de Alumno'),
-                        style: ElevatedButton.styleFrom(
-                            backgroundColor: userProvider.colores.headerColor,
-                            foregroundColor: Colors.white,
-                        ),
-                    ),
-                ),
               ],
             ),
           ),
         );
       },
+    );
+  }
+}
+
+// ====================================================================
+// ⭐️ WIDGET DE MODAL ⭐️
+// ====================================================================
+
+class _AccionesArchivoModal extends StatelessWidget {
+  
+  final AlumnoSalonModel alumno;
+  final String campoArchivo;
+  final bool isUploaded;
+  final String currentUrlOrName;
+  final dynamic colores; 
+  
+  final VoidCallback onSeleccionarArchivo;
+  final VoidCallback onVisualizar;
+  final VoidCallback onEliminar;
+
+  const _AccionesArchivoModal({
+    required this.alumno,
+    required this.campoArchivo,
+    required this.isUploaded,
+    required this.currentUrlOrName,
+    required this.colores,
+    required this.onSeleccionarArchivo,
+    required this.onVisualizar,
+    required this.onEliminar,
+  });
+  
+  String _getFileNameForDisplay() {
+    final lastSeparator = currentUrlOrName.lastIndexOf('/');
+    if (lastSeparator == -1) return currentUrlOrName;
+    return currentUrlOrName.substring(lastSeparator + 1);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    
+    final String campoDisplay = campoArchivo.replaceAll('_', ' ').toUpperCase();
+    
+    return Dialog(
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(15.0),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(vertical: 15.0, horizontal: 20.0),
+            decoration: BoxDecoration(
+              color: colores.headerColor,
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(15),
+                topRight: Radius.circular(15),
+              ),
+            ),
+            child: Text(
+              'Acciones: $campoDisplay', 
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 14,
+                color: Colors.white,
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(20.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // 1. SELECCIONAR / REEMPLAZAR ARCHIVO
+                ElevatedButton.icon(
+                  onPressed: onSeleccionarArchivo,
+                  icon: const Icon(Icons.cloud_upload, color: Colors.white),
+                  label: Text(
+                    isUploaded ? 'Reemplazar archivo' : 'Seleccionar archivo', 
+                    style: const TextStyle(color: Colors.white)
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: colores.botonesColor,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8.0)),
+                    padding: const EdgeInsets.symmetric(vertical: 12.0),
+                  ),
+                ),
+                const SizedBox(height: 10),
+
+                // 2. VISUALIZAR PDF (Solo si ya está subido)
+                if (isUploaded) ...[
+                  ElevatedButton.icon(
+                    onPressed: onVisualizar,
+                    icon: const Icon(Icons.picture_as_pdf, color: Colors.white),
+                    label: Text(
+                      'Visualizar PDF', 
+                      style: const TextStyle(color: Colors.white)
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: colores.botonesColor,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8.0)),
+                      padding: const EdgeInsets.symmetric(vertical: 12.0),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                ],
+
+                // 3. ELIMINAR ARCHIVO (Solo si ya está subido)
+                if (isUploaded)
+                  ElevatedButton.icon(
+                    onPressed: onEliminar,
+                    icon: const Icon(Icons.delete, color: Colors.white),                  
+                    label: const Text('Eliminar archivo', style: TextStyle(color: Colors.white)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: colores.botonesColor,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8.0)),
+                      padding: const EdgeInsets.symmetric(vertical: 12.0),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          
+          // 4. Botón Cerrar
+          Padding(
+            padding: const EdgeInsets.only(left: 20.0, right: 20.0, bottom: 20.0, top: 10.0),
+            child: SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () => Navigator.of(context).pop(),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: colores.botonesColor,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 30),
+                ),
+                child: const Text('Cerrar', style: TextStyle(fontSize: 16)),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

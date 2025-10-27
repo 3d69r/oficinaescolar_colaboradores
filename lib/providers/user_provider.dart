@@ -551,6 +551,33 @@ Future<void> saveColaboradorSessionToPrefs({
     }
   }
 
+  Future<Map<String, dynamic>> deleteCalificacionesArchivo({
+    
+        required String idAlumno,
+        required String idSalon,
+        required String campoAActualizar,
+        required String archivoAEliminar,
+    }) async {
+        final url = Uri.parse('${ApiConstants.apiBaseUrl}/delete_file_calificacion');
+        final String escuelaCode = _escuela;
+        final response = await http.post(
+            url,
+            body: {
+                'escuela': escuelaCode, 
+                'id_alumno': idAlumno,
+                'id_salon': idSalon,
+                'campo_a_actualizar': campoAActualizar,
+                'archivo_a_eliminar': archivoAEliminar,
+            },
+        );
+
+        if (response.statusCode == 200) {
+            return json.decode(response.body);
+        } else {
+            return {'status': 'error', 'message': 'Fallo en la conexión al servidor. Código: ${response.statusCode}'};
+        }
+    }
+
   Future<List<AlumnoAsistenciaModel>> fetchAlumnosPorCurso({
       required String idCurso,
       required TipoCurso tipoCurso,

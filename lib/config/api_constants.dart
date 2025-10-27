@@ -50,6 +50,9 @@ class ApiConstants {
   // endpoint para subir archivos de calificaciones 
   static const String uploadFileCalificacion = 'upload_file_calificacion';
 
+  // enpoint para eliminar archivos de calificaciones
+  static const String deleteFileCalificacion = 'delete_file_calificacion';
+
   //Duración minima en la que se debe de recargar la información entre cambio de pestaña
   static const int minutosRecarga = 10;
 
