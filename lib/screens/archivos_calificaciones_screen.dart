@@ -369,7 +369,7 @@ void _enviarArchivos(
   }
 
   // ⭐️ MÉTODO MODIFICADO: Ahora acepta campoArchivo como segundo argumento ⭐️
-  void _visualizarPDF(String url, String campoArchivo) async { // 🛑 ¡AÑADIDO campoArchivo!
+  void _visualizarPDF(String url, String campoArchivo) async { 
     final String urlBaseServidor = ApiConstants.assetsBaseUrl;
     final userProvider = Provider.of<UserProvider>(context, listen: false);
     
