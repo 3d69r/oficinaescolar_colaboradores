@@ -1,4 +1,4 @@
-// alumno_salon_model.dart
+// alumno_salon_model.dart (Implementación COMPLETA con copyWith)
 
 class AlumnoSalonModel {
   final String idAlumno;
@@ -12,7 +12,6 @@ class AlumnoSalonModel {
   final String apellidoMat;
   
   // Lista de campos de archivo de calificación.
-  // La clave es el nombre del campo (ej: 'archivo_calif_1') y el valor es la ruta/estado actual.
   final Map<String, String> archivosCalificacion;
 
   AlumnoSalonModel({
@@ -48,6 +47,33 @@ class AlumnoSalonModel {
       apellidoPat: json['apellido_pat'] as String? ?? '',
       apellidoMat: json['apellido_mat'] as String? ?? '',
       archivosCalificacion: archivos,
+    );
+  }
+
+  // 🔑 MÉTODO AÑADIDO: Permite crear una nueva instancia con cambios
+  AlumnoSalonModel copyWith({
+    String? idAlumno,
+    String? idCicloAlumno,
+    String? nivelEducativo,
+    String? idSalon,
+    String? salon,
+    String? primerNombre,
+    String? segundoNombre,
+    String? apellidoPat,
+    String? apellidoMat,
+    Map<String, String>? archivosCalificacion,
+  }) {
+    return AlumnoSalonModel(
+      idAlumno: idAlumno ?? this.idAlumno,
+      idCicloAlumno: idCicloAlumno ?? this.idCicloAlumno,
+      nivelEducativo: nivelEducativo ?? this.nivelEducativo,
+      idSalon: idSalon ?? this.idSalon,
+      salon: salon ?? this.salon,
+      primerNombre: primerNombre ?? this.primerNombre,
+      segundoNombre: segundoNombre ?? this.segundoNombre,
+      apellidoPat: apellidoPat ?? this.apellidoPat,
+      apellidoMat: apellidoMat ?? this.apellidoMat,
+      archivosCalificacion: archivosCalificacion ?? this.archivosCalificacion,
     );
   }
 

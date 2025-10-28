@@ -16,6 +16,7 @@ import 'package:oficinaescolar_colaboradores/models/alumno_asistencia_model.dart
 import 'package:oficinaescolar_colaboradores/models/alumno_salon_model.dart';
 import 'package:oficinaescolar_colaboradores/models/boleta_encabezado_model.dart';
 import 'package:oficinaescolar_colaboradores/models/comentario_model.dart';
+import 'package:oficinaescolar_colaboradores/models/datos_archivo_a_subir.dart';
 import 'package:oficinaescolar_colaboradores/models/escuela_model.dart';
 import 'package:oficinaescolar_colaboradores/models/colaborador_model.dart'; // ✅ [REF] Nuevo modelo
 import 'package:oficinaescolar_colaboradores/models/aviso_model.dart';
@@ -462,7 +463,8 @@ Future<void> saveColaboradorSessionToPrefs({
   Future<Map<String, dynamic>> uploadCalificacionesArchivos({
     required String idAlumno,
     required String idSalon,
-    required Map<String, String?> selectedFilePaths, // Clave: campo_archivo (ej: archivo_calif_1), Valor: ruta_local_archivo
+    // ❌ CAMBIO DE TIPO: Usamos el nuevo modelo en una lista
+    required List<DatosArchivoASubir> archivosParaSubir, 
   }) async {
     final String escuelaCode = _escuela;
     
@@ -500,26 +502,53 @@ Future<void> saveColaboradorSessionToPrefs({
       // ⭐️ IMPRESIÓN DE DEPURACIÓN DE ARCHIVOS A ADJUNTAR ⭐️
       debugPrint('DEBUG SUBIDA: Archivos a Adjuntar:');
       
-      for (final entry in selectedFilePaths.entries) {
-        final String campoArchivo = entry.key; // ej: 'archivo_calif_1'
-        final String? localPath = entry.value;
-
-        if (localPath != null && localPath.isNotEmpty) {
-          final file = File(localPath);
-          if (await file.exists()) {
+      // 🔑 BUCLE CORREGIDO: Itera sobre el nuevo modelo de archivo
+      for (final archivo in archivosParaSubir) {
+        final String campoArchivo = archivo.nombreCampoApi;
+        
+        if (!kIsWeb) {
+          // ====================================================================
+          // 💻 LÓGICA PARA MÓVIL/DESKTOP (USA dart:io.File y fromPath)
+          // ====================================================================
+          final String? localPath = archivo.rutaLocal;
+          if (localPath != null && localPath.isNotEmpty) {
+            final file = File(localPath);
+            if (await file.exists()) {
+              hasFilesToUpload = true;
+              
+              request.files.add(
+                await http.MultipartFile.fromPath(
+                  campoArchivo, 
+                  localPath,
+                  filename: '${campoArchivo}_${idAlumno}_${DateTime.now().millisecondsSinceEpoch}.pdf',
+                ),
+              );
+              debugPrint('  - Móvil: Campo API: $campoArchivo, Ruta Local: $localPath');
+            } else {
+              debugPrint('Advertencia Móvil: Archivo local no encontrado en la ruta: $localPath');
+            }
+          }
+        } else {
+          // ====================================================================
+          // 🌐 LÓGICA PARA WEB (USA Bytes y fromBytes) - ¡SOLUCIÓN!
+          // ====================================================================
+          final Uint8List? bytes = archivo.bytesArchivo;
+          final String? nombre = archivo.nombreArchivo;
+          
+          if (bytes != null && bytes.isNotEmpty && nombre != null && nombre.isNotEmpty) {
             hasFilesToUpload = true;
             
-            // Adjuntar el archivo al request
+            // Adjuntar el archivo usando los BYTES (compatible con Web)
             request.files.add(
-              await http.MultipartFile.fromPath(
-                campoArchivo, // Nombre del campo en el API (archivo_calif_1, etc.)
-                localPath,
-                filename: '${campoArchivo}_${idAlumno}_${DateTime.now().millisecondsSinceEpoch}.pdf',
+              http.MultipartFile.fromBytes(
+                campoArchivo, 
+                bytes,
+                filename: nombre,
               ),
             );
-            debugPrint('  - Campo API: $campoArchivo, Ruta Local: $localPath'); // Imprime el archivo antes de adjuntar
+            debugPrint('  - Web: Campo API: $campoArchivo, Nombre Archivo: $nombre');
           } else {
-            debugPrint('Advertencia: Archivo local no encontrado en la ruta: $localPath');
+             debugPrint('Advertencia Web: Bytes o nombre del archivo no disponibles para: $campoArchivo');
           }
         }
       }
