@@ -574,6 +574,8 @@ Future<void> saveColaboradorSessionToPrefs({
         if (response.statusCode == 200) {
             return json.decode(response.body);
         } else {
+            // Manejar errores HTTP, por ejemplo, devolviendo un mapa de error
+            //debugPrint(response.body);
             return {'status': 'error', 'message': 'Fallo en la conexión al servidor. Código: ${response.statusCode}'};
         }
     }

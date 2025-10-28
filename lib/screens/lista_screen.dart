@@ -169,6 +169,7 @@ class _ListaScreenState extends State<ListaScreen> {
           title,
           style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white)
         ),
+        foregroundColor: Colors.white,
         backgroundColor: dynamicHeaderColor,
         centerTitle: true,
         actions: [

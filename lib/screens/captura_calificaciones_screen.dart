@@ -156,7 +156,7 @@ class _CapturaCalificacionesScreenState extends State<CapturaCalificacionesScree
         style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.blueGrey),
       ));
     }
-    
+     
     // 3. Devolver la celda editable (TextFormField) - Permite la edición del valor actual
     return DataCell(
       TextFormField(
@@ -373,6 +373,7 @@ class _CapturaCalificacionesScreenState extends State<CapturaCalificacionesScree
             'Cargando ${widget.materiaSeleccionada.materia}',
             style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
           ),
+          foregroundColor: Colors.white,
           backgroundColor: dynamicHeaderColor, // ⭐️ Color Dinámico ⭐️
           centerTitle: true,
         ),
@@ -388,6 +389,7 @@ class _CapturaCalificacionesScreenState extends State<CapturaCalificacionesScree
             widget.materiaSeleccionada.materia,
             style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
           ),
+          foregroundColor: Colors.white,
           backgroundColor: dynamicHeaderColor, // ⭐️ Color Dinámico ⭐️
           centerTitle: true,
         ),
@@ -402,6 +404,7 @@ class _CapturaCalificacionesScreenState extends State<CapturaCalificacionesScree
           widget.materiaSeleccionada.materia,
           style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
         ),
+        foregroundColor: Colors.white,
         backgroundColor: dynamicHeaderColor, // ⭐️ Color Dinámico ⭐️
         centerTitle: true,
         actions: [

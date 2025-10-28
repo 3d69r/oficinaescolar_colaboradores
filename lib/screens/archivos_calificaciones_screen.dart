@@ -1,6 +1,7 @@
 // archivos_calificaciones_screen.dart
 import 'package:flutter/material.dart';
 import 'package:oficinaescolar_colaboradores/config/api_constants.dart';
+import 'package:oficinaescolar_colaboradores/screens/pdf_viewer_screen.dart';
 import 'package:provider/provider.dart';
 import 'dart:io'; 
 import 'package:url_launcher/url_launcher.dart'; 
@@ -282,9 +283,10 @@ class _ArchivosCalificacionesScreenState extends State<ArchivosCalificacionesScr
     }
   }
 
-  // ⭐️ MÉTODO MODIFICADO: Abre URL completa construida con ApiConstants.assetsBaseUrl ⭐️
-  void _visualizarPDF(String url) async {
+  // ⭐️ MÉTODO MODIFICADO: Ahora acepta campoArchivo como segundo argumento ⭐️
+  void _visualizarPDF(String url, String campoArchivo) async { // 🛑 ¡AÑADIDO campoArchivo!
     final String urlBaseServidor = ApiConstants.assetsBaseUrl;
+    final userProvider = Provider.of<UserProvider>(context, listen: false);
     
     if (url.isEmpty || urlBaseServidor.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -296,6 +298,7 @@ class _ArchivosCalificacionesScreenState extends State<ArchivosCalificacionesScr
         return;
     }
     
+    // Lógica para construir la URL completa
     final String baseLimpia = urlBaseServidor.endsWith('/') 
                               ? urlBaseServidor.substring(0, urlBaseServidor.length - 1) 
                               : urlBaseServidor;
@@ -304,7 +307,6 @@ class _ArchivosCalificacionesScreenState extends State<ArchivosCalificacionesScr
 
     final String urlCompleta = '$baseLimpia/$rutaLimpia'; 
 
-    final Uri uri = Uri.parse(urlCompleta);
     
     if (!urlCompleta.startsWith('http')) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -316,13 +318,19 @@ class _ArchivosCalificacionesScreenState extends State<ArchivosCalificacionesScr
         return;
     }
 
-    if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('No se pudo abrir el PDF. URL: $urlCompleta'),
-          backgroundColor: Colors.red,
-        ),
-      );
+    // 🛑 NUEVA LÓGICA: Navegar a la pantalla interna del visor de PDF
+    if (mounted) {
+        Navigator.push(
+            context,
+            MaterialPageRoute(
+                builder: (context) => PdfViewerScreen(
+                    // 🛑 CAMBIO CLAVE: Usamos el nombre formateado (Ej: "Archivo 1")
+                    title: _formatCampoArchivo(campoArchivo), 
+                    url: urlCompleta, // URL completa del PDF a cargar
+                    colores: userProvider.colores,
+                ),
+            ),
+        );
     }
   }
   
@@ -351,7 +359,7 @@ class _ArchivosCalificacionesScreenState extends State<ArchivosCalificacionesScr
           },
           onVisualizar: () {
             Navigator.of(context).pop();
-            _visualizarPDF(currentUrlOrName);
+            _visualizarPDF(currentUrlOrName, campoArchivo);
           },
           onEliminar: () {
             Navigator.of(context).pop();
@@ -377,6 +385,7 @@ class _ArchivosCalificacionesScreenState extends State<ArchivosCalificacionesScr
           widget.salonSeleccionado,
           style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
         ),
+        foregroundColor: Colors.white,
         backgroundColor: headerColor,
         centerTitle: true,
       ),
@@ -393,8 +402,15 @@ class _ArchivosCalificacionesScreenState extends State<ArchivosCalificacionesScr
               : _buildAlumnoList(userProvider, camposArchivo),
     );
   }
+
+  // ⭐️ NUEVO MÉTODO: Formatea el nombre del campo ⭐️
+  String _formatCampoArchivo(String campo) {
+    // Ejemplo: convierte "archivo_calif_1" en "Archivo 1"
+    // Esto es lo que se mostrará en la UI.
+    return campo.replaceAll('archivo_calif_', 'Archivo ').replaceAll('_', ' ').trim();
+  }
   
-  // ✅ WIDGET MODIFICADO: Lógica para mostrar Subir Directo o Acciones
+  // ✅ WIDGET MODIFICADO: Lógica para mostrar Subir Directo o Acciones (Compacto)
   Widget _buildAlumnoList(UserProvider userProvider, List<String> camposArchivo) {
     
     return ListView.builder(
@@ -426,24 +442,17 @@ class _ArchivosCalificacionesScreenState extends State<ArchivosCalificacionesScr
                   final String currentUrlOrName = alumno.archivosCalificacion[campo] ?? ''; 
                   final bool isUploaded = currentUrlOrName.isNotEmpty;
                   
+                  // 🛑 OBTENEMOS EL NOMBRE DE DISPLAY (Ej: "Archivo 1") 🛑
+                  final String campoDisplay = _formatCampoArchivo(campo);
+
                   return Padding(
                     padding: const EdgeInsets.symmetric(vertical: 6.0),
                     child: Row(
                       children: [
-                        Expanded(
-                          flex: isUploaded ? 3 : 2, // Menor espacio si solo hay un botón
-                          child: Text(
-                            campo.replaceAll('_', ' ').toUpperCase(),
-                            style: const TextStyle(fontWeight: FontWeight.w500),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        
-                        // ⭐️ LÓGICA CLAVE: Condición para mostrar "Subir" o "Acciones" ⭐️
                         if (isUploaded) ...[
                             // Si ya está subido, muestra el estado y el botón de acciones
                             Expanded(
-                              flex: 3, 
+                              flex: 2, // Ocupa 3/5 partes del espacio para la etiqueta de cargado
                               child: Container(
                                 decoration: BoxDecoration(
                                   color: Colors.green.shade50,
@@ -460,7 +469,8 @@ class _ArchivosCalificacionesScreenState extends State<ArchivosCalificacionesScr
                                     const SizedBox(width: 8),
                                     Expanded(
                                       child: Text(
-                                        _getFileNameFromPath(currentUrlOrName),
+                                        // 🛑 CAMBIO CLAVE: Muestra el nombre formateado (Ej: "Archivo 1") 🛑
+                                        campoDisplay,
                                         overflow: TextOverflow.ellipsis,
                                         style: TextStyle(
                                           color: Colors.green.shade800,
@@ -477,7 +487,7 @@ class _ArchivosCalificacionesScreenState extends State<ArchivosCalificacionesScr
 
                             // Botón de ACCIONES
                             Expanded(
-                              flex: 2,
+                              flex: 2, // Ocupa 2/5 partes del espacio para el botón de acciones
                               child: ElevatedButton(
                                 onPressed: () => _mostrarModalAcciones(alumno, campo),
                                 child: const Text('Acciones', style: TextStyle(color: Colors.white)),
@@ -489,14 +499,15 @@ class _ArchivosCalificacionesScreenState extends State<ArchivosCalificacionesScr
                                 ),
                               ),
                             ),
-                        ] else // Si NO está subido (isUploaded es false), muestra el botón de subir directo
+                        ] else // Si NO está subido, muestra el botón de subir que ocupa todo el espacio
                         
                         Expanded(
-                          flex: 2, // Toma el espacio completo restante
+                          flex: 1, // Toma todo el espacio disponible
                           child: ElevatedButton.icon(
                             onPressed: () => _seleccionarArchivo(alumno, campo),
                             icon: const Icon(Icons.cloud_upload, color: Colors.white),
-                            label: const Text('Pendiente (Subir)', style: TextStyle(color: Colors.white)),
+                            // Muestra "Subir Archivo X"
+                            label: Text('Subir $campoDisplay', style: const TextStyle(color: Colors.white)),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: userProvider.colores.botonesColor,
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
@@ -550,6 +561,8 @@ class _AccionesArchivoModal extends StatelessWidget {
     if (lastSeparator == -1) return currentUrlOrName;
     return currentUrlOrName.substring(lastSeparator + 1);
   }
+
+  
 
   @override
   Widget build(BuildContext context) {
