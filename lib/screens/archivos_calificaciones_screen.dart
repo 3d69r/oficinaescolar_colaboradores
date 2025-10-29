@@ -7,7 +7,6 @@ import 'package:oficinaescolar_colaboradores/models/datos_archivo_a_subir.dart';
 import 'package:oficinaescolar_colaboradores/screens/pdf_viewer_screen.dart';
 import 'package:provider/provider.dart';
 import 'dart:io'; 
-import 'package:url_launcher/url_launcher.dart'; 
 
 import 'package:file_picker/file_picker.dart'; 
 // import 'package:shared_preferences/shared_preferences.dart'; // ❌ Eliminada
@@ -115,7 +114,7 @@ class _ArchivosCalificacionesScreenState extends State<ArchivosCalificacionesScr
               final bytes = archivoSeleccionado.bytes;
               final nombre = archivoSeleccionado.name;
 
-              if (bytes != null && nombre != null) {
+              if (bytes != null) {
                   // 1. Guardar los bytes y el nombre en variables de estado
                   if (mounted) {
                       setState(() {
@@ -650,11 +649,11 @@ class _AccionesArchivoModal extends StatelessWidget {
     required this.onEliminar,
   });
   
-  String _getFileNameForDisplay() {
+  /*String _getFileNameForDisplay() {
     final lastSeparator = currentUrlOrName.lastIndexOf('/');
     if (lastSeparator == -1) return currentUrlOrName;
     return currentUrlOrName.substring(lastSeparator + 1);
-  }
+  }*/
 
   @override
   Widget build(BuildContext context) {
