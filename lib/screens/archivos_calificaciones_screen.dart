@@ -1,4 +1,5 @@
 // archivos_calificaciones_screen.dart
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:oficinaescolar_colaboradores/config/api_constants.dart';
@@ -40,6 +41,7 @@ class _ArchivosCalificacionesScreenState extends State<ArchivosCalificacionesScr
   @override
   void initState() {
     super.initState();
+    debugPrint('DEBUG VISTA: initState - Cargando alumnos del salón.'); // ⭐️ DEBUG
     _cargarAlumnosDelSalon();
   }
 
@@ -55,6 +57,7 @@ class _ArchivosCalificacionesScreenState extends State<ArchivosCalificacionesScr
       setState(() {
         _alumnosDelSalon = alumnos;
         _isLoading = false;
+        debugPrint('DEBUG VISTA: setState - Alumnos cargados y listos.'); // ⭐️ DEBUG
       });
     }
   }
@@ -74,6 +77,7 @@ String? nombreArchivoWeb = null;
 
   void _seleccionarArchivo(AlumnoSalonModel alumno, String campoArchivo) async {
       final key = '${alumno.idCicloAlumno}_$campoArchivo';
+      debugPrint('DEBUG SELECCIONAR: Iniciando selección de archivo para campo: $campoArchivo'); // ⭐️ DEBUG
 
       // 🔑 MODIFICACIÓN: Pedir bytes (withData: true) solo si es Web
       FilePickerResult? result = await FilePicker.platform.pickFiles(
@@ -82,7 +86,7 @@ String? nombreArchivoWeb = null;
           allowMultiple: false,
           withData: kIsWeb ? true : false, // 🛠️ CORRECCIÓN WEB
       );
-
+      
       if (result != null && result.files.isNotEmpty) {
           final archivoSeleccionado = result.files.single;
           
@@ -98,6 +102,7 @@ String? nombreArchivoWeb = null;
                           // Limpiar las variables Web
                           bytesArchivoWeb = null; 
                           nombreArchivoWeb = null;
+                          debugPrint('DEBUG SELECCIONAR: [Móvil] Archivo seleccionado, llamando setState. path: $filePath'); // ⭐️ DEBUG
                       });
                   }
                   
@@ -118,18 +123,21 @@ String? nombreArchivoWeb = null;
                           nombreArchivoWeb = nombre;
                           // Usar el nombre como referencia temporal en el mapa
                           _selectedFilePaths[key] = nombre; 
+                          debugPrint('DEBUG SELECCIONAR: [Web] Archivo seleccionado, llamando setState. Nombre: $nombre'); // ⭐️ DEBUG
                       });
                   }
 
                   // 2. Llamar inmediatamente a la función de subida (con el nombre como referencia de path)
                   _enviarArchivos(alumno, campoArchivo, nombre); 
               } else {
+                  debugPrint('DEBUG SELECCIONAR: [Web] Error, bytes o nombre nulos.'); // ⭐️ DEBUG
                   ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(content: Text('Error: Datos del archivo Web no disponibles después de la selección.'), backgroundColor: Colors.red),
                   );
               }
           }
       } else {
+          debugPrint('DEBUG SELECCIONAR: Selección de archivo cancelada o fallida.'); // ⭐️ DEBUG
           // Mantiene el estado en caso de cancelación.
       }
   }
@@ -163,10 +171,12 @@ String? nombreArchivoWeb = null;
           nombreCampoApi: campoArchivo,
           rutaLocal: localPath,
         );
+        debugPrint('DEBUG ENVIAR: [Móvil] Preparando subida. Ruta local: $localPath'); // ⭐️ DEBUG
       } else {
         // 🌐 WEB: Usa bytes y nombre
         // 🛠️ CORRECCIÓN WEB: Aquí se lee la data que _seleccionarArchivo acaba de guardar.
         if (bytesArchivoWeb == null || nombreArchivoWeb == null) {
+            debugPrint('DEBUG ENVIAR: [Web] Fallo, bytes/nombre son nulos en _enviarArchivos.'); // ⭐️ DEBUG
             ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(content: Text('Error Web: Archivo no cargado en memoria (bytes/nombre).'), backgroundColor: Colors.red),
             );
@@ -177,6 +187,7 @@ String? nombreArchivoWeb = null;
           bytesArchivo: bytesArchivoWeb,
           nombreArchivo: nombreArchivoWeb,
         );
+        debugPrint('DEBUG ENVIAR: [Web] Preparando subida. Nombre archivo: $nombreArchivoWeb, Bytes length: ${bytesArchivoWeb!.length}'); // ⭐️ DEBUG
       }
       
       // Crear la lista para la llamada al Provider
@@ -188,6 +199,7 @@ String? nombreArchivoWeb = null;
 
       try {
           // 🔑 CAMBIO DE ESTRUCTURA: Llamada al Provider con la nueva estructura
+          debugPrint('DEBUG ENVIAR: Llamando a userProvider.uploadCalificacionesArchivos...'); // ⭐️ DEBUG
           final result = await userProvider.uploadCalificacionesArchivos(
               idAlumno: alumno.idAlumno,
               idSalon: alumno.idSalon, 
@@ -242,6 +254,7 @@ String? nombreArchivoWeb = null;
               }
 
               setState(() {
+                  debugPrint('DEBUG ENVIAR: Llamando a setState después de subida exitosa. Esto gatilla el build.'); // ⭐️ DEBUG
                   _selectedFilePaths.remove(key);
                   // Opcional: Limpiar los bytes y nombre después de la subida exitosa
                   bytesArchivoWeb = null;
@@ -261,6 +274,7 @@ String? nombreArchivoWeb = null;
   // ⭐️ MÉTODO MODIFICADO: Quitar Archivo (Añadida llamada a la API de eliminación) ⭐️
   void _quitarArchivo(String idCicloAlumno, String campoArchivo) async {
     if (!mounted) return;
+    debugPrint('DEBUG ELIMINAR: Iniciando eliminación para alumno: $idCicloAlumno, campo: $campoArchivo'); // ⭐️ DEBUG
 
     final alumno = _alumnosDelSalon.firstWhere(
       (a) => a.idCicloAlumno == idCicloAlumno,
@@ -319,6 +333,7 @@ String? nombreArchivoWeb = null;
             alumno.archivosCalificacion[campoArchivo] = '';
             
             setState(() {
+              debugPrint('DEBUG ELIMINAR: Llamando a setState después de eliminación exitosa. Esto gatilla el build.'); // ⭐️ DEBUG
               _alumnosDelSalon = List.from(_alumnosDelSalon);
             });
 
@@ -356,6 +371,8 @@ String? nombreArchivoWeb = null;
     final String urlBaseServidor = ApiConstants.assetsBaseUrl;
     final userProvider = Provider.of<UserProvider>(context, listen: false);
     
+    debugPrint('DEBUG VISUALIZAR: Intentando visualizar URL: $url'); // ⭐️ DEBUG
+    
     if (url.isEmpty || urlBaseServidor.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -374,7 +391,8 @@ String? nombreArchivoWeb = null;
     final String rutaLimpia = url.startsWith('/') ? url.substring(1) : url;
 
     final String urlCompleta = '$baseLimpia/$rutaLimpia'; 
-
+    
+    debugPrint('DEBUG VISUALIZAR: URL completa construida: $urlCompleta'); // ⭐️ DEBUG
     
     if (!urlCompleta.startsWith('http')) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -410,6 +428,8 @@ String? nombreArchivoWeb = null;
     
     final userProvider = Provider.of<UserProvider>(context, listen: false);
     
+    debugPrint('DEBUG MODAL: Mostrando modal de acciones para campo: $campoArchivo. isUploaded: $isUploaded'); // ⭐️ DEBUG
+    
     showDialog(
       context: context,
       builder: (BuildContext context) {
@@ -441,7 +461,10 @@ String? nombreArchivoWeb = null;
 
   @override
   Widget build(BuildContext context) {
+    debugPrint('DEBUG BUILD: Inicia la reconstrucción (build) de ArchivosCalificacionesScreen.'); // ⭐️ DEBUG
     final userProvider = Provider.of<UserProvider>(context);
+    
+    // ⚠️ PUNTO CRÍTICO DE LECTURA DE COLORES ⚠️
     final Color headerColor = userProvider.colores.headerColor;
     
     final AlumnoSalonModel? firstAlumno = _alumnosDelSalon.isNotEmpty ? _alumnosDelSalon.first : null;
@@ -500,7 +523,8 @@ String? nombreArchivoWeb = null;
                   '${alumnoNumero}. ${alumno.nombreCompleto} (${alumno.salon})',
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.bold,
-                    color: userProvider.colores.headerColor,
+                    // ⚠️ PUNTO CRÍTICO DE LECTURA DE COLORES ⚠️
+                    color: userProvider.colores.headerColor, 
                   ),
                 ),
                 const Divider(),
@@ -560,7 +584,8 @@ String? nombreArchivoWeb = null;
                                 onPressed: () => _mostrarModalAcciones(alumno, campo),
                                 child: const Text('Acciones', style: TextStyle(color: Colors.white)),
                                 style: ElevatedButton.styleFrom(
-                                    backgroundColor: userProvider.colores.botonesColor,
+                                    // ⚠️ PUNTO CRÍTICO DE LECTURA DE COLORES ⚠️
+                                    backgroundColor: userProvider.colores.botonesColor, 
                                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                                     padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 12),
                                     elevation: 2,
@@ -577,6 +602,7 @@ String? nombreArchivoWeb = null;
                             // Muestra "Subir Archivo X"
                             label: Text('Subir $campoDisplay', style: const TextStyle(color: Colors.white)),
                             style: ElevatedButton.styleFrom(
+                              // ⚠️ PUNTO CRÍTICO DE LECTURA DE COLORES ⚠️
                               backgroundColor: userProvider.colores.botonesColor,
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                               padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 12),
@@ -635,6 +661,9 @@ class _AccionesArchivoModal extends StatelessWidget {
     
     final String campoDisplay = campoArchivo.replaceAll('_', ' ').toUpperCase();
     
+    // ⚠️ PUNTO CRÍTICO DE LECTURA DE COLORES ⚠️
+    debugPrint('DEBUG MODAL BUILD: El modal se está construyendo/reconstruyendo.'); // ⭐️ DEBUG
+    
     return Dialog(
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(15.0),
@@ -646,7 +675,7 @@ class _AccionesArchivoModal extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(vertical: 15.0, horizontal: 20.0),
             decoration: BoxDecoration(
-              color: colores.headerColor,
+              color: colores.headerColor, // ⚠️ Lectura de color
               borderRadius: const BorderRadius.only(
                 topLeft: Radius.circular(15),
                 topRight: Radius.circular(15),
@@ -677,7 +706,7 @@ class _AccionesArchivoModal extends StatelessWidget {
                     style: const TextStyle(color: Colors.white)
                   ),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: colores.botonesColor,
+                    backgroundColor: colores.botonesColor, // ⚠️ Lectura de color
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8.0)),
                     padding: const EdgeInsets.symmetric(vertical: 12.0),
                   ),
@@ -694,7 +723,7 @@ class _AccionesArchivoModal extends StatelessWidget {
                       style: const TextStyle(color: Colors.white)
                     ),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: colores.botonesColor,
+                      backgroundColor: colores.botonesColor, // ⚠️ Lectura de color
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8.0)),
                       padding: const EdgeInsets.symmetric(vertical: 12.0),
                     ),
@@ -709,7 +738,7 @@ class _AccionesArchivoModal extends StatelessWidget {
                     icon: const Icon(Icons.delete, color: Colors.white),                  
                     label: const Text('Eliminar archivo', style: TextStyle(color: Colors.white)),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: colores.botonesColor,
+                      backgroundColor: colores.botonesColor, // ⚠️ Lectura de color
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8.0)),
                       padding: const EdgeInsets.symmetric(vertical: 12.0),
                     ),
@@ -726,7 +755,7 @@ class _AccionesArchivoModal extends StatelessWidget {
               child: ElevatedButton(
                 onPressed: () => Navigator.of(context).pop(),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: colores.botonesColor,
+                  backgroundColor: colores.botonesColor, // ⚠️ Lectura de color
                   foregroundColor: Colors.white,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                   padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 30),
