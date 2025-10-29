@@ -71,9 +71,9 @@ class _ArchivosCalificacionesScreenState extends State<ArchivosCalificacionesScr
 
   // ⭐️ MODIFICACIÓN CLAVE: Subida instantánea al seleccionar ⭐️
   /// Abre el selector de archivos (PDF), almacena la ruta local y llama a la subida inmediata.
-  Uint8List? bytesArchivoWeb = null; 
-String? nombreArchivoWeb = null; 
-// ------------------------------------------------------------------------
+  Uint8List? bytesArchivoWeb; 
+  String? nombreArchivoWeb; 
+  // ------------------------------------------------------------------------
 
   void _seleccionarArchivo(AlumnoSalonModel alumno, String campoArchivo) async {
       final key = '${alumno.idCicloAlumno}_$campoArchivo';
@@ -142,8 +142,8 @@ String? nombreArchivoWeb = null;
       }
   }
 
-// 🔑 MODIFICACIÓN: La firma del método _enviarArchivos permanece igual, 
-// pero la lógica interna usa las variables globales (bytesArchivoWeb, nombreArchivoWeb) para la Web.
+  // 🔑 MODIFICACIÓN: La firma del método _enviarArchivos permanece igual, 
+  // pero la lógica interna usa las variables globales (bytesArchivoWeb, nombreArchivoWeb) para la Web.
 
   void _enviarArchivos(
     AlumnoSalonModel alumno, 
