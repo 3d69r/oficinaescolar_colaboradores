@@ -493,7 +493,4 @@ class _AsistenciaCalificacionArchivoScreenState extends State<AsistenciaCalifica
       },
     );
   }
-
-  // ⚠️ Los métodos _construirListaCursos, _buildPreescolarExpansionTile y _buildGeneralMateriaTile 
-  // del archivo original ya NO se usan ni son necesarios en esta nueva vista.
 }

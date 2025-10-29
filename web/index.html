@@ -1,51 +1,46 @@
 <!DOCTYPE html>
 <html>
-<head>
-  <!--
-    If you are serving your web app in a path other than the root, change the
-    href value below to reflect the base path you are serving from.
+  <head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge">
+    <meta name="description" content="Oficina Escolar - Colaboradores">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-    The path provided below has to start and end with a slash "/" in order for
-    it to work correctly.
+    <base href="$FLUTTER_BASE_HREF">
 
-    For more details:
-    * https://developer.mozilla.org/en-US/docs/Web/HTML/Element/base
 
-    This is a placeholder for base href that will be replaced by the value of
-    the `--base-href` argument provided to `flutter build`.
-  -->
-  <link rel="stylesheet" type="text/css" href="https://fonts.googleapis.com/css?family=Roboto:300,400,500,700">
-  
-  <base href="$FLUTTER_BASE_HREF">
+    <!-- ✅ Seguridad y acceso a archivos -->
+    <meta http-equiv="Cross-Origin-Opener-Policy" content="same-origin">
+    <meta http-equiv="Cross-Origin-Embedder-Policy" content="require-corp">
 
-  <meta charset="UTF-8">
-  <meta content="IE=Edge" http-equiv="X-UA-Compatible">
-  <meta name="description" content="A new Flutter project.">
+    <!-- ✅ Fuente Roboto -->
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,400,500,700">
 
-  <!-- iOS meta tags & icons -->
-  <meta name="mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black">
-  <meta name="apple-mobile-web-app-title" content="oficinaescolar_colaboradores">
-  <link rel="apple-touch-icon" href="icons/oficinaescolarcolaboradoresweb.jpeg">
+    <!-- ✅ iOS meta tags & icons -->
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <meta name="apple-mobile-web-app-title" content="Oficina Escolar Colaboradores">
+    <link rel="apple-touch-icon" href="icons/oficinaescolarcolaboradoresweb.jpeg">
 
-  <!-- Favicon -->
-  <link rel="icon" type="image/png" href="icons/oficinaescolarcolaboradoresweb.jpeg"/>
+    <!-- ✅ Favicon -->
+    <link rel="icon" type="image/png" href="icons/oficinaescolarcolaboradoresweb.jpeg"/>
 
-  <title>oficinaescolar_colaboradores</title>
-  <link rel="manifest" href="manifest.json">
-</head>
-<body>
-  
-  <script src='https://cdn.jsdelivr.net/npm/pdfjs-dist@4.6.82/build/pdf.min.mjs' type='module'></script>
-  <script type='module'>
-  var { pdfjsLib } = globalThis;
-  pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.6.82/build/pdf.worker.mjs';
+    <title>Oficina Escolar Colaboradores</title>
+    <link rel="manifest" href="manifest.json">
+  </head>
+  <body>
+    <!-- ✅ PDF.js (mantiene tu versión actual) -->
+    <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@4.6.82/build/pdf.min.mjs" type="module"></script>
+    <script type="module">
+      var { pdfjsLib } = globalThis;
+      pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.6.82/build/pdf.worker.mjs';
+      var pdfRenderOptions = {
+        cMapUrl: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.6.82/cmaps/',
+        cMapPacked: true,
+      }
+    </script>
 
-  var pdfRenderOptions = {
-    cMapUrl: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.6.82/cmaps/',
-    cMapPacked: true,
-  }
-  </script>
-  <script src="flutter_bootstrap.js" async></script>
-</body>
+    <!-- ✅ Script principal de Flutter -->
+    <script src="flutter_bootstrap.js" async></script>
+  </body>
 </html>

@@ -1,5 +1,3 @@
-// archivos_calificaciones_screen.dart
-
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:oficinaescolar_colaboradores/config/api_constants.dart';
@@ -75,88 +73,103 @@ String? nombreArchivoWeb;
 // ------------------------------------------------------------------------
 
 void _seleccionarArchivo(AlumnoSalonModel alumno, String campoArchivo) async {
-    final key = '${alumno.idCicloAlumno}_$campoArchivo';
-    debugPrint('DEBUG SELECCIONAR: Iniciando selección de archivo para campo: $campoArchivo'); // ⭐️ DEBUG
+  final key = '${alumno.idCicloAlumno}_$campoArchivo';
+  debugPrint('DEBUG SELECCIONAR: Iniciando selección de archivo para campo: $campoArchivo'); // ⭐️ DEBUG
 
-    FilePickerResult? result;
-    
-    // 🛑 BLOQUE TRY-CATCH AÑADIDO PARA DEPURACIÓN EN WEB
+  FilePickerResult? result;
+
+  // 🧩 INICIALIZACIÓN SEGURA DEL FILE PICKER EN WEB
+  if (kIsWeb) {
+    // 🔧 Forzar inicialización segura del FilePicker en web
     try {
-        // 🔑 MODIFICACIÓN: Pedir bytes (withData: true) solo si es Web
-        result = await FilePicker.platform.pickFiles(
-            type: FileType.custom,
-            allowedExtensions: ['pdf'], 
-            allowMultiple: false,
-            withData: kIsWeb ? true : false, // 🛠️ CORRECCIÓN WEB
-        );
+      await FilePicker.platform.clearTemporaryFiles();
+      debugPrint('DEBUG FILE_PICKER: Inicialización segura completada en Web ✅');
     } catch (e) {
-        // Muestra el error capturado en el log y al usuario (SnackBar).
-        debugPrint('FILE_PICKER_CATCH_ERROR: Error al intentar seleccionar archivo: $e'); 
-        ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-                content: Text('Error de selección (seguridad/web): ${e.toString()}'), 
-                backgroundColor: Colors.red
-            ),
-        );
-        return; // Detiene la ejecución si hay un error en la selección.
+      debugPrint('DEBUG FILE_PICKER: Error durante clearTemporaryFiles(): $e');
     }
-    
-    // Si la selección fue cancelada o fallida sin lanzar una excepción capturable
-    if (result == null || result.files.isEmpty) {
-        debugPrint('DEBUG SELECCIONAR: Selección de archivo cancelada o fallida.'); // ⭐️ DEBUG
-        return;
+  }
+
+  // 🛑 BLOQUE TRY-CATCH AÑADIDO PARA DEPURACIÓN EN WEB
+  try {
+    // 🔑 MODIFICACIÓN: Pedir bytes (withData: true) solo si es Web
+    result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['pdf'],
+      allowMultiple: false,
+      withData: kIsWeb ? true : false, // 🛠️ CORRECCIÓN WEB
+    );
+  } catch (e) {
+    // Muestra el error capturado en el log y al usuario (SnackBar).
+    debugPrint('FILE_PICKER_CATCH_ERROR: Error al intentar seleccionar archivo: $e');
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Error de selección (seguridad/web): ${e.toString()}'),
+        backgroundColor: Colors.red,
+      ),
+    );
+    return; // Detiene la ejecución si hay un error en la selección.
+  }
+
+  // Si la selección fue cancelada o fallida sin lanzar una excepción capturable
+  if (result == null || result.files.isEmpty) {
+    debugPrint('DEBUG SELECCIONAR: Selección de archivo cancelada o fallida.'); // ⭐️ DEBUG
+    return;
+  }
+
+  final archivoSeleccionado = result.files.single;
+
+  // --- LÓGICA MÓVIL/DESKTOP ---
+  if (!kIsWeb) {
+    final filePath = archivoSeleccionado.path;
+
+    if (filePath != null) {
+      // 1. Guardar la ruta seleccionada temporalmente
+      if (mounted) {
+        setState(() {
+          _selectedFilePaths[key] = filePath;
+          // Limpiar las variables Web
+          bytesArchivoWeb = null;
+          nombreArchivoWeb = null;
+          debugPrint('DEBUG SELECCIONAR: [Móvil] Archivo seleccionado, llamando setState. path: $filePath'); // ⭐️ DEBUG
+        });
+      }
+
+      // 2. Llamar inmediatamente a la función de subida (con la ruta)
+      _enviarArchivos(alumno, campoArchivo, filePath);
     }
-    
-    final archivoSeleccionado = result.files.single;
-    
-    // --- LÓGICA MÓVIL/DESKTOP ---
-    if (!kIsWeb) {
-        final filePath = archivoSeleccionado.path;
-        
-        if (filePath != null) {
-            // 1. Guardar la ruta seleccionada temporalmente
-            if (mounted) {
-                setState(() {
-                    _selectedFilePaths[key] = filePath;
-                    // Limpiar las variables Web
-                    bytesArchivoWeb = null; 
-                    nombreArchivoWeb = null;
-                    debugPrint('DEBUG SELECCIONAR: [Móvil] Archivo seleccionado, llamando setState. path: $filePath'); // ⭐️ DEBUG
-                });
-            }
-            
-            // 2. Llamar inmediatamente a la función de subida (con la ruta)
-            _enviarArchivos(alumno, campoArchivo, filePath);
-        }
-    
+
     // --- LÓGICA WEB ---
+  } else {
+    final bytes = archivoSeleccionado.bytes;
+    final nombre = archivoSeleccionado.name;
+
+    if (bytes != null) {
+      // 1. Guardar los bytes y el nombre en variables de estado
+      if (mounted) {
+        setState(() {
+          bytesArchivoWeb = bytes;
+          nombreArchivoWeb = nombre;
+          // Usar el nombre como referencia temporal en el mapa
+          _selectedFilePaths[key] = nombre;
+          debugPrint('DEBUG SELECCIONAR: [Web] Archivo seleccionado, llamando setState. Nombre: $nombre'); // ⭐️ DEBUG
+        });
+      }
+
+      // 2. Llamar inmediatamente a la función de subida (con el nombre como referencia de path)
+      _enviarArchivos(alumno, campoArchivo, nombre);
     } else {
-        final bytes = archivoSeleccionado.bytes;
-        final nombre = archivoSeleccionado.name;
-
-        if (bytes != null) {
-            // 1. Guardar los bytes y el nombre en variables de estado
-            if (mounted) {
-                setState(() {
-                    bytesArchivoWeb = bytes; 
-                    nombreArchivoWeb = nombre;
-                    // Usar el nombre como referencia temporal en el mapa
-                    _selectedFilePaths[key] = nombre; 
-                    debugPrint('DEBUG SELECCIONAR: [Web] Archivo seleccionado, llamando setState. Nombre: $nombre'); // ⭐️ DEBUG
-                });
-            }
-
-            // 2. Llamar inmediatamente a la función de subida (con el nombre como referencia de path)
-            _enviarArchivos(alumno, campoArchivo, nombre); 
-        } else {
-            debugPrint('DEBUG SELECCIONAR: [Web] Error, bytes o nombre nulos.'); // ⭐️ DEBUG
-            // ignore: use_build_context_synchronously
-            ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Error: Datos del archivo Web no disponibles después de la selección.'), backgroundColor: Colors.red),
-            );
-        }
+      debugPrint('DEBUG SELECCIONAR: [Web] Error, bytes o nombre nulos.'); // ⭐️ DEBUG
+      // ignore: use_build_context_synchronously
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Error: Datos del archivo Web no disponibles después de la selección.'),
+          backgroundColor: Colors.red,
+        ),
+      );
     }
+  }
 }
+
 
   // 🔑 MODIFICACIÓN: La firma del método _enviarArchivos permanece igual, 
   // pero la lógica interna usa las variables globales (bytesArchivoWeb, nombreArchivoWeb) para la Web.
@@ -784,4 +797,4 @@ class _AccionesArchivoModal extends StatelessWidget {
       ),
     );
   }
-}
+} 
