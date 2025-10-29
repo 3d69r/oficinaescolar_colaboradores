@@ -59,23 +59,6 @@ class _ArchivosCalificacionesScreenState extends State<ArchivosCalificacionesScr
     }
   }
   
-  // ❌ Eliminado el método _sincronizar_con_shared_preferences
-  /*
-  Future<void> _sincronizar_con_shared_preferences(List<AlumnoSalonModel> alumnos) async {
-    final prefs = await SharedPreferences.getInstance();
-    final String? jsonString = prefs.getString(_persistenciaKey);
-    // ... (resto del código de sincronización)
-  }
-  */
-
-  // ❌ Eliminado el método _guardar_archivos_en_shared_preferences
-  /*
-  Future<void> _guardar_archivos_en_shared_preferences() async {
-    final prefs = await SharedPreferences.getInstance();
-    // ... (resto del código de guardado)
-  }
-  */
-  
   String _getFileNameFromPath(String? path) {
       if (path == null || path.isEmpty) return 'Archivo';
       final lastSeparator = path.lastIndexOf('/');
@@ -89,191 +72,191 @@ class _ArchivosCalificacionesScreenState extends State<ArchivosCalificacionesScr
 String? nombreArchivoWeb = null; 
 // ------------------------------------------------------------------------
 
-void _seleccionarArchivo(AlumnoSalonModel alumno, String campoArchivo) async {
-    final key = '${alumno.idCicloAlumno}_$campoArchivo';
+  void _seleccionarArchivo(AlumnoSalonModel alumno, String campoArchivo) async {
+      final key = '${alumno.idCicloAlumno}_$campoArchivo';
 
-    // 🔑 MODIFICACIÓN: Pedir bytes (withData: true) solo si es Web
-    FilePickerResult? result = await FilePicker.platform.pickFiles(
-        type: FileType.custom,
-        allowedExtensions: ['pdf'], 
-        allowMultiple: false,
-        withData: kIsWeb ? true : false, // 🛠️ CORRECCIÓN WEB
-    );
+      // 🔑 MODIFICACIÓN: Pedir bytes (withData: true) solo si es Web
+      FilePickerResult? result = await FilePicker.platform.pickFiles(
+          type: FileType.custom,
+          allowedExtensions: ['pdf'], 
+          allowMultiple: false,
+          withData: kIsWeb ? true : false, // 🛠️ CORRECCIÓN WEB
+      );
 
-    if (result != null && result.files.isNotEmpty) {
-        final archivoSeleccionado = result.files.single;
-        
-        // --- LÓGICA MÓVIL/DESKTOP ---
-        if (!kIsWeb) {
-            final filePath = archivoSeleccionado.path;
-            
-            if (filePath != null) {
-                // 1. Guardar la ruta seleccionada temporalmente
-                if (mounted) {
-                    setState(() {
-                        _selectedFilePaths[key] = filePath;
-                        // Limpiar las variables Web
-                        bytesArchivoWeb = null; 
-                        nombreArchivoWeb = null;
-                    });
-                }
-                
-                // 2. Llamar inmediatamente a la función de subida (con la ruta)
-                 _enviarArchivos(alumno, campoArchivo, filePath);
-            }
-        
-        // --- LÓGICA WEB ---
-        } else {
-            final bytes = archivoSeleccionado.bytes;
-            final nombre = archivoSeleccionado.name;
+      if (result != null && result.files.isNotEmpty) {
+          final archivoSeleccionado = result.files.single;
+          
+          // --- LÓGICA MÓVIL/DESKTOP ---
+          if (!kIsWeb) {
+              final filePath = archivoSeleccionado.path;
+              
+              if (filePath != null) {
+                  // 1. Guardar la ruta seleccionada temporalmente
+                  if (mounted) {
+                      setState(() {
+                          _selectedFilePaths[key] = filePath;
+                          // Limpiar las variables Web
+                          bytesArchivoWeb = null; 
+                          nombreArchivoWeb = null;
+                      });
+                  }
+                  
+                  // 2. Llamar inmediatamente a la función de subida (con la ruta)
+                  _enviarArchivos(alumno, campoArchivo, filePath);
+              }
+          
+          // --- LÓGICA WEB ---
+          } else {
+              final bytes = archivoSeleccionado.bytes;
+              final nombre = archivoSeleccionado.name;
 
-            if (bytes != null && nombre != null) {
-                // 1. Guardar los bytes y el nombre en variables de estado
-                if (mounted) {
-                    setState(() {
-                        bytesArchivoWeb = bytes; 
-                        nombreArchivoWeb = nombre;
-                        // Usar el nombre como referencia temporal en el mapa
-                        _selectedFilePaths[key] = nombre; 
-                    });
-                }
+              if (bytes != null && nombre != null) {
+                  // 1. Guardar los bytes y el nombre en variables de estado
+                  if (mounted) {
+                      setState(() {
+                          bytesArchivoWeb = bytes; 
+                          nombreArchivoWeb = nombre;
+                          // Usar el nombre como referencia temporal en el mapa
+                          _selectedFilePaths[key] = nombre; 
+                      });
+                  }
 
-                // 2. Llamar inmediatamente a la función de subida (con el nombre como referencia de path)
-                _enviarArchivos(alumno, campoArchivo, nombre); 
-            } else {
-                ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Error: Datos del archivo Web no disponibles después de la selección.'), backgroundColor: Colors.red),
-                );
-            }
-        }
-    } else {
-        // Mantiene el estado en caso de cancelación.
-    }
-}
+                  // 2. Llamar inmediatamente a la función de subida (con el nombre como referencia de path)
+                  _enviarArchivos(alumno, campoArchivo, nombre); 
+              } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Error: Datos del archivo Web no disponibles después de la selección.'), backgroundColor: Colors.red),
+                  );
+              }
+          }
+      } else {
+          // Mantiene el estado en caso de cancelación.
+      }
+  }
 
 // 🔑 MODIFICACIÓN: La firma del método _enviarArchivos permanece igual, 
 // pero la lógica interna usa las variables globales (bytesArchivoWeb, nombreArchivoWeb) para la Web.
 
-void _enviarArchivos(
-  AlumnoSalonModel alumno, 
-  String campoArchivo, 
-  String localPath
-) async { 
-    // ⚠️ ATENCIÓN: Se asume que bytesArchivoWeb y nombreArchivoWeb son variables de clase (estado)
-    // llenadas por _seleccionarArchivo.
+  void _enviarArchivos(
+    AlumnoSalonModel alumno, 
+    String campoArchivo, 
+    String localPath
+  ) async { 
+      // ⚠️ ATENCIÓN: Se asume que bytesArchivoWeb y nombreArchivoWeb son variables de clase (estado)
+      // llenadas por _seleccionarArchivo.
 
-    final userProvider = Provider.of<UserProvider>(context, listen: false);
-    final key = '${alumno.idCicloAlumno}_$campoArchivo';
-    
-    // 1. Crear el modelo de datos para la subida
-    final DatosArchivoASubir archivoParaSubir;
+      final userProvider = Provider.of<UserProvider>(context, listen: false);
+      final key = '${alumno.idCicloAlumno}_$campoArchivo';
+      
+      // 1. Crear el modelo de datos para la subida
+      final DatosArchivoASubir archivoParaSubir;
 
-    if (!kIsWeb) {
-      // 💻 MÓVIL/DESKTOP: Usa localPath (y tu verificación de existencia)
-      if (!await File(localPath).exists()) {
-          ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Error: Archivo local no encontrado.'), backgroundColor: Colors.red),
-          );
-          return;
-      }
-      archivoParaSubir = DatosArchivoASubir(
-        nombreCampoApi: campoArchivo,
-        rutaLocal: localPath,
-      );
-    } else {
-      // 🌐 WEB: Usa bytes y nombre
-      // 🛠️ CORRECCIÓN WEB: Aquí se lee la data que _seleccionarArchivo acaba de guardar.
-      if (bytesArchivoWeb == null || nombreArchivoWeb == null) {
-          ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Error Web: Archivo no cargado en memoria (bytes/nombre).'), backgroundColor: Colors.red),
-          );
-          return;
-      }
-      archivoParaSubir = DatosArchivoASubir(
-        nombreCampoApi: campoArchivo,
-        bytesArchivo: bytesArchivoWeb,
-        nombreArchivo: nombreArchivoWeb,
-      );
-    }
-    
-    // Crear la lista para la llamada al Provider
-    final List<DatosArchivoASubir> archivosParaEnviar = [archivoParaSubir];
-    
-    ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Subiendo ${_getFileNameFromPath(localPath)}...'), duration: const Duration(seconds: 20)),
-    );
-
-    try {
-        // 🔑 CAMBIO DE ESTRUCTURA: Llamada al Provider con la nueva estructura
-        final result = await userProvider.uploadCalificacionesArchivos(
-            idAlumno: alumno.idAlumno,
-            idSalon: alumno.idSalon, 
-            archivosParaSubir: archivosParaEnviar, 
-        );
-        
-        // Imprime el resultado completo de la API para depuración
-        print('✅ Respuesta de la API para campo $campoArchivo: $result');
-        
-        ScaffoldMessenger.of(context).hideCurrentSnackBar(); 
-        
-        // El status de éxito es ahora 'correcto', no 'success' (según tu log)
-        final bool isSuccess = (result['status'] == 'correcto') || 
-                               (result['message'] == 'Información enviada correctamente!!');
-        
-        ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-                content: Text(result['message'] as String),
-                backgroundColor: isSuccess ? Colors.green : Colors.red,
-            ),
-        );
-        
-        if (isSuccess) {
-            
-            final String newUrlOrName;
-            
-            // Usamos 'nombre_archivo' si está disponible
-            if (result.containsKey('nombre_archivo') && result['nombre_archivo'] is String) {
-              newUrlOrName = result['nombre_archivo'] as String; 
-            } else {
-               // Fallback si la clave 'nombre_archivo' no se encuentra
-              newUrlOrName = _getFileNameFromPath(localPath); 
-            }
-            
-            // ❌ CÓDIGO ANTERIOR ELIMINADO: alumno.archivosCalificacion[campoArchivo] = newUrlOrName;
-            
-            // 🔑 CORRECCIÓN INMUTABILIDAD: Usar copyWith
-            // 1. Copiar y modificar el mapa
-            final Map<String, String> updatedArchivos = 
-                Map.from(alumno.archivosCalificacion);
-            updatedArchivos[campoArchivo] = newUrlOrName;
-            
-            // 2. Crear una nueva instancia del modelo
-            final AlumnoSalonModel updatedAlumno = alumno.copyWith(
-                archivosCalificacion: updatedArchivos,
+      if (!kIsWeb) {
+        // 💻 MÓVIL/DESKTOP: Usa localPath (y tu verificación de existencia)
+        if (!await File(localPath).exists()) {
+            ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Error: Archivo local no encontrado.'), backgroundColor: Colors.red),
             );
-
-            // 3. Buscar y reemplazar el modelo en la lista de la vista
-            final int index = _alumnosDelSalon.indexOf(alumno);
-            if (index != -1) {
-                _alumnosDelSalon[index] = updatedAlumno;
-            }
-
-            setState(() {
-                _selectedFilePaths.remove(key);
-                // Opcional: Limpiar los bytes y nombre después de la subida exitosa
-                bytesArchivoWeb = null;
-                nombreArchivoWeb = null;
-            });
+            return;
         }
-
-    } catch (e) {
-        ScaffoldMessenger.of(context).hideCurrentSnackBar(); 
-        print('❌ Error inesperado en _enviarArchivos: $e');
-        ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error inesperado al subir: $e'), backgroundColor: Colors.red),
+        archivoParaSubir = DatosArchivoASubir(
+          nombreCampoApi: campoArchivo,
+          rutaLocal: localPath,
         );
-    }
-}
+      } else {
+        // 🌐 WEB: Usa bytes y nombre
+        // 🛠️ CORRECCIÓN WEB: Aquí se lee la data que _seleccionarArchivo acaba de guardar.
+        if (bytesArchivoWeb == null || nombreArchivoWeb == null) {
+            ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Error Web: Archivo no cargado en memoria (bytes/nombre).'), backgroundColor: Colors.red),
+            );
+            return;
+        }
+        archivoParaSubir = DatosArchivoASubir(
+          nombreCampoApi: campoArchivo,
+          bytesArchivo: bytesArchivoWeb,
+          nombreArchivo: nombreArchivoWeb,
+        );
+      }
+      
+      // Crear la lista para la llamada al Provider
+      final List<DatosArchivoASubir> archivosParaEnviar = [archivoParaSubir];
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Subiendo ${_getFileNameFromPath(localPath)}...'), duration: const Duration(seconds: 20)),
+      );
+
+      try {
+          // 🔑 CAMBIO DE ESTRUCTURA: Llamada al Provider con la nueva estructura
+          final result = await userProvider.uploadCalificacionesArchivos(
+              idAlumno: alumno.idAlumno,
+              idSalon: alumno.idSalon, 
+              archivosParaSubir: archivosParaEnviar, 
+          );
+          
+          // Imprime el resultado completo de la API para depuración
+          print('✅ Respuesta de la API para campo $campoArchivo: $result');
+          
+          ScaffoldMessenger.of(context).hideCurrentSnackBar(); 
+          
+          // El status de éxito es ahora 'correcto', no 'success' (según tu log)
+          final bool isSuccess = (result['status'] == 'correcto') || 
+                                (result['message'] == 'Información enviada correctamente!!');
+          
+          ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                  content: Text(result['message'] as String),
+                  backgroundColor: isSuccess ? Colors.green : Colors.red,
+              ),
+          );
+          
+          if (isSuccess) {
+              
+              final String newUrlOrName;
+              
+              // Usamos 'nombre_archivo' si está disponible
+              if (result.containsKey('nombre_archivo') && result['nombre_archivo'] is String) {
+                newUrlOrName = result['nombre_archivo'] as String; 
+              } else {
+                // Fallback si la clave 'nombre_archivo' no se encuentra
+                newUrlOrName = _getFileNameFromPath(localPath); 
+              }
+              
+              // ❌ CÓDIGO ANTERIOR ELIMINADO: alumno.archivosCalificacion[campoArchivo] = newUrlOrName;
+              
+              // 🔑 CORRECCIÓN INMUTABILIDAD: Usar copyWith
+              // 1. Copiar y modificar el mapa
+              final Map<String, String> updatedArchivos = 
+                  Map.from(alumno.archivosCalificacion);
+              updatedArchivos[campoArchivo] = newUrlOrName;
+              
+              // 2. Crear una nueva instancia del modelo
+              final AlumnoSalonModel updatedAlumno = alumno.copyWith(
+                  archivosCalificacion: updatedArchivos,
+              );
+
+              // 3. Buscar y reemplazar el modelo en la lista de la vista
+              final int index = _alumnosDelSalon.indexOf(alumno);
+              if (index != -1) {
+                  _alumnosDelSalon[index] = updatedAlumno;
+              }
+
+              setState(() {
+                  _selectedFilePaths.remove(key);
+                  // Opcional: Limpiar los bytes y nombre después de la subida exitosa
+                  bytesArchivoWeb = null;
+                  nombreArchivoWeb = null;
+              });
+          }
+
+      } catch (e) {
+          ScaffoldMessenger.of(context).hideCurrentSnackBar(); 
+          print('❌ Error inesperado en _enviarArchivos: $e');
+          ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Error inesperado al subir: $e'), backgroundColor: Colors.red),
+          );
+      }
+  }
 
   // ⭐️ MÉTODO MODIFICADO: Quitar Archivo (Añadida llamada a la API de eliminación) ⭐️
   void _quitarArchivo(String idCicloAlumno, String campoArchivo) async {
@@ -646,8 +629,6 @@ class _AccionesArchivoModal extends StatelessWidget {
     if (lastSeparator == -1) return currentUrlOrName;
     return currentUrlOrName.substring(lastSeparator + 1);
   }
-
-  
 
   @override
   Widget build(BuildContext context) {

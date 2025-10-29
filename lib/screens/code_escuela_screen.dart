@@ -27,7 +27,7 @@ class _CodeEscuelaScreenState extends State<CodeEscuelaScreen> {
   }
 
   // ✅ [NUEVO] Método para llamar a la API de notificar_firebase
-  Future<void> notificarFirebase() async {
+  /*Future<void> notificarFirebase() async {
     final apiClient = Provider.of<ApiClient>(context, listen: false);
     final url = ApiConstants.getNotificarFirebaseUrl();
 
@@ -62,7 +62,7 @@ class _CodeEscuelaScreenState extends State<CodeEscuelaScreen> {
     } catch (e) {
       debugPrint('Excepción al llamar a notificar_firebase: $e');
     }
-  }
+  }*/
 
   Future<Map<String, dynamic>?> validarCodigoEscuela(String codigo) async {
     final url = Uri.parse(
@@ -238,7 +238,7 @@ class _CodeEscuelaScreenState extends State<CodeEscuelaScreen> {
                                 _isLoading = true;
                               });
 
-                              await notificarFirebase();
+                              //await notificarFirebase();
 
                               final response =
                                   await validarCodigoEscuela(codigo);

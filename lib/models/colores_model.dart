@@ -5,8 +5,19 @@ Color _hexToColor(String? hexCode, {Color defaultColor = Colors.indigoAccent}) {
   if (hexCode == null || hexCode.isEmpty) {
     return defaultColor;
   }
+
   final hexString = hexCode.replaceAll('#', '');
-  return Color(int.parse('FF$hexString', radix: 16));
+  final fullHex = 'FF$hexString';
+  
+  // 🔑 CORRECCIÓN CLAVE: Usar int.tryParse para manejar formatos inválidos
+  final int? colorValue = int.tryParse(fullHex, radix: 16);
+  
+  if (colorValue == null) {
+    // Si la conversión falla (no es un hex válido), devuelve el color por defecto
+    return defaultColor; 
+  }
+  
+  return Color(colorValue);
 }
 
 class Colores {
