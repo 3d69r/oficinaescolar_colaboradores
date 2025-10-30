@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+// Asegúrate de que estas importaciones sean correctas en tu proyecto
 import 'package:oficinaescolar_colaboradores/config/api_constants.dart';
 import 'package:oficinaescolar_colaboradores/providers/user_provider.dart';
 import 'package:oficinaescolar_colaboradores/services/api_client.dart';
@@ -149,133 +150,145 @@ class _CodeEscuelaScreenState extends State<CodeEscuelaScreen> {
   }
 
   Widget _loginForm(BuildContext context) {
+    // ⚙️ DEFINICIÓN RESPONSIVA: Ancho máximo para el formulario en web/desktop.
+    const double maxFormWidth = 450; 
+    
     return SingleChildScrollView(
       child: Column(
         children: [
           const SizedBox(height: 280),
-          Container(
-            margin: const EdgeInsets.symmetric(horizontal: 30),
-            width: double.infinity,
-            height: 230,
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(25),
-              boxShadow: const [
-                BoxShadow(
-                  color: Colors.black,
-                  blurRadius: 15,
-                  offset: Offset(0, 5),
-                ),
-              ],
-            ),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20.0),
-              child: Form(
-                key: _formKey,
-                autovalidateMode: AutovalidateMode.onUserInteraction,
-                child: Column(
-                  children: [
-                    const SizedBox(height: 10),
-                    const Text(
-                      'Código de escuela',
-                      style: TextStyle(
-                        fontSize: 20,
-                        color: Color.fromARGB(255, 0, 0, 0),
-                      ),
+          // 🚀 INICIO DE LA MODIFICACIÓN RESPONSIVA
+          Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(
+                maxWidth: maxFormWidth, // Límite el ancho en pantallas grandes
+              ),
+              child: Container(
+                margin: const EdgeInsets.symmetric(horizontal: 30),
+                width: double.infinity, // Se ajustará al maxWidth o al ancho móvil.
+                height: 230,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(25),
+                  boxShadow: const [
+                    BoxShadow(
+                      color: Colors.black,
+                      blurRadius: 15,
+                      offset: Offset(0, 5),
                     ),
-                    const SizedBox(height: 15),
-                    TextFormField(
-                      controller: _codigoController,
-                      autocorrect: false,
-                      decoration: InputDecorations.inputDecoration(
-                        hintext: 'Ingresa el código escuela',
-                        labeltext: 'Escuela',
-                        icono: const Icon(Icons.key),
-                      ),
-                      validator: (value) {
-                        if (value == null || value.trim().isEmpty) {
-                          return 'Ingrese un código de escuela';
-                        }
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 30),
-                    _isLoading
-                        ? const CircularProgressIndicator()
-                        : MaterialButton(
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            disabledColor: Colors.grey,
-                            color: Colors.indigoAccent,
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 80,
-                                vertical: 15,
-                              ),
-                              child: const Text(
-                                'Ingresar',
-                                style: TextStyle(color: Colors.white),
-                              ),
-                            ),
-                            onPressed: () async {
-                              final codigo = _codigoController.text.trim();
-                              if (codigo.isEmpty ||
-                                  !_formKey.currentState!.validate()) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text(
-                                      'Ingrese un código de escuela válido',
-                                    ),
-                                    backgroundColor: Colors.red,
-                                    behavior: SnackBarBehavior.floating,
-                                  ),
-                                );
-                                return;
-                              }
-
-                              setState(() {
-                                _isLoading = true;
-                              });
-
-                              //await notificarFirebase();
-
-                              final response =
-                                  await validarCodigoEscuela(codigo);
-
-                              if (response != null) {
-                                // Éxito en la validación
-                                final userProvider = Provider.of<UserProvider>(
-                                  context,
-                                  listen: false,
-                                );
-
-                                await userProvider.processAndSaveSchoolColors(
-                                  response,
-                                );
-
-                                await userProvider.saveColorsToPrefs(response);
-
-                                Navigator.pushReplacementNamed(
-                                  context,
-                                  'login',
-                                  arguments: {'codigo': codigo},
-                                );
-                              } else {
-                                // El error ya fue mostrado por la función
-                                // validarCodigoEscuela, solo evitamos la navegación.
-                              }
-
-                              setState(() {
-                                _isLoading = false;
-                              });
-                            },
-                          ),
                   ],
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20.0),
+                  child: Form(
+                    key: _formKey,
+                    autovalidateMode: AutovalidateMode.onUserInteraction,
+                    child: Column(
+                      children: [
+                        const SizedBox(height: 10),
+                        const Text(
+                          'Código de escuela',
+                          style: TextStyle(
+                            fontSize: 20,
+                            color: Color.fromARGB(255, 0, 0, 0),
+                          ),
+                        ),
+                        const SizedBox(height: 15),
+                        TextFormField(
+                          controller: _codigoController,
+                          autocorrect: false,
+                          decoration: InputDecorations.inputDecoration(
+                            hintext: 'Ingresa el código escuela',
+                            labeltext: 'Escuela',
+                            icono: const Icon(Icons.key),
+                          ),
+                          validator: (value) {
+                            if (value == null || value.trim().isEmpty) {
+                              return 'Ingrese un código de escuela';
+                            }
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: 30),
+                        _isLoading
+                            ? const CircularProgressIndicator()
+                            : MaterialButton(
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                disabledColor: Colors.grey,
+                                color: Colors.indigoAccent,
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 80,
+                                    vertical: 15,
+                                  ),
+                                  child: const Text(
+                                    'Ingresar',
+                                    style: TextStyle(color: Colors.white),
+                                  ),
+                                ),
+                                onPressed: () async {
+                                  final codigo = _codigoController.text.trim();
+                                  if (codigo.isEmpty ||
+                                      !_formKey.currentState!.validate()) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text(
+                                          'Ingrese un código de escuela válido',
+                                        ),
+                                        backgroundColor: Colors.red,
+                                        behavior: SnackBarBehavior.floating,
+                                      ),
+                                    );
+                                    return;
+                                  }
+
+                                  setState(() {
+                                    _isLoading = true;
+                                  });
+
+                                  //await notificarFirebase();
+
+                                  final response =
+                                      await validarCodigoEscuela(codigo);
+
+                                  if (response != null) {
+                                    // Éxito en la validación
+                                    final userProvider = Provider.of<UserProvider>(
+                                      context,
+                                      listen: false,
+                                    );
+
+                                    await userProvider.processAndSaveSchoolColors(
+                                      response,
+                                    );
+
+                                    await userProvider.saveColorsToPrefs(response);
+
+                                    Navigator.pushReplacementNamed(
+                                      context,
+                                      'login',
+                                      arguments: {'codigo': codigo},
+                                    );
+                                  } else {
+                                    // El error ya fue mostrado por la función
+                                    // validarCodigoEscuela, solo evitamos la navegación.
+                                  }
+
+                                  setState(() {
+                                    _isLoading = false;
+                                  });
+                                },
+                              ),
+                      ],
+                    ),
+                  ),
                 ),
               ),
             ),
           ),
+          // 🛑 FIN DE LA MODIFICACIÓN RESPONSIVA
           const SizedBox(height: 50),
         ],
       ),

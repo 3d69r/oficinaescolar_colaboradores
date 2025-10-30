@@ -27,8 +27,9 @@ class _LoginScreenState extends State<LoginScreen> {
   String? _currentSchoolCode;
   
   // [NUEVO] Referencia al UserProvider y a los colores dinámicos
-  late UserProvider userProvider;
-  late Colores colores;
+  // Se mantienen para referencia, aunque el provider se accede dentro de build()
+  // late UserProvider userProvider; 
+  // late Colores colores; 
 
 
   @override
@@ -547,11 +548,15 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
 
-    // [MODIFICACIÓN] Obtener los colores del provider dentro del builder
-        final userProvider = Provider.of<UserProvider>(context, listen: false);
-        final colores = userProvider.colores;
+    // [MODIFICACIÓN] Obtener los colores del provider dentro del build
+    final userProvider = Provider.of<UserProvider>(context, listen: false);
+    final colores = userProvider.colores;
     
     final size = MediaQuery.of(context).size;
+    
+    // ⚙️ DEFINICIÓN RESPONSIVA: Ancho máximo para el formulario en web/desktop.
+    const double maxFormWidth = 450; 
+
 
     return SafeArea(
       child: Scaffold(
@@ -576,7 +581,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   SizedBox(height: 8),
                   Text(
-                    'Acceso colaboradores', // ✅ [REF] Cambiado de padres de familia
+                    'Acceso Colaboradores', // ✅ [REF] Texto actualizado
                     style: TextStyle(color: Colors.white70, fontSize: 16),
                   ),
                 ],
@@ -586,120 +591,129 @@ class _LoginScreenState extends State<LoginScreen> {
               child: Column(
                 children: [
                   const SizedBox(height: 250),
-                  Container(
-                    margin: const EdgeInsets.symmetric(horizontal: 30),
-                    width: double.infinity,
-                    height: 390,
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(25),
-                      boxShadow: const [
-                        BoxShadow(
-                          color: Colors.black,
-                          blurRadius: 15,
-                          offset: Offset(0, 5),
-                        ),
-                      ],
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 20.0),
-                      child: Form(
-                        key: formKey,
-                        child: Column(
-                          children: [
-                            const SizedBox(height: 10),
-                            if (_currentSchoolCode != null)
-                              Text(
-                                '$_currentSchoolCode'.toUpperCase(),
-                                style: TextStyle(
-                                  color: colores.headerColor,
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            const SizedBox(height: 30),
-                            TextFormField(
-                              controller: emailController,
-                              decoration: InputDecorations.inputDecoration(
-                                hintext: 'Ingresa tu correo electrónico',
-                                labeltext: 'Usuario',
-                                icono: const Icon(Icons.alternate_email_rounded),
-                              ),
-                              validator: (value) {
-                                if (value == null || value.trim().isEmpty)
-                                  return 'El correo es requerido';
-                                return null;
-                              },
-                            ),
-                            const SizedBox(height: 30),
-                            TextFormField(
-                              controller: passwordController,
-                              obscureText: _obscurePassword,
-                              decoration: InputDecorations.inputDecoration(
-                                hintext: 'Ingresa tu contraseña',
-                                labeltext: 'Contraseña',
-                                icono: const Icon(Icons.lock),
-                              ).copyWith(
-                                suffixIcon: IconButton(
-                                  icon: Icon(
-                                    _obscurePassword
-                                        ? Icons.visibility_off
-                                        : Icons.visibility,
-                                  ),
-                                  onPressed:
-                                      () => setState(
-                                        () =>
-                                            _obscurePassword = !_obscurePassword,
-                                      ),
-                                ),
-                              ),
-                              validator:
-                                  (value) =>
-                                      value == null || value.trim().length < 4
-                                          ? 'Contraseña mínima de 4 caracteres'
-                                          : null,
-                            ),
-                            const SizedBox(height: 20),
-                            MaterialButton(
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              color: colores.botonesColor,
-                              onPressed: isLoading ? null : onLoginPressed,
-                              child: Padding(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 80,
-                                  vertical: 15,
-                                ),
-                                child:
-                                    isLoading
-                                        ? const CircularProgressIndicator(
-                                          color: Colors.white,
-                                        )
-                                        : const Text(
-                                          'Ingresar',
-                                          style: TextStyle(color: Colors.white),
-                                        ),
-                              ),
-                            ),
-                            const SizedBox(height: 20),
-                            GestureDetector(
-                              onTap: _showForgotPasswordOptionsModal,
-                              child: Text(
-                                '¿Olvidaste tu contraseña?',
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                  color: colores.botonesColor,
-                                  decoration: TextDecoration.none,
-                                ),
-                              ),
+                  // 🚀 INICIO DE LA MODIFICACIÓN RESPONSIVA
+                  Center(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(
+                        maxWidth: maxFormWidth, // Límite el ancho en pantallas grandes
+                      ),
+                      child: Container(
+                        margin: const EdgeInsets.symmetric(horizontal: 30),
+                        width: double.infinity, // Se ajustará al maxWidth o al ancho móvil.
+                        height: 390,
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(25),
+                          boxShadow: const [
+                            BoxShadow(
+                              color: Colors.black,
+                              blurRadius: 15,
+                              offset: Offset(0, 5),
                             ),
                           ],
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 20.0),
+                          child: Form(
+                            key: formKey,
+                            child: Column(
+                              children: [
+                                const SizedBox(height: 10),
+                                if (_currentSchoolCode != null)
+                                  Text(
+                                    '$_currentSchoolCode'.toUpperCase(),
+                                    style: TextStyle(
+                                      color: colores.headerColor,
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                const SizedBox(height: 30),
+                                TextFormField(
+                                  controller: emailController,
+                                  decoration: InputDecorations.inputDecoration(
+                                    hintext: 'Ingresa tu correo electrónico',
+                                    labeltext: 'Usuario',
+                                    icono: const Icon(Icons.alternate_email_rounded),
+                                  ),
+                                  validator: (value) {
+                                    if (value == null || value.trim().isEmpty)
+                                      return 'El correo es requerido';
+                                    return null;
+                                  },
+                                ),
+                                const SizedBox(height: 30),
+                                TextFormField(
+                                  controller: passwordController,
+                                  obscureText: _obscurePassword,
+                                  decoration: InputDecorations.inputDecoration(
+                                    hintext: 'Ingresa tu contraseña',
+                                    labeltext: 'Contraseña',
+                                    icono: const Icon(Icons.lock),
+                                  ).copyWith(
+                                    suffixIcon: IconButton(
+                                      icon: Icon(
+                                        _obscurePassword
+                                            ? Icons.visibility_off
+                                            : Icons.visibility,
+                                      ),
+                                      onPressed:
+                                          () => setState(
+                                            () =>
+                                                _obscurePassword = !_obscurePassword,
+                                          ),
+                                    ),
+                                  ),
+                                  validator:
+                                      (value) =>
+                                          value == null || value.trim().length < 4
+                                              ? 'Contraseña mínima de 4 caracteres'
+                                              : null,
+                                ),
+                                const SizedBox(height: 20),
+                                MaterialButton(
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  color: colores.botonesColor,
+                                  onPressed: isLoading ? null : onLoginPressed,
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 80,
+                                      vertical: 15,
+                                    ),
+                                    child:
+                                        isLoading
+                                            ? const CircularProgressIndicator(
+                                              color: Colors.white,
+                                            )
+                                            : const Text(
+                                              'Ingresar',
+                                              style: TextStyle(color: Colors.white),
+                                            ),
+                                  ),
+                                ),
+                                const SizedBox(height: 20),
+                                GestureDetector(
+                                  onTap: _showForgotPasswordOptionsModal,
+                                  child: Text(
+                                    '¿Olvidaste tu contraseña?',
+                                    style: TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.bold,
+                                      color: colores.botonesColor,
+                                      decoration: TextDecoration.none,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
                         ),
                       ),
                     ),
                   ),
+                  // 🛑 FIN DE LA MODIFICACIÓN RESPONSIVA
                   const SizedBox(height: 50),
                 ],
               ), 
