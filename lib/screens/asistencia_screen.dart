@@ -394,10 +394,9 @@ class _AsistenciaScreenState extends State<AsistenciaScreen>
     );
   }
 
-  // ✅ MÉTODO: Construir lista de cursos (Materias o Clubes)
+  // ⭐️ MÉTODO MODIFICADO: Construir lista de cursos (Materias o Clubes) ⭐️
   Widget _construirListaCursos(UserProvider userProvider) { 
     final bool isMateria = _selectedOption == 'materia';
-    final Color headerColor = userProvider.colores.headerColor; 
     
     final List items = isMateria 
         ? userProvider.colaboradorMaterias 
@@ -433,16 +432,19 @@ class _AsistenciaScreenState extends State<AsistenciaScreen>
         final String subtitle = isMateria
             ? 'Plan: ${materia!.planEstudio}'
             : 'Horario: ${(item as ClubModel).horario}';
-
-        final bool isPreescolar = isMateria && materia!.planEstudio == 'Preescolar';
-
+        
+        // La condición isPreescolar ahora se usará para el color del icono si fuera necesario,
+        // pero NO para diferenciar el Widget.
+        // final bool isPreescolar = isMateria && materia!.planEstudio == 'Preescolar'; 
+        
+        // 🚨 Manejo de Clubes (sin cambios)
         if (!isMateria) {
             return Card(
                 margin: const EdgeInsets.symmetric(vertical: 8.0),
                 child: ListTile(
                     title: Text(title),
                     subtitle: Text(subtitle),
-                    trailing: const Icon(Icons.arrow_forward_ios, color: Colors.white,),
+                    trailing: const Icon(Icons.arrow_forward_ios, color: Colors.black),
                     onTap: () {
                         Navigator.push(
                             context, 
@@ -458,82 +460,31 @@ class _AsistenciaScreenState extends State<AsistenciaScreen>
             );
         }
 
+        // 🚀 MANEJO UNIFICADO DE MATERIAS (Incluyendo Preescolar) 🚀
+        // Se llama directamente a _buildGeneralMateriaTile para TODAS las materias
         return Card(
           margin: const EdgeInsets.symmetric(vertical: 8.0),
-          child: isPreescolar
-              ? _buildPreescolarExpansionTile(context, materia, title, subtitle, headerColor)
-              : _buildGeneralMateriaTile(context, materia!, title, subtitle),
+          // Usamos el mismo widget para todos los niveles de materia
+          child: _buildGeneralMateriaTile(context, materia!, title, subtitle),
         );
       },
     );
   }
-
-  // ⭐️ MÉTODO: Para materias de Preescolar (con botones de acción)
-  Widget _buildPreescolarExpansionTile(
-      BuildContext context, 
-      MateriaModel materia, 
-      String title, 
-      String subtitle,
-      Color headerColor,
-  ) {
-      return ExpansionTile(
-          key: PageStorageKey<String>(materia.idMateriaClase),
-          title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
-          subtitle: Text(subtitle),
-          initiallyExpanded: false,
-          collapsedIconColor: headerColor,
-          iconColor: headerColor,
-          childrenPadding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-          children: <Widget>[
-              // 1. Botón para Capturar Comentarios
-              ListTile(
-                  leading: Icon(Icons.edit_note, color: headerColor),
-                  title: const Text('Capturar Comentarios'),
-                  trailing: const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.white,),
-                  onTap: () {
-                      Navigator.push(
-                          context, 
-                          MaterialPageRoute(
-                              builder: (_) => CapturaCalificacionesScreen(
-                                  materiaSeleccionada: materia, 
-                              ),
-                          ),
-                      );
-                  },
-              ),
-              const Divider(height: 1),
-              // 2. Botón para Ver Listado
-              /*ListTile(
-                  leading: const Icon(Icons.list_alt, color: Colors.blueGrey),
-                  title: const Text('Ver Listado de Comentarios'),
-                  trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-                  onTap: () {
-                      Navigator.push(
-                          context, 
-                          MaterialPageRoute(
-                              builder: (_) => PreescolarListadoScreen(
-                                  materiaSeleccionada: materia,
-                              ),
-                          ),
-                      );
-                  },
-              ),*/
-          ],
-      );
-  }
-
-  // ⭐️ MÉTODO: Para materias Generales 
+  
+  // ⭐️ MÉTODO: Para materias Generales (usado ahora también por Preescolar) 
   Widget _buildGeneralMateriaTile(
       BuildContext context, 
       MateriaModel materia, 
       String title, 
       String subtitle,
   ) {
+      // El icono trailing se cambia a color negro para ser visible
       return ListTile(
-          title: Text(title),
+          title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
           subtitle: Text(subtitle),
           trailing: const Icon(Icons.arrow_forward_ios, color: Colors.black,),
           onTap: () {
+              // Navegación directa a la pantalla de captura, aplicable a todos los niveles
               Navigator.push(
                   context, 
                   MaterialPageRoute(

@@ -73,7 +73,7 @@ class _CapturaCalificacionesScreenState extends State<CapturaCalificacionesScree
         tipoCurso: TipoCurso.materia, 
       );
       
-      // 3. IDENTIFICAR CAMPOS DE SOLO LECTURA (PROMEDIOS)
+      // 3. IDENTIFICAR CAMPOS DE SOLO LECTURA
       _identifyReadonlyKeys(estructura);
 
       // 4. ACTUALIZAR EL ESTADO
@@ -110,11 +110,6 @@ class _CapturaCalificacionesScreenState extends State<CapturaCalificacionesScree
             // 🚨 CAMBIO CLAVE AQUÍ
             // Si la clave anterior 'calificacion_final' sigue siendo un riesgo de ser read-only, 
             // mantenemos la exclusión o la eliminamos si ya no es relevante.
-            // Dado que 'calificacion' y 'observaciones' no tienen 'final', 
-            // la siguiente línea puede simplificarse para solo buscar 'final' que NO sea 'calificacion_final'.
-            
-            // Si el backend introduce 'calificacion_promedio', la primera condición lo atraparía.
-            // Si introduce 'calificacion_final', el siguiente bloque lo excluye si lo necesitas.
             
             if (lowerKey.contains('final') && lowerKey != 'calificacion_final') {
                 keys.add(key.trim());
@@ -360,7 +355,6 @@ class _CapturaCalificacionesScreenState extends State<CapturaCalificacionesScree
   }
 
   @override
-  @override
   Widget build(BuildContext context) {
     // ⭐️ ACCESO AL PROVEEDOR DE COLOR ⭐️
     final colores = Provider.of<UserProvider>(context).colores;
@@ -416,23 +410,33 @@ class _CapturaCalificacionesScreenState extends State<CapturaCalificacionesScree
           foregroundColor: Colors.white,
           backgroundColor: dynamicHeaderColor, // ⭐️ Color Dinámico ⭐️
           centerTitle: true,
-          actions: [
-            IconButton(
-              icon: const Icon(Icons.save),
-              onPressed: () {
-                // 🚨 LLAMAR AL MÉTODO DE ENVÍO
-                _sendCalificaciones();
-              },
-              color: Colors.white, // Asegurar que el ícono sea blanco
-            ),
-          ],
+          // ❌ Eliminamos el botón de guardar de aquí
+          // actions: [...],
         ),
+        
         // El widget de contenido maneja su propio SingleChildScrollView horizontal
         body: SingleChildScrollView(
           scrollDirection: Axis.vertical,
           padding: const EdgeInsets.all(8.0),
           child: _buildContentWidget(),
         ),
+        
+        // ✅ AÑADIMOS EL BOTÓN DE GUARDAR FIJO EN LA PARTE INFERIOR DERECHA
+        floatingActionButton: FloatingActionButton.extended(
+          onPressed: _sendCalificaciones,
+          label: const Text(
+            'Guardar',
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+          ),
+          //icon: const Icon(Icons.save),
+          backgroundColor: colores.botonesColor, // Usar el color dinámico del Provider
+          foregroundColor: Colors.white,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          elevation: 8,
+        ),
+        
+        // Aseguramos que el botón flotante esté centrado a la derecha (por defecto)
+        // floatingActionButtonLocation: FloatingActionButtonLocation.endFloat, 
       ),
     );
   }

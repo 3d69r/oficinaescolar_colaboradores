@@ -166,7 +166,7 @@ class _ListaScreenState extends State<ListaScreen> {
         borderRadius: BorderRadius.circular(10), 
         child: AnimatedContainer( 
           duration: const Duration(milliseconds: 200),
-          width: 150, 
+          width: 100, 
           height: 50,
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(10),
@@ -180,8 +180,8 @@ class _ListaScreenState extends State<ListaScreen> {
           child: const Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(Icons.save, size: 22, color: Colors.white),
-              SizedBox(width: 8),
+              //Icon(Icons.save, size: 22, color: Colors.white),
+              SizedBox(width: 2),
               Text(
                 'Guardar',
                 style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
