@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 // ✅ Asegúrate de tener estas importaciones correctas
+// Asumo que estas rutas y clases existen en tu proyecto
 import 'package:oficinaescolar_colaboradores/providers/user_provider.dart'; 
 import 'package:oficinaescolar_colaboradores/models/alumno_asistencia_model.dart'; 
 import 'package:oficinaescolar_colaboradores/providers/tipo_curso.dart'; // Tu enum TipoCurso
@@ -152,6 +153,46 @@ class _ListaScreenState extends State<ListaScreen> {
     }
   }
 
+  // ⭐️ Widget actualizado para usar colores.botonesColor ⭐️
+  Widget _construirBotonGuardar() {
+    // Es necesario acceder al provider aquí si el color es dinámico
+    final colores = Provider.of<UserProvider>(context).colores; 
+    final Color botonColor = colores.botonesColor; // Usamos el color dinámico
+
+    return Tooltip(
+      message: 'Guardar Asistencia',
+      child: InkWell(
+        onTap: _enviarAsistencia, 
+        borderRadius: BorderRadius.circular(10), 
+        child: AnimatedContainer( 
+          duration: const Duration(milliseconds: 200),
+          width: 150, 
+          height: 50,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(10),
+            color: botonColor, // Color dinámico
+            boxShadow: [
+              // Usamos una sombra basada en el color dinámico para un mejor efecto
+              BoxShadow(color: botonColor.withOpacity(0.4), blurRadius: 6, offset: const Offset(0, 3))
+            ],
+          ),
+          alignment: Alignment.center,
+          child: const Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.save, size: 22, color: Colors.white),
+              SizedBox(width: 8),
+              Text(
+                'Guardar',
+                style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     // ⭐️ ACCESO AL PROVEEDOR DE COLOR ⭐️
@@ -163,132 +204,115 @@ class _ListaScreenState extends State<ListaScreen> {
         ? 'Asistencia Club' 
         : 'Asistencia Materia';
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(
-          title,
-          style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white)
+    return SafeArea(
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text(
+            title,
+            style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white)
+          ),
+          foregroundColor: Colors.white,
+          backgroundColor: dynamicHeaderColor,
+          centerTitle: true,
         ),
-        foregroundColor: Colors.white,
-        backgroundColor: dynamicHeaderColor,
-        centerTitle: true,
-        actions: [
-          
-          Padding(
-            padding: const EdgeInsets.only(right: 12.0, top: 5.0, bottom: 5.0), // Ajuste de padding
-            child: InkWell(
-              onTap: _enviarAsistencia, 
-              borderRadius: BorderRadius.circular(8), // Ajuste del InkWell para coincidir
-              child: Tooltip(
-                message: 'Guardar Asistencia',
-                child: AnimatedContainer( 
-                  duration: const Duration(milliseconds: 200),
-                  width: 45, // Mismo tamaño
-                  height: 45,
-                  decoration: BoxDecoration(
-                    // ⭐️ CAMBIO A RECTANGLE ⭐️
-                    shape: BoxShape.rectangle, 
-                    borderRadius: BorderRadius.circular(8), // ⭐️ ESQUINAS REDONDEADAS ⭐️
-                    // ignore: deprecated_member_use
-                    color: Colors.green.withOpacity(0.9),
-                    border: Border.all(color: Colors.green, width: 2),
-                    boxShadow: [
-                      // ignore: deprecated_member_use
-                      BoxShadow(color: colores.botonesColor.withOpacity(0.4), blurRadius: 4, offset: const Offset(0, 2))
+        body: FutureBuilder<List<AlumnoAsistenciaModel>>(
+          future: _alumnosFuture,
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Center(child: CircularProgressIndicator());
+            } 
+            
+            if (snapshot.hasError) {
+              return Center(
+                child: Text('Error al cargar la lista: ${snapshot.error}', textAlign: TextAlign.center),
+              );
+            }
+            
+            final List<AlumnoAsistenciaModel> alumnos = snapshot.data ?? [];
+            
+            if (alumnos.isEmpty) {
+              return const Center(
+                child: Text('No hay alumnos inscritos en este curso o club.', textAlign: TextAlign.center),
+              );
+            }
+
+            return Column(
+              children: [
+                // --- Botones de Marcar Todos (Usan colores.botonesColor) ---
+                Padding(
+                  padding: const EdgeInsets.all(12.0),
+                  child: Row(
+                    children: [
+                      // BOTÓN 1: MARCAR ASISTENCIA A TODOS (PRESENTE)
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          onPressed: _marcarTodosPresentes, 
+                          icon: const Icon(Icons.check_circle, size: 20),
+                          label: const Text('Asistencia a todos', style: TextStyle(fontWeight: FontWeight.bold)),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: colores.botonesColor, // Usa colores.botonesColor
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                            padding: const EdgeInsets.symmetric(vertical: 15),
+                            elevation: 3,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      // BOTÓN 2: MARCAR FALTA A TODOS (AUSENTE)
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          onPressed: _marcarTodosAusentes,
+                          icon: const Icon(Icons.close, size: 20),
+                          label: const Text('Falta a Todos', style: TextStyle(fontWeight: FontWeight.bold)),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: colores.botonesColor, // Usa colores.botonesColor
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                            padding: const EdgeInsets.symmetric(vertical: 15),
+                            elevation: 3,
+                          ),
+                        ),
+                      ),
                     ],
                   ),
-                  child: const Icon(
-                    Icons.save, 
-                    size: 22,
-                    color: Colors.white,
-                  ),
                 ),
-              ),
-            ),
-          ),
-        ],
-      ),
-      body: FutureBuilder<List<AlumnoAsistenciaModel>>(
-        future: _alumnosFuture,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          } 
-          
-          if (snapshot.hasError) {
-            return Center(
-              child: Text('Error al cargar la lista: ${snapshot.error}', textAlign: TextAlign.center),
-            );
-          }
-          
-          final List<AlumnoAsistenciaModel> alumnos = snapshot.data ?? [];
-          
-          if (alumnos.isEmpty) {
-            return const Center(
-              child: Text('No hay alumnos inscritos en este curso o club.', textAlign: TextAlign.center),
-            );
-          }
+                // -----------------------------
 
-          return Column(
-            children: [
-              Padding(
-                padding: const EdgeInsets.all(12.0),
-                child: Row(
-                  children: [
-                    // BOTÓN 1: MARCAR ASISTENCIA A TODOS (PRESENTE)
-                    Expanded(
-                      child: ElevatedButton.icon(
-                        onPressed: _marcarTodosPresentes, 
-                        icon: const Icon(Icons.check_circle, size: 20),
-                        label: const Text('Asistencia a todos', style: TextStyle(fontWeight: FontWeight.bold)),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: colores.botonesColor,
-                          foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                          padding: const EdgeInsets.symmetric(vertical: 15),
-                          elevation: 3,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    // BOTÓN 2: MARCAR FALTA A TODOS (AUSENTE)
-                    Expanded(
-                      child: ElevatedButton.icon(
-                        onPressed: _marcarTodosAusentes,
-                        icon: const Icon(Icons.close, size: 20),
-                        label: const Text('Falta a Todos', style: TextStyle(fontWeight: FontWeight.bold)),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: colores.botonesColor,
-                          foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                          padding: const EdgeInsets.symmetric(vertical: 15),
-                          elevation: 3,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                // 🚀 El ListView ahora incluye el botón Guardar (+1) al final
+                Expanded(
                   child: ListView.builder(
-                    itemCount: alumnos.length,
+                    itemCount: alumnos.length + 1, // +1 para el botón Guardar
                     itemBuilder: (context, index) {
-                      final alumno = alumnos[index];
-                      // El estado actual ahora se basa en el mapa _attendanceState, que fue inicializado con la API.
-                      final currentStatus = _attendanceState[alumno.idCursoAlumno] ?? AttendanceStatus.ausente;
-                      
-                      // ✅ MODIFICACIÓN CLAVE: Pasamos el índice (index)
-                      return _construirTarjetaAlumno(context, alumno, currentStatus, _presenteColor, index); 
+                      // 1. Mostrar tarjeta de alumno
+                      if (index < alumnos.length) {
+                        final alumno = alumnos[index];
+                        final currentStatus = _attendanceState[alumno.idCursoAlumno] ?? AttendanceStatus.ausente;
+                        
+                        return Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 8.0), // Padding interno para los elementos
+                            child: _construirTarjetaAlumno(context, alumno, currentStatus, _presenteColor, index)
+                        );
+                      } 
+                      // 2. Mostrar botón Guardar al final de la lista
+                      else {
+                        return Padding(
+                          padding: const EdgeInsets.only(right: 16.0, bottom: 16.0, top: 12.0, left: 16.0),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.end, // Alinear a la derecha
+                            children: [
+                              _construirBotonGuardar(), // Usa el color dinámico
+                            ],
+                          ),
+                        );
+                      }
                     },
                   ),
                 ),
-              ),
-            ],
-          );
-        },
+              ],
+            );
+          },
+        ),
       ),
     );
   }
@@ -299,7 +323,7 @@ class _ListaScreenState extends State<ListaScreen> {
     AlumnoAsistenciaModel alumno, 
     AttendanceStatus currentStatus,
     Color presenteColor,
-    int index, // ✅ RECIBE EL ÍNDICE
+    int index, 
   ) { 
     Color statusColor = _obtenerColorPorEstado(currentStatus, presenteColor); 
     final int alumnoNumero = index + 1; // Contador 1-based (1, 2, 3...)

@@ -360,31 +360,55 @@ class _CapturaCalificacionesScreenState extends State<CapturaCalificacionesScree
   }
 
   @override
+  @override
   Widget build(BuildContext context) {
     // ⭐️ ACCESO AL PROVEEDOR DE COLOR ⭐️
     final colores = Provider.of<UserProvider>(context).colores;
     final Color dynamicHeaderColor = colores.headerColor;
 
+    // 🚀 INICIO del SafeArea
     if (_isLoading) {
       // Aplicar formato de título al AppBar de carga
-      return Scaffold(
-        appBar: AppBar(
-          title: Text(
-            'Cargando ${widget.materiaSeleccionada.materia}',
-            style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
+      return SafeArea(
+        child: Scaffold(
+          appBar: AppBar(
+            title: Text(
+              'Cargando ${widget.materiaSeleccionada.materia}',
+              style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
+            ),
+            foregroundColor: Colors.white,
+            backgroundColor: dynamicHeaderColor, // ⭐️ Color Dinámico ⭐️
+            centerTitle: true,
           ),
-          foregroundColor: Colors.white,
-          backgroundColor: dynamicHeaderColor, // ⭐️ Color Dinámico ⭐️
-          centerTitle: true,
+          body: const Center(child: CircularProgressIndicator()),
         ),
-        body: const Center(child: CircularProgressIndicator()),
       );
     }
 
     if (_errorMessage.isNotEmpty || _estructuraBoleta == null) {
       // Aplicar formato de título al AppBar de error
-      return Scaffold(
+      return SafeArea(
+        child: Scaffold(
+          appBar: AppBar(
+            title: Text(
+              widget.materiaSeleccionada.materia,
+              style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
+            ),
+            foregroundColor: Colors.white,
+            backgroundColor: dynamicHeaderColor, // ⭐️ Color Dinámico ⭐️
+            centerTitle: true,
+          ),
+          body: Center(child: Text('Error: $_errorMessage', style: const TextStyle(color: Colors.red))),
+        ),
+      );
+    }
+    // 🚀 FIN del SafeArea
+
+    // 🚀 Scaffold principal (Datos cargados) dentro de SafeArea
+    return SafeArea(
+      child: Scaffold(
         appBar: AppBar(
+          // ⭐️ APLICACIÓN DEL FORMATO DE TÍTULO CONSISTENTE ⭐️
           title: Text(
             widget.materiaSeleccionada.materia,
             style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
@@ -392,37 +416,23 @@ class _CapturaCalificacionesScreenState extends State<CapturaCalificacionesScree
           foregroundColor: Colors.white,
           backgroundColor: dynamicHeaderColor, // ⭐️ Color Dinámico ⭐️
           centerTitle: true,
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.save),
+              onPressed: () {
+                // 🚨 LLAMAR AL MÉTODO DE ENVÍO
+                _sendCalificaciones();
+              },
+              color: Colors.white, // Asegurar que el ícono sea blanco
+            ),
+          ],
         ),
-        body: Center(child: Text('Error: $_errorMessage', style: const TextStyle(color: Colors.red))),
-      );
-    }
-
-    return Scaffold(
-      appBar: AppBar(
-        // ⭐️ APLICACIÓN DEL FORMATO DE TÍTULO CONSISTENTE ⭐️
-        title: Text(
-          widget.materiaSeleccionada.materia,
-          style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
+        // El widget de contenido maneja su propio SingleChildScrollView horizontal
+        body: SingleChildScrollView(
+          scrollDirection: Axis.vertical,
+          padding: const EdgeInsets.all(8.0),
+          child: _buildContentWidget(),
         ),
-        foregroundColor: Colors.white,
-        backgroundColor: dynamicHeaderColor, // ⭐️ Color Dinámico ⭐️
-        centerTitle: true,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.save),
-            onPressed: () {
-              // 🚨 LLAMAR AL MÉTODO DE ENVÍO
-              _sendCalificaciones();
-            },
-            color: Colors.white, // Asegurar que el ícono sea blanco
-          ),
-        ],
-      ),
-      // El widget de contenido maneja su propio SingleChildScrollView horizontal
-      body: SingleChildScrollView(
-        scrollDirection: Axis.vertical,
-        padding: const EdgeInsets.all(8.0),
-        child: _buildContentWidget(),
       ),
     );
   }

@@ -488,7 +488,7 @@ void _seleccionarArchivo(AlumnoSalonModel alumno, String campoArchivo) async {
   }
 
 
-  @override
+ @override
   Widget build(BuildContext context) {
     debugPrint('DEBUG BUILD: Inicia la reconstrucción (build) de ArchivosCalificacionesScreen.'); // ⭐️ DEBUG
     final userProvider = Provider.of<UserProvider>(context);
@@ -499,27 +499,30 @@ void _seleccionarArchivo(AlumnoSalonModel alumno, String campoArchivo) async {
     final AlumnoSalonModel? firstAlumno = _alumnosDelSalon.isNotEmpty ? _alumnosDelSalon.first : null;
     final List<String> camposArchivo = firstAlumno?.archivosCalificacion.keys.toList() ?? [];
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(
-          widget.salonSeleccionado,
-          style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
+    // 🚀 CAMBIO: Envolvemos el Scaffold en un SafeArea
+    return SafeArea(
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text(
+            widget.salonSeleccionado,
+            style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
+          ),
+          foregroundColor: Colors.white,
+          backgroundColor: headerColor,
+          centerTitle: true,
         ),
-        foregroundColor: Colors.white,
-        backgroundColor: headerColor,
-        centerTitle: true,
+        body: _isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : _alumnosDelSalon.isEmpty
+                ? Center(
+                    child: Text(
+                      'No hay alumnos asignados a este salón para subir archivos de calificación.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: Colors.grey.shade600, fontSize: 16),
+                    ),
+                  )
+                : _buildAlumnoList(userProvider, camposArchivo),
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _alumnosDelSalon.isEmpty
-              ? Center(
-                  child: Text(
-                    'No hay alumnos asignados a este salón para subir archivos de calificación.',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(color: Colors.grey.shade600, fontSize: 16),
-                  ),
-                )
-              : _buildAlumnoList(userProvider, camposArchivo),
     );
   }
 
