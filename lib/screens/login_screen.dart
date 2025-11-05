@@ -4,7 +4,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:oficinaescolar_colaboradores/widgets/input_decoration.dart';
-import 'package:oficinaescolar_colaboradores/models/colores_model.dart';
+//import 'package:oficinaescolar_colaboradores/models/colores_model.dart';
 import 'package:provider/provider.dart';
 import 'package:oficinaescolar_colaboradores/config/api_constants.dart';
 import 'package:oficinaescolar_colaboradores/providers/user_provider.dart';

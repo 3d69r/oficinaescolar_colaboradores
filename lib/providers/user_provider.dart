@@ -609,6 +609,168 @@ Future<void> saveColaboradorSessionToPrefs({
         }
     }
 
+    // Función auxiliar para mapear el texto del combo al código de la API
+String _mapDestinatarioToApiCode(String destinatario) {
+    switch (destinatario) {
+        case 'Todos los Alumnos':
+            return 'Alumnos';
+        case 'Todos los Colaboradores':
+            return 'Colaboradores';
+        case 'Nivel Educativo':
+            // Asumo que el API espera 'AlumnosNivelEdu' para evitar ambigüedad con 'Nivel Educativo'
+            return 'AlumnosNivelEdu';
+        case 'Salón':
+            // Asumo que el API espera 'AlumnosSalon' para evitar ambigüedad con 'Salón'
+            return 'AlumnosSalon';
+        case 'Alumno Específico':
+            return 'AlumnoEspecifico';
+        case 'Colaborador Específico':
+            return 'ColaboradorEspecifico';
+        case 'Todos':
+        default:
+            return 'Todos';
+    }
+}
+
+Future<Map<String, dynamic>> saveAviso(Map<String, dynamic> avisoData) async {
+    final url = Uri.parse('${ApiConstants.apiBaseUrl}${ApiConstants.setCreaAvisoEndpoint}');
+
+    // --- 1. Inicializar IDs ---
+    String idSalon = '0';
+    String idAlumno = '0';
+    String idColaboradorDestino = '0'; // Parámetro 'id_colaborador' de la API (el destinatario).
+
+    // Datos de la sesión
+    final String idTokenValue = _idToken ?? ''; 
+    final String escuelaCode = _escuela;
+    final String idEmpresaValue = _idEmpresa; 
+    final String idCicloValue = _idCiclo;     
+    
+    final String tipoDestinatario = avisoData['destinatario_tipo'];
+    final String? valorEspecifico = avisoData['destinatario_valor'];
+    final String tipoRespuesta = avisoData['requiere_respuesta'];
+    
+    final RegExp regExp = RegExp(r'\((\d+)\)'); 
+
+    // --- 2. Determinar los IDs de Destino Específico ---
+
+    if (tipoDestinatario == 'Salón' && valorEspecifico != null) {
+         final AvisoSalaModel? salonData = colaboradorModel?.avisoSalones.firstWhere(
+            (s) => s.salon == valorEspecifico, 
+            orElse: () => null as AvisoSalaModel, 
+         );
+         idSalon = salonData?.idSalon ?? '0';
+         
+    } else if (tipoDestinatario == 'Alumno Específico' && valorEspecifico != null) {
+        final match = regExp.firstMatch(valorEspecifico);
+        idAlumno = match?.group(1) ?? '0';
+        
+    } else if (tipoDestinatario == 'Colaborador Específico' && valorEspecifico != null) {
+        final AvisoColaboradorModel? colaboradorData = colaboradorModel?.avisoColaboradores.firstWhere(
+            (c) => c.nombreCompleto == valorEspecifico,
+            orElse: () => null as AvisoColaboradorModel, 
+        );
+        // ⭐️ REGLA CLAVE: Si es Colaborador Específico, id_colaborador lleva este ID.
+        idColaboradorDestino = colaboradorData?.idColaborador ?? '0';
+    } 
+    
+    // --- 3. Mapeo de la Sección (seccion) ---
+    final String apiSeccionCode = _mapDestinatarioToApiCode(tipoDestinatario);
+
+    // Obtener la cadena de opciones concatenadas que viene de la vista
+    final String opcionesConcatenadas = avisoData['opciones_multiples'] ?? '';
+    List<String> opcionesList = [];
+
+    if (tipoRespuesta == 'Seleccion' && opcionesConcatenadas.isNotEmpty) {
+        // Dividir la cadena (ej. "Opción A,Opción B,Opción C") en una lista
+        // y tomar solo las que tengan contenido.
+        opcionesList = opcionesConcatenadas
+            .split(',')
+            .map((e) => e.trim())
+            .where((e) => e.isNotEmpty)
+            .toList();
+    }
+
+    // Inicializar las variables separadas para la API
+    String opcion1 = opcionesList.length > 0 ? opcionesList[0] : '';
+    String opcion2 = opcionesList.length > 1 ? opcionesList[1] : '';
+    String opcion3 = opcionesList.length > 2 ? opcionesList[2] : '';
+
+    // --- 5. Preparar el Body para la API (AJUSTADO) ---
+    final Map<String, String> body = {
+        'escuela': escuelaCode,
+        'id_calendario': avisoData['id_calendario'] ?? '0', 
+        'id_colaborador': idColaboradorDestino, // ID del Colaborador DESTINO, o '0'.
+        'id_salon': idSalon, 
+        'id_alumno': idAlumno, 
+        'id_token': idTokenValue, 
+        'titulo': avisoData['titulo'],
+        'comentario': avisoData['cuerpo'],
+        'id_empresa': idEmpresaValue,
+        'id_ciclo': idCicloValue,
+        'seccion': apiSeccionCode, // Usa el código mapeado (ej. 'AlumnosSalon') 
+        'tipo_respuesta': tipoRespuesta, 
+        'fecha_inicio': avisoData['fecha_inicio'],
+        'fecha_fin': avisoData['fecha_fin'],
+        
+        // ⭐️ CAMPOS NUEVOS/CORREGIDOS PARA OPCIÓN MÚLTIPLE ⭐️
+        'opcion_1': opcion1, 
+        'opcion_2': opcion2, 
+        'opcion_3': opcion3,
+        // Eliminamos 'opciones_respuesta' ya que la API no lo usa.
+        
+        // El API necesita el valor de Nivel Educativo solo si 'seccion' es 'AlumnosNivelEdu'
+        if (tipoDestinatario == 'Nivel Educativo') 'nivel_educativo_valor': valorEspecifico ?? '',
+    };
+
+    debugPrint('UserProvider: Enviando aviso a API: $body');
+        
+    // --- 6. Ejecución y Manejo de Respuesta ---
+    try {
+        final response = await http.post(url, body: body);
+
+        debugPrint('UserProvider: Código de estado de la respuesta: ${response.statusCode}');
+        debugPrint('UserProvider: Body de la API: ${response.body}');
+        
+        // ... (Manejo de respuesta) ...
+        if (response.body.isEmpty) {
+            return {'success': false, 'message': 'Respuesta vacía del servidor (${response.statusCode}).'};
+        }
+        
+        final Map<String, dynamic> result = json.decode(response.body);
+
+        if (response.statusCode == 200) {
+    
+    // ⭐️ AJUSTE CRÍTICO: Verificamos 'Correcto' y forzamos 'message' a String ⭐️
+    if (result['status'] == 'Correcto') { 
+        // Éxito: El 'message' (que es 186, un int) se convierte a String.
+        return {'success': true, 'message': result['message']?.toString() ?? 'Aviso guardado con éxito.'};
+    } else {
+        // Fallo lógico del API (status != 'Correcto'). Aseguramos que el mensaje sea una cadena.
+        dynamic apiMessage = result['message'];
+        String errorMessage;
+        
+        if (apiMessage is Map) {
+            // Si el error es complejo (ej. validación), tomamos la representación de cadena.
+            errorMessage = apiMessage.toString();
+        } else {
+            // Si es String, int, o null, lo convertimos a String.
+            errorMessage = apiMessage?.toString() ?? 'Error desconocido.';
+        }
+        
+        return {'success': false, 'message': errorMessage};
+    }
+} else {
+    // Fallo HTTP (ej. 404, 500). Imprimimos la respuesta completa para diagnóstico.
+    debugPrint('UserProvider: Body de error HTTP ${response.statusCode}: ${response.body}');
+    return {'success': false, 'message': 'Error de servidor: ${response.statusCode}'};
+}
+    } catch (e) {
+        debugPrint('UserProvider: Excepción al guardar aviso: $e');
+        return {'success': false, 'message': 'Error de conexión: $e'};
+    }
+}
+
   Future<List<AlumnoAsistenciaModel>> fetchAlumnosPorCurso({
       required String idCurso,
       required TipoCurso tipoCurso,

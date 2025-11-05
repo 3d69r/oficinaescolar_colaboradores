@@ -56,6 +56,10 @@ class ApiConstants {
   //Duración minima en la que se debe de recargar la información entre cambio de pestaña
   static const int minutosRecarga = 10;
 
+  // Metodo para crear el aviso  
+  static const String setCreaAvisoEndpoint = 'set_crea_aviso';
+  
+
   // --- Métodos para construir URLs GET con parámetros dinámicos ---
   // Estos métodos ahora usan apiBaseUrl para las llamadas a la API.
 
