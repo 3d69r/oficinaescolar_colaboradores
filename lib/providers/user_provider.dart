@@ -3,12 +3,10 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:device_info_plus/device_info_plus.dart';
-import 'dart:io' show Platform;
 
 import 'package:oficinaescolar_colaboradores/data/database_helper.dart';
 import 'package:oficinaescolar_colaboradores/config/api_constants.dart';
@@ -81,6 +79,8 @@ class UserProvider with ChangeNotifier {
   List<Articulo> _articulosCaf = [];
   List<Map<String, dynamic>> _cafeteriaMovimientos = [];
   List<BoletaEncabezadoModel> _boletaEncabezados = [];
+  List<Map<String, dynamic>> _avisosCreados = [];
+  //List<Map<String, dynamic>> _avisosArchivados = [];
   
   // ✅ [REF] Eliminados los modelos de datos para CFDI, Pagos, Cargos, Materias
 
@@ -118,6 +118,14 @@ class UserProvider with ChangeNotifier {
 
   // Getter para acceder a la configuración de la boleta
   List<BoletaEncabezadoModel> get boletaEncabezados => _boletaEncabezados;
+    // ⭐️ INSTANCIAS DE HELPERS ⭐️
+  final DatabaseHelper _dbHelper = DatabaseHelper.instance;
+  static const String _prefsAvisosCreadosKey = 'avisos_creados_json_list'; // Clave para SharedPreferences
+  //static const String _prefsAvisosArchivadosKey = 'avisos_archivados_json_list';
+  //List<Map<String, dynamic>> get avisosArchivados => _avisosArchivados;
+
+  // ⭐️ NUEVO GETTER: Avisos creados ⭐️
+  List<Map<String, dynamic>> get avisosCreados => _avisosCreados;
 
   int get unreadAvisosCount => _avisos.where((aviso) => !aviso.leido).length;
 
@@ -140,7 +148,69 @@ class UserProvider with ChangeNotifier {
   UserProvider() {
     loadUserDataFromDb();
     loadAppColorsFromDb();
+    loadAvisosCreados();
   }
+
+  /// ⭐️ [MODIFICADO] Carga la lista de avisos creados y archivados usando lógica dual (DB > SharedPreferences).
+Future<void> loadAvisosCreados() async {
+    debugPrint('UserProvider: Intentando cargar avisos creados...');
+    
+    List<Map<String, dynamic>> loadedActivos = [];
+    
+    // 1. INTENTO DE CARGA DESDE DB LOCAL (Móvil)
+    try {
+        loadedActivos = await _dbHelper.getAvisosCreados(); 
+        debugPrint('UserProvider: ${loadedActivos.length} avisos creados (activos) cargados desde DB (Móvil).');
+    } catch (e) {
+        // Esto captura el UnsupportedError en Web/Desktop o cualquier otro fallo de DB.
+        debugPrint('UserProvider: Fallo al cargar avisos desde DB. Intentando SharedPreferences. Error: $e');
+        
+        // 2. INTENTO DE CARGA DESDE SHARED_PREFERENCES (Web/Desktop)
+        loadedActivos = await _getAvisosCreadosFromPrefs(_prefsAvisosCreadosKey);
+        debugPrint('UserProvider: ${loadedActivos.length} activos cargados desde SharedPreferences.');
+    }
+    
+    // 3. ACTUALIZAR ESTADO
+    // ⭐️ CAMBIO CLAVE: Usamos .toList() para crear una COPIA MUTABLE ⭐️
+    _avisosCreados = loadedActivos.toList(); 
+    notifyListeners();
+}
+  
+  /// ⭐️ [MODIFICADO] Guarda una lista de avisos completa en SharedPreferences (Web/Fallback), usando una KEY específica.
+  Future<void> _saveAvisosCreadosToPrefs(List<Map<String, dynamic>> avisos, String key) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      // Serializar toda la lista de Mapas a una cadena JSON
+      final String jsonString = json.encode(avisos);
+      await prefs.setString(key, jsonString); 
+      debugPrint('UserProvider: ${avisos.length} avisos guardados en SharedPreferences con clave: $key.');
+    } catch (e) {
+      debugPrint('UserProvider: Error al guardar avisos en SharedPreferences: $e');
+    }
+  }
+
+  /// ⭐️ [MODIFICADO] Obtiene la lista de avisos creados desde SharedPreferences (Web/Fallback), usando una KEY específica.
+Future<List<Map<String, dynamic>>> _getAvisosCreadosFromPrefs(String key) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final String? jsonString = prefs.getString(key); 
+      
+      if (jsonString == null || jsonString.isEmpty) {
+        return [];
+      }
+      
+      // Deserializar la cadena JSON a una List<dynamic> y luego a List<Map<String, dynamic>>
+      final List<dynamic> decodedList = json.decode(jsonString);
+      // Asegurar que solo añadimos Mapas válidos
+      // ⭐️ CAMBIO CLAVE: El .toList() asegura que la lista devuelta es mutable ⭐️
+      final List<Map<String, dynamic>> avisos = decodedList.map((e) => e as Map<String, dynamic>).toList(); 
+      
+      return avisos;
+    } catch (e) {
+      debugPrint('UserProvider: Error al obtener avisos desde SharedPreferences con clave $key: $e');
+      return [];
+    }
+}
 
   Future<void> loadAppColorsFromDb() async {
     debugPrint('UserProvider: Intentando cargar colores desde la base de datos...');
@@ -635,10 +705,10 @@ String _mapDestinatarioToApiCode(String destinatario) {
 Future<Map<String, dynamic>> saveAviso(Map<String, dynamic> avisoData) async {
     final url = Uri.parse('${ApiConstants.apiBaseUrl}${ApiConstants.setCreaAvisoEndpoint}');
 
-    // --- 1. Inicializar IDs ---
+    // --- 1. Inicializar IDs (Mantenido) ---
     String idSalon = '0';
     String idAlumno = '0';
-    String idColaboradorDestino = '0'; // Parámetro 'id_colaborador' de la API (el destinatario).
+    String idColaboradorDestino = '0'; 
 
     // Datos de la sesión
     final String idTokenValue = _idToken ?? ''; 
@@ -652,12 +722,12 @@ Future<Map<String, dynamic>> saveAviso(Map<String, dynamic> avisoData) async {
     
     final RegExp regExp = RegExp(r'\((\d+)\)'); 
 
-    // --- 2. Determinar los IDs de Destino Específico ---
-
+    // --- 2. Determinar los IDs de Destino Específico (Mantenido) ---
     if (tipoDestinatario == 'Salón' && valorEspecifico != null) {
          final AvisoSalaModel? salonData = colaboradorModel?.avisoSalones.firstWhere(
             (s) => s.salon == valorEspecifico, 
-            orElse: () => null as AvisoSalaModel, 
+            // ignore: cast_from_null_always_fails
+            orElse: () => null as AvisoSalaModel , 
          );
          idSalon = salonData?.idSalon ?? '0';
          
@@ -668,13 +738,13 @@ Future<Map<String, dynamic>> saveAviso(Map<String, dynamic> avisoData) async {
     } else if (tipoDestinatario == 'Colaborador Específico' && valorEspecifico != null) {
         final AvisoColaboradorModel? colaboradorData = colaboradorModel?.avisoColaboradores.firstWhere(
             (c) => c.nombreCompleto == valorEspecifico,
+            // ignore: cast_from_null_always_fails
             orElse: () => null as AvisoColaboradorModel, 
         );
-        // ⭐️ REGLA CLAVE: Si es Colaborador Específico, id_colaborador lleva este ID.
         idColaboradorDestino = colaboradorData?.idColaborador ?? '0';
     } 
     
-    // --- 3. Mapeo de la Sección (seccion) ---
+    // --- 3. Mapeo de la Sección (seccion) (Mantenido) ---
     final String apiSeccionCode = _mapDestinatarioToApiCode(tipoDestinatario);
 
     // Obtener la cadena de opciones concatenadas que viene de la vista
@@ -682,8 +752,6 @@ Future<Map<String, dynamic>> saveAviso(Map<String, dynamic> avisoData) async {
     List<String> opcionesList = [];
 
     if (tipoRespuesta == 'Seleccion' && opcionesConcatenadas.isNotEmpty) {
-        // Dividir la cadena (ej. "Opción A,Opción B,Opción C") en una lista
-        // y tomar solo las que tengan contenido.
         opcionesList = opcionesConcatenadas
             .split(',')
             .map((e) => e.trim())
@@ -691,16 +759,15 @@ Future<Map<String, dynamic>> saveAviso(Map<String, dynamic> avisoData) async {
             .toList();
     }
 
-    // Inicializar las variables separadas para la API
     String opcion1 = opcionesList.length > 0 ? opcionesList[0] : '';
     String opcion2 = opcionesList.length > 1 ? opcionesList[1] : '';
     String opcion3 = opcionesList.length > 2 ? opcionesList[2] : '';
 
-    // --- 5. Preparar el Body para la API (AJUSTADO) ---
+    // --- 4. Preparar el Body para la API (Mantenido) ---
     final Map<String, String> body = {
         'escuela': escuelaCode,
         'id_calendario': avisoData['id_calendario'] ?? '0', 
-        'id_colaborador': idColaboradorDestino, // ID del Colaborador DESTINO, o '0'.
+        'id_colaborador': idColaboradorDestino, 
         'id_salon': idSalon, 
         'id_alumno': idAlumno, 
         'id_token': idTokenValue, 
@@ -708,66 +775,186 @@ Future<Map<String, dynamic>> saveAviso(Map<String, dynamic> avisoData) async {
         'comentario': avisoData['cuerpo'],
         'id_empresa': idEmpresaValue,
         'id_ciclo': idCicloValue,
-        'seccion': apiSeccionCode, // Usa el código mapeado (ej. 'AlumnosSalon') 
+        'seccion': apiSeccionCode, 
         'tipo_respuesta': tipoRespuesta, 
         'fecha_inicio': avisoData['fecha_inicio'],
         'fecha_fin': avisoData['fecha_fin'],
-        
-        // ⭐️ CAMPOS NUEVOS/CORREGIDOS PARA OPCIÓN MÚLTIPLE ⭐️
         'opcion_1': opcion1, 
         'opcion_2': opcion2, 
         'opcion_3': opcion3,
-        // Eliminamos 'opciones_respuesta' ya que la API no lo usa.
-        
-        // El API necesita el valor de Nivel Educativo solo si 'seccion' es 'AlumnosNivelEdu'
         if (tipoDestinatario == 'Nivel Educativo') 'nivel_educativo_valor': valorEspecifico ?? '',
     };
 
     debugPrint('UserProvider: Enviando aviso a API: $body');
         
-    // --- 6. Ejecución y Manejo de Respuesta ---
+    // --- 5. Ejecución y Manejo de Respuesta ---
     try {
         final response = await http.post(url, body: body);
 
         debugPrint('UserProvider: Código de estado de la respuesta: ${response.statusCode}');
-        debugPrint('UserProvider: Body de la API: ${response.body}');
         
-        // ... (Manejo de respuesta) ...
         if (response.body.isEmpty) {
             return {'success': false, 'message': 'Respuesta vacía del servidor (${response.statusCode}).'};
         }
         
         final Map<String, dynamic> result = json.decode(response.body);
 
-        if (response.statusCode == 200) {
-    
-    // ⭐️ AJUSTE CRÍTICO: Verificamos 'Correcto' y forzamos 'message' a String ⭐️
-    if (result['status'] == 'Correcto') { 
-        // Éxito: El 'message' (que es 186, un int) se convierte a String.
-        return {'success': true, 'message': result['message']?.toString() ?? 'Aviso guardado con éxito.'};
-    } else {
-        // Fallo lógico del API (status != 'Correcto'). Aseguramos que el mensaje sea una cadena.
-        dynamic apiMessage = result['message'];
-        String errorMessage;
+        if (response.statusCode == 200 && result['status'] == 'Correcto') {
+            
+            // ⭐️ LÓGICA DE PERSISTENCIA LOCAL (SOLO SI EL API ES EXITOSO) ⭐️
+            
+            // Determinar si es una nueva creación ANTES de obtener el ID del servidor.
+            // Usamos el ID original enviado, ya que es la clave para la búsqueda.
+            final String originalId = avisoData['id_calendario'] ?? '0';
+            final bool isNew = originalId == '0'; 
+            
+            // El 'message' de la API es el ID_AVISO/ID_CALENDARIO (la clave real).
+            final String idAvisoServer = result['message']?.toString() ?? originalId;
+            
+            // 1. Crear el mapa de datos para guardar localmente (DB/SP)
+            final Map<String, dynamic> avisoLocal = {
+                // Usamos el ID del servidor para ambas claves
+                'id_aviso': idAvisoServer, 
+                'id_calendario': idAvisoServer, 
+                'titulo': avisoData['titulo'],
+                'comentario': avisoData['cuerpo'], 
+                'seccion': apiSeccionCode,
+                'valor_especifico': valorEspecifico ?? '', 
+                'tipo_respuesta': tipoRespuesta,
+                'fecha_inicio': avisoData['fecha_inicio'],
+                'fecha_fin': avisoData['fecha_fin'],
+                'opcion_1': opcion1,
+                'opcion_2': opcion2,
+                'opcion_3': opcion3,
+            };
+
+            // ⭐️ DEBUG PRINT AÑADIDO ⭐️
+            debugPrint('UserProvider: Aviso ${isNew ? 'creado' : 'editado'}. ID de calendario asignado para persistencia local: $idAvisoServer');
+
+            // 2. Intentar guardar/actualizar en la Base de Datos (Móvil)
+            try {
+                // ✅ VERIFICACIÓN: Llama a la función que inserta/actualiza en la tabla _avisosCreadosTable
+                await _dbHelper.saveAvisoCreado(avisoLocal); 
+                debugPrint('UserProvider: Aviso creado guardado/actualizado exitosamente en DB local.');
+            } catch (e) {
+                debugPrint('UserProvider: Fallo al guardar aviso creado en DB. Usando SharedPreferences. Error: $e');
+            }
+            
+            // 3. Actualizar la lista en memoria (_avisosCreados)
+            if (isNew) {
+                // Si es nuevo, insertamos al inicio con el nuevo ID real.
+                _avisosCreados.insert(0, avisoLocal); 
+            } else {
+                // Si es edición, buscamos usando el ID original y reemplazamos.
+                // Usamos el ID original porque es el que existe en _avisosCreados en este momento.
+                final int activoIndex = _avisosCreados.indexWhere((a) => a['id_calendario'] == originalId);
+
+                if (activoIndex != -1) {
+                    // Reemplazamos el mapa, que ahora contiene el ID_CALENDARIO real del servidor.
+                    _avisosCreados[activoIndex] = avisoLocal;
+                } else {
+                    // Si no se encontró (ej. se borró de la lista sin recargar), lo insertamos.
+                    _avisosCreados.insert(0, avisoLocal); 
+                }
+            }
+
+            // 4. Guardamos la lista en SharedPreferences (Fallback)
+            await _saveAvisosCreadosToPrefs(_avisosCreados, _prefsAvisosCreadosKey);
+            
+            // 5. Notificar a las vistas
+            notifyListeners(); 
+
+            // Devolver éxito a la vista
+            final String action = isNew ? 'creado' : 'actualizado';
+            return {'success': true, 'message': 'Aviso ${action} con éxito. ID: $idAvisoServer'};
         
-        if (apiMessage is Map) {
-            // Si el error es complejo (ej. validación), tomamos la representación de cadena.
-            errorMessage = apiMessage.toString();
         } else {
-            // Si es String, int, o null, lo convertimos a String.
-            errorMessage = apiMessage?.toString() ?? 'Error desconocido.';
+            // Fallo de la API (Mantenido)
+            dynamic apiMessage = result['message'];
+            String errorMessage;
+            
+            if (apiMessage is Map) {
+                errorMessage = apiMessage.toString();
+            } else {
+                errorMessage = apiMessage?.toString() ?? 'Error desconocido.';
+            }
+            
+            return {'success': false, 'message': errorMessage};
         }
-        
-        return {'success': false, 'message': errorMessage};
-    }
-} else {
-    // Fallo HTTP (ej. 404, 500). Imprimimos la respuesta completa para diagnóstico.
-    debugPrint('UserProvider: Body de error HTTP ${response.statusCode}: ${response.body}');
-    return {'success': false, 'message': 'Error de servidor: ${response.statusCode}'};
-}
     } catch (e) {
         debugPrint('UserProvider: Excepción al guardar aviso: $e');
-        return {'success': false, 'message': 'Error de conexión: $e'};
+        return {'success': false, 'message': 'Error de conexión: ${e.toString()}'};
+    }
+}
+
+Future<Map<String, dynamic>> deleteAvisoCreado(String idAviso) async {
+    final url = Uri.parse('${ApiConstants.apiBaseUrl}${ApiConstants.eliminaAviso}');
+
+    final String idTokenValue = _idToken ?? ''; 
+    final String escuelaCode = _escuela;
+    final String idEmpresaValue = _idEmpresa; 
+    
+    // Los parámetros son: escuela, id_calendario, id_token, id_empresa
+    final Map<String, String> body = {
+        'escuela': escuelaCode,
+        'id_calendario': idAviso, 
+        'id_token': idTokenValue, 
+        'id_empresa': idEmpresaValue,
+        // No se requiere id_ciclo según tu captura de Postman
+    };
+
+    // ⭐️ DEBUG PRINT AÑADIDO: Muestra la URL completa ⭐️
+    debugPrint('UserProvider: URL de eliminación: $url');
+    // ⭐️ DEBUG PRINT EXISTENTE: Muestra el cuerpo (parámetros) de la solicitud ⭐️
+    debugPrint('UserProvider: Enviando solicitud de eliminación para ID: $idAviso con BODY: $body');
+
+    try {
+        final response = await http.post(url, body: body);
+
+        debugPrint('UserProvider: Código de estado de la respuesta: ${response.statusCode}');
+        
+        if (response.body.isEmpty) {
+            return {'success': false, 'message': 'Respuesta vacía del servidor (${response.statusCode}).'};
+        }
+        
+        final Map<String, dynamic> result = json.decode(response.body);
+
+        // ⭐️ DEBUG PRINT ADICIONAL: Muestra la respuesta de la API ⭐️
+        debugPrint('UserProvider: Respuesta de API (JSON): $result');
+
+        if (response.statusCode == 200 && result['status'] == 'Correcto') {
+            
+            // 1. Eliminar de la Base de Datos Local (Móvil)
+            try {
+                await _dbHelper.deleteAvisoCreado(idAviso);
+                debugPrint('UserProvider: Aviso con ID $idAviso eliminado de la DB local.');
+            } catch (e) {
+                debugPrint('UserProvider: Fallo al eliminar aviso creado de DB. Continuando con memoria/prefs. Error: $e');
+            }
+            
+            // 2. Eliminar de la lista en memoria (_avisosCreados)
+            // La clave de búsqueda es 'id_calendario'
+            _avisosCreados.removeWhere((aviso) => aviso['id_calendario'] == idAviso);
+            debugPrint('UserProvider: Aviso con ID $idAviso eliminado de la lista en memoria.');
+
+            // 3. Guardamos la lista actualizada en SharedPreferences (Fallback)
+            await _saveAvisosCreadosToPrefs(_avisosCreados, _prefsAvisosCreadosKey);
+            
+            // 4. Notificar a las vistas
+            notifyListeners(); 
+
+            // Devolver éxito a la vista
+            final String message = result['message']?.toString() ?? 'Aviso eliminado con éxito.';
+            return {'success': true, 'message': message};
+        
+        } else {
+            // Fallo de la API
+            final String errorMessage = result['message']?.toString() ?? 'Error desconocido al intentar eliminar.';
+            return {'success': false, 'message': 'Error de API al eliminar aviso: $errorMessage'};
+        }
+    } catch (e) {
+        debugPrint('UserProvider: Excepción al eliminar aviso: $e');
+        return {'success': false, 'message': 'Error de conexión: ${e.toString()}'};
     }
 }
 

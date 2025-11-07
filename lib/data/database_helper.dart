@@ -30,6 +30,8 @@ class DatabaseHelper {
   static const String _tokensTable = 'tokens_data';
   // ⭐️ NUEVO: Tabla para la estructura de encabezados de calificación
   static const String _encabezadosBoletaTable = 'boleta_encabezados';
+  // ⭐️ NUEVO: Tabla para avisos creados por el colaborador ⭐️
+  static const String _avisosCreadosTable = 'avisos_creados'; 
   
   DatabaseHelper._privateConstructor();
 
@@ -164,11 +166,27 @@ class DatabaseHelper {
         token_celular TEXT
       )
     ''');
-    // ⭐️ NUEVO: Creación de la tabla de encabezados de boleta
+    // ⭐️ Creación de la tabla de encabezados de boleta
     await db.execute('''
       CREATE TABLE $_encabezadosBoletaTable (
         nivel_educativo TEXT PRIMARY KEY,
         data TEXT NOT NULL
+      )
+    ''');
+    // ⭐️ NUEVO: Creación de la tabla para avisos creados por el colaborador ⭐️
+    await db.execute('''
+      CREATE TABLE $_avisosCreadosTable (
+        id_aviso TEXT PRIMARY KEY,
+        titulo TEXT NOT NULL,
+        comentario TEXT,
+        seccion TEXT,
+        valor_especifico TEXT,
+        tipo_respuesta TEXT,
+        fecha_inicio TEXT NOT NULL,
+        fecha_fin TEXT NOT NULL,
+        opcion_1 TEXT,
+        opcion_2 TEXT,
+        opcion_3 TEXT
       )
     ''');
     debugPrint('DatabaseHelper: Tablas creadas exitosamente.');
@@ -176,6 +194,10 @@ class DatabaseHelper {
 
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
     debugPrint('DatabaseHelper: Iniciando migración de la base de datos de la versión $oldVersion a $newVersion.');
+    // Si la versión anterior era 1 y la nueva es 2, se podría añadir la tabla aquí.
+    // if (oldVersion < 2) { 
+    //   await db.execute(sql para crear _avisosCreadosTable);
+    // }
     debugPrint('DatabaseHelper: Migración completada.');
   }
 
@@ -210,8 +232,11 @@ class DatabaseHelper {
     await db.delete(_sessionDataTable);
     await db.delete(_coloresAppTable);
     await db.delete(_tokensTable);
-    // ⭐️ NUEVO: Limpiar tabla de encabezados de boleta
+    // ⭐️ Limpiar tabla de encabezados de boleta
     await db.delete(_encabezadosBoletaTable); 
+    // ⭐️ NUEVO: Limpiar la tabla de avisos creados ⭐️
+   // await db.delete(_avisosCreadosTable); 
+    
     debugPrint('DatabaseHelper: Todas las tablas limpiadas.');
   }
 
@@ -304,7 +329,7 @@ class DatabaseHelper {
     return await _getData(_colaboradorDataTable, id);
   }
 
-  // ⭐️ NUEVO: Métodos para Guardar y Obtener la Configuración de la Boleta
+  // ⭐️ Métodos para Guardar y Obtener la Configuración de la Boleta
   
   /// Guarda la estructura de encabezados de boleta en la base de datos local.
   Future<void> saveBoletaEncabezados(List<BoletaEncabezadoModel> encabezados) async {
@@ -370,6 +395,84 @@ class DatabaseHelper {
         );
     }).toList();
   }
+
+  // --- Métodos Específicos para Avisos Creados (NUEVOS) ---
+
+  /// Guarda un aviso creado por el colaborador en la base de datos local.
+  Future<void> saveAvisoCreado(Map<String, dynamic> avisoData) async {
+    // ⭐️ PROTECCIÓN ⭐️
+    if (_debeDeshabilitarDb) {
+      debugPrint('DatabaseHelper: Guardado de aviso creado omitido (Web/Desktop).');
+      return;
+    }
+    // FIN PROTECCIÓN
+    
+    final db = await database;
+    
+    // Mapeo de datos para la inserción (asegura que las claves coincidan con las columnas)
+    final Map<String, dynamic> dataToSave = {
+      'id_aviso': avisoData['id_aviso'], // ID devuelto por el servidor
+      'titulo': avisoData['titulo'],
+      'comentario': avisoData['comentario'],
+      'seccion': avisoData['seccion'],
+      'valor_especifico': avisoData['valor_especifico'],
+      'tipo_respuesta': avisoData['tipo_respuesta'],
+      'fecha_inicio': avisoData['fecha_inicio'],
+      'fecha_fin': avisoData['fecha_fin'],
+      'opcion_1': avisoData['opcion_1'],
+      'opcion_2': avisoData['opcion_2'],
+      'opcion_3': avisoData['opcion_3'],
+    };
+    
+    await db.insert(
+      _avisosCreadosTable, 
+      dataToSave, 
+      conflictAlgorithm: ConflictAlgorithm.replace
+    );
+    debugPrint('DatabaseHelper: Aviso creado con ID ${avisoData['id_aviso']} guardado localmente.');
+  }
+
+  /// Obtiene todos los avisos creados por el colaborador.
+  Future<List<Map<String, dynamic>>> getAvisosCreados() async {
+    // ⭐️ PROTECCIÓN ⭐️
+    if (_debeDeshabilitarDb) {
+      debugPrint('DatabaseHelper: Obtención de avisos creados omitida (Web/Desktop).');
+      return [];
+    }
+    // FIN PROTECCIÓN
+    
+    final db = await database;
+    // Consulta todos los avisos y los ordena por el campo más nuevo (ej. id_aviso DESC)
+    final List<Map<String, dynamic>> maps = await db.query(
+      _avisosCreadosTable,
+      orderBy: 'id_aviso DESC', // Asumiendo que un ID mayor significa más reciente
+    );
+
+    if (maps.isNotEmpty) {
+      debugPrint('DatabaseHelper: ${maps.length} avisos creados obtenidos de la base de datos.');
+      return maps; // Retorna la lista de Mapas directamente
+    }
+    return [];
+  }
+  
+  /// Elimina un aviso creado localmente (útil para sincronización o borrado)
+  Future<void> deleteAvisoCreado(String idAviso) async {
+    // ⭐️ PROTECCIÓN ⭐️
+    if (_debeDeshabilitarDb) {
+      debugPrint('DatabaseHelper: Eliminación de aviso creado omitida (Web/Desktop).');
+      return;
+    }
+    // FIN PROTECCIÓN
+    
+    final db = await database;
+    await db.delete(
+      _avisosCreadosTable,
+      where: 'id_aviso = ?',
+      whereArgs: [idAviso],
+    );
+    debugPrint('DatabaseHelper: Aviso creado con ID $idAviso eliminado localmente.');
+  }
+
 
   Future<void> saveAvisosData(String cacheId, List<AvisoModel> avisos) async {
     // ⭐️ PROTECCIÓN ⭐️

@@ -10,6 +10,7 @@ import 'package:oficinaescolar_colaboradores/screens/login_screen.dart';
 import 'package:oficinaescolar_colaboradores/services/api_client.dart';
 import 'package:provider/provider.dart';
 import 'providers/user_provider.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 
 
 const double _phoneBreakpoint = 600.0;
@@ -127,6 +128,24 @@ class MyApp extends StatelessWidget {
         debugShowCheckedModeBanner: false,
         title: 'OFICINA COLABORADORES',
         initialRoute: initialRoute,
+        // ⭐️ INICIO DE LA CONFIGURACIÓN DE LOCALIZACIÓN (ESPAÑOL) ⭐️
+        localizationsDelegates: const [
+          // Delegado de Material para textos de UI (botones, meses, días)
+          GlobalMaterialLocalizations.delegate,
+          // Delegado para widgets
+          GlobalWidgetsLocalizations.delegate,
+          // Delegado para widgets de iOS/Cupertino
+          GlobalCupertinoLocalizations.delegate,
+        ],
+        // Definimos los idiomas que la app debe cargar
+        supportedLocales: const [
+          Locale('en', 'US'), // Inglés (generalmente se incluye por defecto)
+          Locale('es', 'ES'), // Español de España/general
+        ],
+        // Definimos la localización por defecto si el sistema del usuario no es 'es'.
+        // Ya tienes initializeDateFormatting('es', null) en main(), pero esto es más robusto.
+        locale: const Locale('es', 'ES'), 
+        // ⭐️ FIN DE LA CONFIGURACIÓN DE LOCALIZACIÓN ⭐️
         routes: {
           '/': (_) => const CodeEscuelaScreen(),
           'login': (context) => const LoginScreen(),

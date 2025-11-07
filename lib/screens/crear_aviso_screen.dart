@@ -1,10 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:oficinaescolar_colaboradores/providers/user_provider.dart';
-// Asumo que tu ColaboradorModel y submodelos (AvisoSalonModel, etc.) 
-// están en un path accesible y pueden ser referenciados si es necesario,
-// aunque la lógica de la vista solo interactúa con el Provider.
-// import 'package:oficinaescolar_colaboradores/models/colaborador_model.dart'; 
+// ⭐️ IMPORTACIÓN NECESARIA para el Editor WYSIWYG ⭐️
+import 'package:html_editor_enhanced/html_editor.dart';
 
 class CrearAvisoScreen extends StatefulWidget {
   final Map<String, dynamic>? avisoParaEditar; // Null si es un nuevo aviso
@@ -20,31 +18,36 @@ class _CrearAvisoScreenState extends State<CrearAvisoScreen> {
 
   // Controladores y variables de estado para los campos
   final _tituloController = TextEditingController();
-  final _cuerpoController = TextEditingController();
   
-  // ⭐️ 1. Controladores para las opciones de respuesta múltiple (NUEVOS) ⭐️
+  // ⭐️ CONTROLADOR: Para el editor HTML ⭐️
+  final HtmlEditorController _cuerpoEditorController = HtmlEditorController();
+  
+  // Variables de estado auxiliares (mantengo las que usabas)
+  // Color _colorSeleccionado = Colors.black;
+  // double _sizeSeleccionado = 16.0; 
+
+  // Controladores para las opciones de respuesta múltiple
   final _opcion1Controller = TextEditingController();
   final _opcion2Controller = TextEditingController();
   final _opcion3Controller = TextEditingController();
   
-  // ⭐️ DINÁMICOS: Se llenan en initState con datos del Provider ⭐️
+  // DINÁMICOS: Se llenan en initState con datos del Provider
   List<String> _destinatariosPrincipales = ['Todos'];
   String _destinatarioSeleccionado = 'Todos'; 
   
-  // ⭐️ DINÁMICO: Se llena en initState con datos del Provider ⭐️
   Map<String, List<String>> _opcionesEspecificas = {};
   String? _seleccionEspecifica; // Valor seleccionado en el segundo combo
   
   String _respuestaSeleccionada = 'Ninguna';
   DateTime _fechaInicio = DateTime.now();
   DateTime _fechaFin = DateTime.now().add(const Duration(days: 7));
+  
+  // ⭐️ NUEVA VARIABLE: Contenido HTML inicial para el editor ⭐️
+  String _initialHtmlContent = ''; 
 
-
-  // Función para resetear/inicializar la selección específica cuando cambia el destinatario principal
   void _resetSeleccionEspecifica() {
     final String key = _destinatarioSeleccionado;
 
-    // 1. Si el destinatario es 'Todos' o si la clave no existe en el mapa (por error o falta de datos)
     if (key == 'Todos' || !_opcionesEspecificas.containsKey(key)) {
         setState(() {
             _seleccionEspecifica = null;
@@ -52,19 +55,15 @@ class _CrearAvisoScreenState extends State<CrearAvisoScreen> {
         return;
     }
     
-    // 2. Si la clave existe, obtener la lista de opciones
     final List<String> opciones = _opcionesEspecificas[key]!;
 
     if (opciones.isNotEmpty) {
-        // 3. Inicializar al primer elemento si hay opciones disponibles
-        // Solo llamamos a setState si el valor va a cambiar (evitar reconstrucción innecesaria)
         if (_seleccionEspecifica == null || !opciones.contains(_seleccionEspecifica)) {
              setState(() {
                 _seleccionEspecifica = opciones.first;
              });
         }
     } else {
-        // 4. Si la lista está vacía, anular la selección
         setState(() {
             _seleccionEspecifica = null;
         });
@@ -75,74 +74,75 @@ class _CrearAvisoScreenState extends State<CrearAvisoScreen> {
   void initState() {
     super.initState();
     
-    // ⭐️ LÓGICA DE CARGA DE DATOS DESDE EL PROVIDER ⭐️
     final userProvider = Provider.of<UserProvider>(context, listen: false);
-    // Usamos 'colaboradorModel' asumiendo que es el getter correcto en tu UserProvider
     final colaborador = userProvider.colaboradorModel;
 
     if (colaborador != null) {
-      // 1. Extracción y formateo de los datos del modelo
       final List<String> listaNiveles = colaborador.avisoNivelesEducativos.map((n) => n.nivelEducativo).toList();
       final List<String> listaSalones = colaborador.avisoSalones.map((s) => s.salon).toList();
       final List<String> listaAlumnos = colaborador.avisoAlumnos.map((a) => '${a.primerNombre} ${a.apellidoPat} (${a.idAlumno})').toList();
       final List<String> listaColaboradores = colaborador.avisoColaboradores.map((c) => c.nombreCompleto).toList(); 
       
-      // 2. Llenar el mapa dinámico de opciones específicas
       _opcionesEspecificas = {
         'Nivel Educativo': listaNiveles,
         'Salón': listaSalones,
         'Alumno Específico': listaAlumnos,
         'Colaborador Específico': listaColaboradores,
-        // Añadir aquí la clave 'Club' si tienes datos
       };
       
-      // 3. Llenar la lista de destinatarios principales (solo si tienen datos)
       _destinatariosPrincipales = [
-        'Todos',                   // Mapea a 'Todos'
-        'Todos los Alumnos',       // Mapea a 'Alumnos'
-        'Todos los Colaboradores', // Mapea a 'Colaboradores'
-
-        // Opciones que dependen de la existencia de datos específicos
+        'Todos',                   
+        'Todos los Alumnos',       
+        'Todos los Colaboradores', 
         if (listaNiveles.isNotEmpty) 'Nivel Educativo',
         if (listaSalones.isNotEmpty) 'Salón',
         if (listaAlumnos.isNotEmpty) 'Alumno Específico',
         if (listaColaboradores.isNotEmpty) 'Colaborador Específico',
       ];
     }
-    // ⭐️ FIN DE LA LÓGICA DE CARGA DE DATOS ⭐️
 
     // Llenar los campos si se está editando un aviso
     if (widget.avisoParaEditar != null) {
       _tituloController.text = widget.avisoParaEditar!['titulo'] as String? ?? '';
-      _cuerpoController.text = widget.avisoParaEditar!['cuerpo'] as String? ?? '';
-      _destinatarioSeleccionado = widget.avisoParaEditar!['destinatario'] as String? ?? 'Todos';
-      _respuestaSeleccionada = widget.avisoParaEditar!['respuesta'] as String? ?? 'Ninguna';
-      _fechaInicio = widget.avisoParaEditar!['fechaInicio'] as DateTime? ?? DateTime.now();
-      _fechaFin = widget.avisoParaEditar!['fechaFin'] as DateTime? ?? DateTime.now().add(const Duration(days: 7));
       
-      // Inicializar el nuevo combo al editar
-      _seleccionEspecifica = widget.avisoParaEditar!['seleccionEspecifica'] as String?;
+      // ⭐️ CORRECCIÓN CLAVE: Almacenar el contenido HTML inicial aquí ⭐️
+      _initialHtmlContent = widget.avisoParaEditar!['comentario'] as String? ?? ''; 
       
-      // ⭐️ Cargar opciones múltiples al editar (si existen) ⭐️
-      // NOTA: Esto asume que las opciones vienen en formato "op1,op2,op3" en 'opcionesMultiples'
-      final String? opciones = widget.avisoParaEditar!['opcionesMultiples'] as String?;
+      _destinatarioSeleccionado = widget.avisoParaEditar!['destinatario_tipo'] as String? ?? 'Todos'; 
+      
+      final String apiRespuesta = widget.avisoParaEditar!['requiere_respuesta'] as String? ?? 'Ninguna'; 
+      _respuestaSeleccionada = apiRespuesta == 'Seleccion' ? 'Seleccion multiple' : apiRespuesta;
+
+      try {
+          final String? fechaInicioStr = widget.avisoParaEditar!['fecha_inicio'] as String?;
+          final String? fechaFinStr = widget.avisoParaEditar!['fecha_fin'] as String?;
+          
+          if (fechaInicioStr != null && fechaInicioStr.isNotEmpty) {
+               _fechaInicio = DateTime.parse(fechaInicioStr);
+          }
+          if (fechaFinStr != null && fechaFinStr.isNotEmpty) {
+               _fechaFin = DateTime.parse(fechaFinStr);
+          }
+      } catch (_) {}
+      
+      _seleccionEspecifica = widget.avisoParaEditar!['destinatario_valor'] as String?;
+      
+      // Lógica de opciones múltiples (Asumiendo que 'opciones_multiples' es la clave correcta)
+      final String? opciones = widget.avisoParaEditar!['opciones_multiples'] as String?; 
       if (opciones != null && opciones.isNotEmpty) {
           final List<String> parts = opciones.split(',');
-          if (parts.length > 0) _opcion1Controller.text = parts[0].trim();
+          if (parts.isNotEmpty) _opcion1Controller.text = parts[0].trim();
           if (parts.length > 1) _opcion2Controller.text = parts[1].trim();
           if (parts.length > 2) _opcion3Controller.text = parts[2].trim();
       }
     } 
     
-    // Asegurar que la selección específica sea coherente, ya sea al editar o crear
     _resetSeleccionEspecifica(); 
   }
 
   @override
   void dispose() {
     _tituloController.dispose();
-    _cuerpoController.dispose();
-    // ⭐️ 2. Disponer los controladores de opciones múltiples (NUEVOS) ⭐️
     _opcion1Controller.dispose();
     _opcion2Controller.dispose();
     _opcion3Controller.dispose();
@@ -155,7 +155,6 @@ class _CrearAvisoScreenState extends State<CrearAvisoScreen> {
       initialDate: isStartDate ? _fechaInicio : _fechaFin,
       firstDate: DateTime(2023),
       lastDate: DateTime(2030),
-      // Aplicar color dinámico al DatePicker
       builder: (BuildContext context, Widget? child) {
         final Color dynamicPrimaryColor = Provider.of<UserProvider>(context, listen: false).colores.headerColor;
         return Theme(
@@ -183,13 +182,23 @@ class _CrearAvisoScreenState extends State<CrearAvisoScreen> {
     if (_formKey.currentState!.validate()) {
       
       final userProvider = Provider.of<UserProvider>(context, listen: false);
+      
+      // ⭐️ OBTENER EL CONTENIDO HTML DEL EDITOR ⭐️
+      // Usamos 'getText' y manejamos el posible error si se llama antes de cargar (aunque el paquete lo mitiga)
+      final String cuerpoHtml = await _cuerpoEditorController.getText();
+      
+      // Validación básica del contenido (ignorando etiquetas HTML vacías)
+      if (cuerpoHtml.trim().isEmpty || cuerpoHtml.trim() == '<p><br></p>') {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('El campo de comentario no puede estar vacío.')),
+          );
+          return;
+      }
 
-      // ⭐️ LÓGICA DE CONCATENACIÓN DE OPCIONES MÚLTIPLES ⭐️
       String opcionesMultiples = '';
-      String tipoRespuestaAPI = _respuestaSeleccionada; // Por defecto usa el texto del combo
+      String tipoRespuestaAPI = _respuestaSeleccionada; 
       
       if (_respuestaSeleccionada == 'Seleccion multiple') {
-          // Si es "Seleccion multiple", cambiamos el valor que se enviará a la API
           tipoRespuestaAPI = 'Seleccion'; 
           
           final List<String> opciones = [];
@@ -198,7 +207,6 @@ class _CrearAvisoScreenState extends State<CrearAvisoScreen> {
           if (_opcion3Controller.text.isNotEmpty) opciones.add(_opcion3Controller.text.trim());
           opcionesMultiples = opciones.join(',');
           
-          // Validación adicional: debe haber al menos dos opciones
           if (opciones.length < 2) {
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(content: Text('Debe ingresar al menos dos opciones para la Selección Múltiple.')),
@@ -207,21 +215,33 @@ class _CrearAvisoScreenState extends State<CrearAvisoScreen> {
           }
       }
       
-      // 1. Mapeo de datos para el método saveAviso
+      final bool esDestinatarioEspecifico = _opcionesEspecificas.containsKey(_destinatarioSeleccionado);
+      final bool hayOpcionesDisponibles = _opcionesEspecificas[_destinatarioSeleccionado]?.isNotEmpty ?? false;
+      
+      final String? destinatarioValor;
+      
+      if (esDestinatarioEspecifico && hayOpcionesDisponibles && _seleccionEspecifica != null) {
+          destinatarioValor = _seleccionEspecifica;
+      } else {
+          destinatarioValor = null;
+      }
+      
+      // Usamos 'id_calendario' ya que es el campo que espera el Provider
+      final String idAviso = widget.avisoParaEditar?['id_calendario'] as String? ?? '0';
+
       final avisoDataParaProvider = {
         'titulo': _tituloController.text,
-        'cuerpo': _cuerpoController.text,
+        'cuerpo': cuerpoHtml, // ⭐️ ENVIAMOS EL HTML generado ⭐️
         'destinatario_tipo': _destinatarioSeleccionado,
-        'destinatario_valor': _destinatarioSeleccionado != 'Todos' ? _seleccionEspecifica : null, 
-        // ⭐️ CAMBIO APLICADO AQUÍ: Usamos tipoRespuestaAPI ⭐️
+        'destinatario_valor': destinatarioValor,
         'requiere_respuesta': tipoRespuestaAPI, 
         'fecha_inicio': _fechaInicio.toIso8601String().substring(0, 10),
         'fecha_fin': _fechaFin.toIso8601String().substring(0, 10),
-        'id_calendario': widget.avisoParaEditar != null ? widget.avisoParaEditar!['id_aviso'] : '0', 
+        'id_calendario': idAviso, 
         'opciones_multiples': opcionesMultiples,
       };
       
-      // 2. Mostrar indicador de carga
+      // Mostrar indicador de carga
       final snackBar = SnackBar(
         content: Row(
           children: const [
@@ -236,10 +256,10 @@ class _CrearAvisoScreenState extends State<CrearAvisoScreen> {
         ScaffoldMessenger.of(context).showSnackBar(snackBar);
       });
 
-      // 3. Llamar a la API a través del Provider
+      // Llamar a la API a través del Provider
       final result = await userProvider.saveAviso(avisoDataParaProvider);
 
-      // 4. Manejo de la respuesta
+      // Manejo de la respuesta
       if (!mounted) return; 
 
       ScaffoldMessenger.of(context).hideCurrentSnackBar(); 
@@ -258,218 +278,243 @@ class _CrearAvisoScreenState extends State<CrearAvisoScreen> {
 }
 
   void _eliminarAviso() {
-    // Lógica para eliminar el aviso
+    // Implementar la lógica de eliminación aquí
+    // userProvider.deleteAviso(idAviso);
+    // ...
     // ignore: avoid_print
     print('Aviso eliminado');
     Navigator.pop(context); // Regresar a la pantalla de lista
   }
 
-  // ⭐️ NUEVO: Constructor para los campos de texto de opciones múltiples ⭐️
-  Widget _buildOpcionTextField({
-    required TextEditingController controller,
-    required String label,
-    required Color dynamicPrimaryColor,
-  }) {
-    return Padding(
-      padding: const EdgeInsets.only(top: 10.0),
-      child: TextFormField(
-        controller: controller,
-        decoration: InputDecoration(
-          labelText: label, 
-          hintText: 'Ej. "Opción A"',
-          border: const OutlineInputBorder(),
-          focusedBorder: OutlineInputBorder(
-            borderSide: BorderSide(color: dynamicPrimaryColor, width: 2.0),
-          ),
-          labelStyle: TextStyle(color: dynamicPrimaryColor),
+  // ⭐️ FUNCIÓN AGREGADA: Construye la barra de herramientas como un widget separado ⭐️
+  Widget _buildCustomToolbar(BuildContext context, Color dynamicPrimaryColor) {
+    return Container(
+      // Estilo para el contenedor de la barra (opcional, pero ayuda a delimitar)
+      decoration: BoxDecoration(
+        color: dynamicPrimaryColor.withOpacity(0.1), 
+        borderRadius: BorderRadius.circular(5.0),
+        border: Border.all(color: dynamicPrimaryColor, width: 0.5),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 5.0, vertical: 8.0),
+      child: ToolbarWidget(
+        controller: _cuerpoEditorController, // ¡Importante: pasar el controlador!
+        callbacks: Callbacks(),
+        htmlToolbarOptions: const HtmlToolbarOptions(
+          // Definir los botones que queremos que aparezcan aquí
+          defaultToolbarButtons: [
+            FontButtons(
+              strikethrough: false, 
+              subscript: false,     
+              superscript: false,   
+            ),
+            FontSettingButtons(
+              fontSize: true,   
+              fontName: false,  
+            ),
+            StyleButtons(), 
+            ColorButtons(), 
+            ParagraphButtons(
+              textDirection: false, 
+              lineHeight: false, 
+              caseConverter: false,
+            ),
+            ListButtons(
+              listStyles: true, 
+            ),
+            InsertButtons(
+              link: true,       
+              picture: true, 
+              audio: false, 
+              video: false, 
+              table: false, 
+              hr: false,
+            ),
+          ],
         ),
       ),
     );
   }
+  // ⭐️ FIN DE FUNCIÓN AGREGADA ⭐️
 
   @override
   Widget build(BuildContext context) {
-    // ACCESO AL PROVEEDOR DE COLOR
-    final colores = Provider.of<UserProvider>(context).colores;
+    final userProvider = Provider.of<UserProvider>(context);
+    final colores = userProvider.colores;
     final Color dynamicPrimaryColor = colores.footerColor;
     final Color dynamicHeaderColor = colores.headerColor;
 
-    // DETERMINAR SI EL SEGUNDO COMBO DEBE MOSTRARSE
     final bool mostrarComboEspecifico = _opcionesEspecificas.containsKey(_destinatarioSeleccionado) && (_opcionesEspecificas[_destinatarioSeleccionado]?.isNotEmpty ?? false);
-    
-    // ⭐️ DETERMINAR SI LOS CAMPOS DE OPCIÓN MÚLTIPLE DEBEN MOSTRARSE (NUEVO) ⭐️
     final bool mostrarOpcionesMultiples = _respuestaSeleccionada == 'Seleccion multiple';
 
-    return Scaffold(
-      // ... (AppBar) ...
-      appBar: AppBar(
-        title: Text(widget.avisoParaEditar == null ? 'Crear Aviso' : 'Editar Aviso'),
-        backgroundColor: dynamicHeaderColor,
-        centerTitle: true,
-        foregroundColor: Colors.white,
-        actions: widget.avisoParaEditar != null
-            ? [
-          IconButton(
-            icon: const Icon(Icons.delete),
-            onPressed: _eliminarAviso,
-            tooltip: 'Eliminar aviso',
-            color: Colors.white,
-          ),
-        ]
-            : null,
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              // 1. Combo Destinatario Principal
-              _buildFiltroDropdown(
-                label: 'Mostrar en Calendario de',
-                value: _destinatarioSeleccionado,
-                items: _destinatariosPrincipales, 
-                onChanged: (String? newValue) {
-                  setState(() {
-                    _destinatarioSeleccionado = newValue!;
-                    _resetSeleccionEspecifica(); 
-                  });
-                },
-                dynamicPrimaryColor: dynamicPrimaryColor,
-              ),
-              
-              // 2. Combo Específico Condicional
-              if (mostrarComboEspecifico) ...[
-                const SizedBox(height: 20),
+    // ⭐️ CAMBIO CLAVE: Envolver el Scaffold con SafeArea ⭐️
+    return SafeArea( 
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text(widget.avisoParaEditar == null ? 'Crear Aviso' : 'Editar Aviso'),
+          backgroundColor: dynamicHeaderColor,
+          centerTitle: true,
+          foregroundColor: Colors.white,
+          actions: widget.avisoParaEditar != null
+              ? [
+            IconButton(
+              icon: const Icon(Icons.delete),
+              onPressed: _eliminarAviso,
+              tooltip: 'Eliminar aviso',
+              color: Colors.white,
+            ),
+          ]
+              : null,
+        ),
+        body: SingleChildScrollView(
+          padding: const EdgeInsets.all(16.0),
+          child: Form(
+            key: _formKey,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                // ... (todo el contenido original, Dropdowns, Fechas, TextFields y HtmlEditor) ...
                 _buildFiltroDropdown(
-                  label: 'Seleccionar $_destinatarioSeleccionado',
-                  value: _seleccionEspecifica!, 
-                  items: _opcionesEspecificas[_destinatarioSeleccionado]!, 
+                  label: 'Mostrar en Calendario de',
+                  value: _destinatarioSeleccionado,
+                  items: _destinatariosPrincipales, 
                   onChanged: (String? newValue) {
                     setState(() {
-                      _seleccionEspecifica = newValue!;
+                      _destinatarioSeleccionado = newValue!;
+                      _resetSeleccionEspecifica(); 
                     });
                   },
                   dynamicPrimaryColor: dynamicPrimaryColor,
                 ),
-              ],
-              
-              const SizedBox(height: 20),
-              // Fechas
-              Row(
-                children: [
-                  Expanded(
-                    child: _buildDateInput(
-                      label: 'Visible desde',
-                      date: _fechaInicio,
-                      onTap: () => _selectDate(context, true),
-                      dynamicPrimaryColor: dynamicPrimaryColor,
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: _buildDateInput(
-                      label: 'Visible hasta',
-                      date: _fechaFin,
-                      onTap: () => _selectDate(context, false),
-                      dynamicPrimaryColor: dynamicPrimaryColor,
-                    ),
+                
+                if (mostrarComboEspecifico) ...[
+                  const SizedBox(height: 20),
+                  _buildFiltroDropdown(
+                    label: 'Seleccionar $_destinatarioSeleccionado',
+                    value: _seleccionEspecifica,
+                    items: _opcionesEspecificas[_destinatarioSeleccionado]!, 
+                    onChanged: (String? newValue) {
+                      setState(() {
+                        _seleccionEspecifica = newValue!;
+                      });
+                    },
+                    dynamicPrimaryColor: dynamicPrimaryColor,
                   ),
                 ],
-              ),
-              const SizedBox(height: 20),
-              // Combo Respuesta
-              _buildFiltroDropdown(
-                label: 'Requiere respuesta',
-                value: _respuestaSeleccionada,
-                items: const ['Ninguna', 'Sí o No', 'Seleccion multiple'],
-                onChanged: (String? newValue) {
-                  setState(() {
-                    _respuestaSeleccionada = newValue!;
-                  });
-                },
-                dynamicPrimaryColor: dynamicPrimaryColor,
-              ),
-              const SizedBox(height: 20),
-              
-              // ⭐️ 3. Campos de Opción Múltiple Condicionales (NUEVOS) ⭐️
-              if (mostrarOpcionesMultiples) ...[
-                const Text('Opciones de Respuesta Múltiple:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                _buildOpcionTextField(
-                  controller: _opcion1Controller, 
-                  label: 'Opción 1', 
-                  dynamicPrimaryColor: dynamicPrimaryColor
-                ),
-                _buildOpcionTextField(
-                  controller: _opcion2Controller, 
-                  label: 'Opción 2', 
-                  dynamicPrimaryColor: dynamicPrimaryColor
-                ),
-                _buildOpcionTextField(
-                  controller: _opcion3Controller, 
-                  label: 'Opción 3', 
-                  dynamicPrimaryColor: dynamicPrimaryColor
+                
+                const SizedBox(height: 20),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _buildDateInput(
+                        label: 'Visible desde',
+                        date: _fechaInicio,
+                        onTap: () => _selectDate(context, true),
+                        dynamicPrimaryColor: dynamicPrimaryColor,
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: _buildDateInput(
+                        label: 'Visible hasta',
+                        date: _fechaFin,
+                        onTap: () => _selectDate(context, false),
+                        dynamicPrimaryColor: dynamicPrimaryColor,
+                      ),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 20),
+                _buildFiltroDropdown(
+                  label: 'Requiere respuesta',
+                  value: _respuestaSeleccionada,
+                  items: const ['Ninguna', 'Sí o No', 'Seleccion multiple'],
+                  onChanged: (String? newValue) {
+                    setState(() {
+                      _respuestaSeleccionada = newValue!;
+                    });
+                  },
+                  dynamicPrimaryColor: dynamicPrimaryColor,
+                ),
+                const SizedBox(height: 20),
+                
+                if (mostrarOpcionesMultiples) ...[
+                  const Text('Opciones de Respuesta Múltiple:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                  _buildOpcionTextField(controller: _opcion1Controller, label: 'Opción 1', dynamicPrimaryColor: dynamicPrimaryColor),
+                  _buildOpcionTextField(controller: _opcion2Controller, label: 'Opción 2', dynamicPrimaryColor: dynamicPrimaryColor),
+                  _buildOpcionTextField(controller: _opcion3Controller, label: 'Opción 3', dynamicPrimaryColor: dynamicPrimaryColor),
+                  const SizedBox(height: 20),
+                ],
+                
+                // Título
+                TextFormField(
+                  controller: _tituloController,
+                  decoration: InputDecoration(
+                    labelText: 'Título', 
+                    border: const OutlineInputBorder(),
+                    focusedBorder: OutlineInputBorder(
+                      borderSide: BorderSide(color: dynamicPrimaryColor, width: 2.0),
+                    ),
+                    labelStyle: TextStyle(color: dynamicPrimaryColor),
+                  ),
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Por favor, ingrese un título';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 20),
+                
+                const Text('Comentario:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                
+                const SizedBox(height: 10),
+                _buildCustomToolbar(context, dynamicPrimaryColor),
+                const SizedBox(height: 10),
+                
+                HtmlEditor(
+                  controller: _cuerpoEditorController,
+                  htmlEditorOptions: HtmlEditorOptions(
+                    hint: "Escriba aquí el cuerpo del aviso...",
+                    initialText: _initialHtmlContent, 
+                    darkMode: Theme.of(context).brightness == Brightness.dark,
+                    adjustHeightForKeyboard: true,
+                  ),
+                  htmlToolbarOptions: const HtmlToolbarOptions(
+                    toolbarPosition: ToolbarPosition.custom, 
+                    toolbarType: ToolbarType.nativeGrid,
+                  ),
+                  otherOptions: OtherOptions(
+                    height: 400, 
+                    decoration: BoxDecoration(
+                      border: Border.all(color: Colors.grey.shade400),
+                      borderRadius: BorderRadius.circular(5.0),
+                    ),
+                  ),
+                ),
+                
+                const SizedBox(height: 30),
+                // Botón de guardar
+                ElevatedButton(
+                  onPressed: _guardarAviso,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: dynamicPrimaryColor,
+                    foregroundColor: Colors.white,
+                    minimumSize: const Size.fromHeight(50),
+                  ),
+                  child: const Text('Guardar Aviso'),
+                ),
               ],
-              
-              // Título
-              TextFormField(
-                controller: _tituloController,
-                decoration: InputDecoration(
-                  labelText: 'Título', 
-                  border: const OutlineInputBorder(),
-                  focusedBorder: OutlineInputBorder(
-                    borderSide: BorderSide(color: dynamicPrimaryColor, width: 2.0),
-                  ),
-                  labelStyle: TextStyle(color: dynamicPrimaryColor),
-                ),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Por favor, ingrese un título';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 20),
-              // Comentario
-              TextFormField(
-                controller: _cuerpoController,
-                decoration: InputDecoration(
-                  labelText: 'Comentario', 
-                  border: const OutlineInputBorder(),
-                  focusedBorder: OutlineInputBorder(
-                    borderSide: BorderSide(color: dynamicPrimaryColor, width: 2.0),
-                  ),
-                  labelStyle: TextStyle(color: dynamicPrimaryColor),
-                ),
-                maxLines: null,
-                minLines: 5,
-                keyboardType: TextInputType.multiline,
-              ),
-              const SizedBox(height: 30),
-              // Botón de guardar
-              ElevatedButton(
-                onPressed: _guardarAviso,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: dynamicPrimaryColor,
-                  foregroundColor: Colors.white,
-                  minimumSize: const Size.fromHeight(50),
-                ),
-                child: const Text('Guardar Aviso'),
-              ),
-            ],
+            ),
           ),
         ),
       ),
     );
   }
 
-  // Modificado: value ahora es String?
+  // Widget para Dropdown (Mantenido)
   Widget _buildFiltroDropdown({
     required String label,
-    required String? value, // Puede ser null si la lista específica está vacía
+    required String? value, 
     required List<String> items,
     required Function(String?) onChanged,
     required Color dynamicPrimaryColor,
@@ -481,7 +526,6 @@ class _CrearAvisoScreenState extends State<CrearAvisoScreen> {
         const SizedBox(height: 8),
         DropdownButtonFormField<String>(
           value: value, 
-          // Si items está vacío o value es nulo, deshabilitamos el dropdown
           decoration: InputDecoration(
             border: const OutlineInputBorder(),
             focusedBorder: OutlineInputBorder(
@@ -495,10 +539,8 @@ class _CrearAvisoScreenState extends State<CrearAvisoScreen> {
               child: Text(itemValue),
             );
           }).toList(),
-          // Deshabilitar el onChanged si la lista está vacía o el valor inicial es nulo (no hay nada que seleccionar)
           onChanged: items.isEmpty || value == null ? null : onChanged, 
           validator: (val) {
-             // Validar solo si la lista de ítems no está vacía y se requiere una selección
              if (items.isNotEmpty && val == null) {
                  return 'Debe seleccionar una opción.';
              }
@@ -509,7 +551,7 @@ class _CrearAvisoScreenState extends State<CrearAvisoScreen> {
     );
   }
 
-  // Se mantiene sin cambios
+  // Widget para entrada de fecha (Mantenido)
   Widget _buildDateInput({
     required String label,
     required DateTime date,
@@ -538,6 +580,29 @@ class _CrearAvisoScreenState extends State<CrearAvisoScreen> {
           ),
         ),
       ],
+    );
+  }
+
+  // Widget para opciones múltiples (Mantenido)
+  Widget _buildOpcionTextField({
+    required TextEditingController controller,
+    required String label,
+    required Color dynamicPrimaryColor,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 10.0),
+      child: TextFormField(
+        controller: controller,
+        decoration: InputDecoration(
+          labelText: label, 
+          hintText: 'Ej. "Opción A"',
+          border: const OutlineInputBorder(),
+          focusedBorder: OutlineInputBorder(
+            borderSide: BorderSide(color: dynamicPrimaryColor, width: 2.0),
+          ),
+          labelStyle: TextStyle(color: dynamicPrimaryColor),
+        ),
+      ),
     );
   }
 }

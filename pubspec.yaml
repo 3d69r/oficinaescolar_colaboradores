@@ -36,6 +36,11 @@ dependencies:
   syncfusion_flutter_pdfviewer: ^31.1.18
   qr_flutter: ^4.1.0
   file_picker: ^10.3.3
+  flutter_quill: ^11.5.0
+  flutter_quill_extensions: ^11.0.0
+  html_editor_enhanced: ^2.7.1
+  flutter_localization: ^0.3.3
+
   
 
   path: any
