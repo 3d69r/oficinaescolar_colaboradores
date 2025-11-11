@@ -318,9 +318,9 @@ class _CrearAvisoScreenState extends State<CrearAvisoScreen> {
               lineHeight: false, 
               caseConverter: false,
             ),
-            ListButtons(
+            /*ListButtons(
               listStyles: true, 
-            ),
+            ),*/
             InsertButtons(
               link: true,       
               picture: true, 

@@ -35,6 +35,7 @@ class ColaboradorModel {
   final String afiliacion;
   final bool accesoActivo; // Convertido de String "1" a bool
   final String rutaFoto;
+  final String puesto;
 
   ColaboradorModel({
     required this.status,
@@ -64,6 +65,7 @@ class ColaboradorModel {
     required this.afiliacion,
     required this.accesoActivo,
     required this.rutaFoto,
+    required this.puesto,
   });
 
   factory ColaboradorModel.fromJson(Map<String, dynamic> json) {
@@ -147,6 +149,7 @@ class ColaboradorModel {
       foto: personaData['foto'] as String? ?? '',
       idCredencial: personaData['id_credencial'] as String? ?? '',
       password: personaData['password'] as String? ?? '',
+      puesto: personaData['puesto'] as String? ?? '',
       // Conversión segura de saldo
       cafeteriaSaldo: double.tryParse(personaData['cafeteria_saldo'] as String? ?? '0.0') ?? 0.0,
       afiliacion: personaData['afiliacion'] as String? ?? '',

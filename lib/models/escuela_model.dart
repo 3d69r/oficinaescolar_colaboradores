@@ -296,7 +296,7 @@ class EscuelaModel {
   final String estado;
   final String rutaLogo;
   final String appPermisos;
-  final String rutaFirma;
+  final String rutaLogoCred;
   String? logoLocalPath; 
   DateTime? logoCacheTimestamp; 
 
@@ -315,6 +315,7 @@ class EscuelaModel {
   final List<PeriodoCafeteria> cafPeriodos;
   final String cafPeriodoActual;
   final String appPermisosColab;
+  final String appTextoCred;
 
   EscuelaModel({
     required this.status,
@@ -332,7 +333,7 @@ class EscuelaModel {
     required this.estado,
     required this.rutaLogo,
     required this.appPermisos,
-    required this.rutaFirma,
+    required this.rutaLogoCred,
     this.logoLocalPath,
     this.logoCacheTimestamp,
     required this.empDirector,
@@ -349,6 +350,7 @@ class EscuelaModel {
     required this.cafPeriodos,
     required this.cafPeriodoActual,
     required this.appPermisosColab,
+    required this.appTextoCred, 
   });
 
   factory EscuelaModel.fromJson(Map<String, dynamic> json) {
@@ -383,9 +385,10 @@ class EscuelaModel {
       empDirectorSec: schoolJson['emp_director_sec']?.toString() ?? '',
       empDirectorPrepa: schoolJson['emp_director_prepa']?.toString() ?? '',
       rutaLogo: schoolJson['ruta_logo']?.toString() ?? '',
-      rutaFirma: schoolJson['ruta_credencial_firma']?.toString() ?? '',
+      rutaLogoCred: schoolJson['ruta_logo_credencial']?.toString() ?? '',
       appPermisos: schoolJson['app_permisos']?.toString() ?? '',
       appPermisosColab: schoolJson['app_permisos_colab']?.toString() ?? '',
+      appTextoCred: schoolJson['app_texto_credencial_colab']?.toString() ?? '',
       cicloEscolar: CicloEscolar.fromJson(cicloEscolarJson),
       contactos: contactosJson.map((e) => Contacto.fromJson(e as Map<String, dynamic>)).toList(),
        dirDomicilios: dirDomiciliosJson?.map((e) => Domicilio.fromJson(e as Map<String, dynamic>)).toList() ?? [], 
