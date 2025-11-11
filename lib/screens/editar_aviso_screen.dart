@@ -240,6 +240,10 @@ class _EditarAvisoScreenState extends State<EditarAvisoScreen> {
         'id_calendario': idAviso, // El ID existente
         'opciones_multiples': opcionesMultiples,
       };
+
+      print('--- EDICIÓN DE AVISO (ID: ${idAviso}) ---');
+      print('Datos enviados al Provider: $avisoDataParaProvider');
+      print('-------------------------------------------');
       
       // Llamar a la API a través del Provider
       // Mostrar indicador de carga...
@@ -274,60 +278,6 @@ class _EditarAvisoScreenState extends State<EditarAvisoScreen> {
       }
     }
   }
-
-  // ❌ Lógica de eliminación (DESHABILITADA TEMPORALMENTE) ❌
-  /*
-  void _eliminarAviso() {
-    final String idAviso = widget.avisoParaEditar['id_calendario'] as String? ?? '0';
-    if (idAviso == '0') {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Error: ID de aviso no válido para eliminar.')),
-      );
-      return;
-    }
-    
-    // Muestra un diálogo de confirmación
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Confirmar Eliminación'),
-        content: const Text('¿Está seguro de que desea eliminar este aviso permanentemente?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cancelar'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              Navigator.of(context).pop(); // Cerrar diálogo
-              final userProvider = Provider.of<UserProvider>(context, listen: false);
-              
-              // ⚠️ ESTA FUNCIÓN AÚN NO EXISTE EN EL PROVIDER ⚠️
-              // final result = await userProvider.deleteAviso(idAviso); 
-              
-              const result = {'success': false, 'message': 'Funcionalidad de Eliminación deshabilitada temporalmente.'};
-
-              if (!mounted) return;
-              
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(result['message']),
-                  backgroundColor: result['success'] ? Colors.green : Colors.red,
-                ),
-              );
-
-              // if (result['success']) {
-              //   Navigator.pop(context); // Regresar a la lista de avisos
-              // }
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            child: const Text('Eliminar', style: TextStyle(color: Colors.white)),
-          ),
-        ],
-      ),
-    );
-  }
-  */
 
   // ⭐️ FUNCIÓN: Construye la barra de herramientas separada ⭐️
   Widget _buildCustomToolbar(BuildContext context, Color dynamicPrimaryColor) {

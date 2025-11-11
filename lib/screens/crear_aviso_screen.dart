@@ -240,6 +240,10 @@ class _CrearAvisoScreenState extends State<CrearAvisoScreen> {
         'id_calendario': idAviso, 
         'opciones_multiples': opcionesMultiples,
       };
+
+      print('--- CREACIÓN DE AVISO (ID: ${idAviso}) ---');
+      print('Datos enviados al Provider: $avisoDataParaProvider');
+      print('-------------------------------------------');
       
       // Mostrar indicador de carga
       final snackBar = SnackBar(

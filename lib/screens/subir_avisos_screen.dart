@@ -8,31 +8,6 @@ import 'package:oficinaescolar_colaboradores/providers/user_provider.dart';
 import 'package:flutter_html/flutter_html.dart'; 
 
 // CLASE AUXILIAR DE PINTURA (Se mantiene)
-class _SharpLinePainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final Paint paint = Paint()
-      ..color = Colors.grey.shade400
-      ..strokeCap = StrokeCap.butt
-      ..strokeWidth = 1.0;
-
-    const double dashWidth = 5.0;
-    const double dashSpace = 3.0;
-    double currentX = 0;
-
-    while (currentX < size.width) {
-      canvas.drawLine(
-        Offset(currentX, size.height / 2),
-        Offset(currentX + dashWidth, size.height / 2),
-        paint,
-      );
-      currentX += dashWidth + dashSpace;
-    }
-  }
-
-  @override
-  bool shouldRepaint(CustomPainter oldDelegate) => false;
-}
 
 // ----------------------------------------------------------------------
 // CLASE PRINCIPAL
@@ -430,9 +405,9 @@ Future<void> _confirmarYEliminar(BuildContext context, Map<String, dynamic> avis
                           MaterialPageRoute(builder: (context) => const CrearAvisoScreen()), 
                         );
                         // Forzar la recarga al regresar del formulario de creación
-                        if (mounted) {
+                        /*/if (mounted) {
                             Provider.of<UserProvider>(context, listen: false).loadAvisosCreados();
-                        }
+                        }*/
                         },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: dynamicPrimaryColor, 

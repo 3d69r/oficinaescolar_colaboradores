@@ -746,9 +746,9 @@ class _PerfilScreenState extends State<PerfilScreen>
               decoration: const BoxDecoration(
                 color: Colors.white,
               ),
-              child: escuela.rutaLogoCred.isNotEmpty
+              child: escuela.rutaFirma.isNotEmpty
                   ? CachedNetworkImage(
-                      imageUrl: '${ApiConstants.assetsBaseUrl}${escuela.rutaLogoCred}',
+                      imageUrl: '${ApiConstants.assetsBaseUrl}${escuela.rutaFirma}',
                       fit: BoxFit.contain, 
                       placeholder: (context, url) => const Center(child: CircularProgressIndicator()),
                       errorWidget: (context, url, error) => const Icon(Icons.broken_image, size: 50),

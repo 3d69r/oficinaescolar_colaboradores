@@ -297,6 +297,7 @@ class EscuelaModel {
   final String rutaLogo;
   final String appPermisos;
   final String rutaLogoCred;
+  final String rutaFirma;
   String? logoLocalPath; 
   DateTime? logoCacheTimestamp; 
 
@@ -334,6 +335,7 @@ class EscuelaModel {
     required this.rutaLogo,
     required this.appPermisos,
     required this.rutaLogoCred,
+    required this.rutaFirma,
     this.logoLocalPath,
     this.logoCacheTimestamp,
     required this.empDirector,
@@ -386,6 +388,7 @@ class EscuelaModel {
       empDirectorPrepa: schoolJson['emp_director_prepa']?.toString() ?? '',
       rutaLogo: schoolJson['ruta_logo']?.toString() ?? '',
       rutaLogoCred: schoolJson['ruta_logo_credencial']?.toString() ?? '',
+      rutaFirma: schoolJson['ruta_credencial_firma']?.toString() ?? '',
       appPermisos: schoolJson['app_permisos']?.toString() ?? '',
       appPermisosColab: schoolJson['app_permisos_colab']?.toString() ?? '',
       appTextoCred: schoolJson['app_texto_credencial_colab']?.toString() ?? '',
