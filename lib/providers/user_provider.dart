@@ -151,27 +151,31 @@ class UserProvider with ChangeNotifier {
     loadAvisosCreados();
   }
 
-  /// ⭐️ [MODIFICADO] Carga la lista de avisos creados y archivados usando lógica dual (DB > SharedPreferences).
+  /// ⭐️ [FINAL] Carga la lista de avisos creados usando lógica dual (DB > SharedPreferences o Solo SP en Web).
 Future<void> loadAvisosCreados() async {
     debugPrint('UserProvider: Intentando cargar avisos creados...');
     
     List<Map<String, dynamic>> loadedActivos = [];
     
-    // 1. INTENTO DE CARGA DESDE DB LOCAL (Móvil)
-    try {
-        loadedActivos = await _dbHelper.getAvisosCreados(); 
-        debugPrint('UserProvider: ${loadedActivos.length} avisos creados (activos) cargados desde DB (Móvil).');
-    } catch (e) {
-        // Esto captura el UnsupportedError en Web/Desktop o cualquier otro fallo de DB.
-        debugPrint('UserProvider: Fallo al cargar avisos desde DB. Intentando SharedPreferences. Error: $e');
-        
-        // 2. INTENTO DE CARGA DESDE SHARED_PREFERENCES (Web/Desktop)
+    if (kIsWeb) {
+        // 🚀 MODO WEB: Saltamos la DB, vamos directo a SharedPreferences.
         loadedActivos = await _getAvisosCreadosFromPrefs(_prefsAvisosCreadosKey);
-        debugPrint('UserProvider: ${loadedActivos.length} activos cargados desde SharedPreferences.');
+        debugPrint('UserProvider: ${loadedActivos.length} activos cargados directamente desde SharedPreferences (Web).');
+    } else {
+        // 📱 MODO MÓVIL/DESKTOP: Intentamos DB primero.
+        try {
+            loadedActivos = await _dbHelper.getAvisosCreados(); 
+            debugPrint('UserProvider: ${loadedActivos.length} avisos creados (activos) cargados desde DB (Móvil).');
+        } catch (e) {
+            // Fallback si la DB local falla o no existe (ej. primer arranque en iOS/Android).
+            debugPrint('UserProvider: Fallo al cargar avisos desde DB. Intentando SharedPreferences. Error: $e');
+            
+            loadedActivos = await _getAvisosCreadosFromPrefs(_prefsAvisosCreadosKey);
+            debugPrint('UserProvider: ${loadedActivos.length} activos cargados desde SharedPreferences (Fallback Móvil).');
+        }
     }
-    
+
     // 3. ACTUALIZAR ESTADO
-    // ⭐️ CAMBIO CLAVE: Usamos .toList() para crear una COPIA MUTABLE ⭐️
     _avisosCreados = loadedActivos.toList(); 
     notifyListeners();
 }
@@ -759,7 +763,7 @@ Future<Map<String, dynamic>> saveAviso(Map<String, dynamic> avisoData) async {
             .toList();
     }
 
-    String opcion1 = opcionesList.length > 0 ? opcionesList[0] : '';
+    String opcion1 = opcionesList.isNotEmpty ? opcionesList[0] : '';
     String opcion2 = opcionesList.length > 1 ? opcionesList[1] : '';
     String opcion3 = opcionesList.length > 2 ? opcionesList[2] : '';
 
@@ -803,17 +807,13 @@ Future<Map<String, dynamic>> saveAviso(Map<String, dynamic> avisoData) async {
             
             // ⭐️ LÓGICA DE PERSISTENCIA LOCAL (SOLO SI EL API ES EXITOSO) ⭐️
             
-            // Determinar si es una nueva creación ANTES de obtener el ID del servidor.
-            // Usamos el ID original enviado, ya que es la clave para la búsqueda.
             final String originalId = avisoData['id_calendario'] ?? '0';
             final bool isNew = originalId == '0'; 
             
-            // El 'message' de la API es el ID_AVISO/ID_CALENDARIO (la clave real).
             final String idAvisoServer = result['message']?.toString() ?? originalId;
             
             // 1. Crear el mapa de datos para guardar localmente (DB/SP)
             final Map<String, dynamic> avisoLocal = {
-                // Usamos el ID del servidor para ambas claves
                 'id_aviso': idAvisoServer, 
                 'id_calendario': idAvisoServer, 
                 'titulo': avisoData['titulo'],
@@ -828,43 +828,39 @@ Future<Map<String, dynamic>> saveAviso(Map<String, dynamic> avisoData) async {
                 'opcion_3': opcion3,
             };
 
-            // ⭐️ DEBUG PRINT AÑADIDO ⭐️
             debugPrint('UserProvider: Aviso ${isNew ? 'creado' : 'editado'}. ID de calendario asignado para persistencia local: $idAvisoServer');
 
             // 2. Intentar guardar/actualizar en la Base de Datos (Móvil)
-            try {
-                // ✅ VERIFICACIÓN: Llama a la función que inserta/actualiza en la tabla _avisosCreadosTable
-                await _dbHelper.saveAvisoCreado(avisoLocal); 
-                debugPrint('UserProvider: Aviso creado guardado/actualizado exitosamente en DB local.');
-            } catch (e) {
-                debugPrint('UserProvider: Fallo al guardar aviso creado en DB. Usando SharedPreferences. Error: $e');
+            if (!kIsWeb) { // 👈 ÚNICO CAMBIO: Omitir en Web
+                try {
+                    await _dbHelper.saveAvisoCreado(avisoLocal); 
+                    debugPrint('UserProvider: Aviso creado guardado/actualizado exitosamente en DB local (Mobile).');
+                } catch (e) {
+                    debugPrint('UserProvider: Fallo al guardar aviso creado en DB. Usando SharedPreferences. Error: $e');
+                }
+            } else {
+                 debugPrint('UserProvider: Ejecutando en Web. Se omite el guardado en DB local.');
             }
             
-            // 3. Actualizar la lista en memoria (_avisosCreados)
+            // 3. Actualizar la lista en memoria (_avisosCreados) (Válido para todas las plataformas)
             if (isNew) {
-                // Si es nuevo, insertamos al inicio con el nuevo ID real.
                 _avisosCreados.insert(0, avisoLocal); 
             } else {
-                // Si es edición, buscamos usando el ID original y reemplazamos.
-                // Usamos el ID original porque es el que existe en _avisosCreados en este momento.
                 final int activoIndex = _avisosCreados.indexWhere((a) => a['id_calendario'] == originalId);
 
                 if (activoIndex != -1) {
-                    // Reemplazamos el mapa, que ahora contiene el ID_CALENDARIO real del servidor.
                     _avisosCreados[activoIndex] = avisoLocal;
                 } else {
-                    // Si no se encontró (ej. se borró de la lista sin recargar), lo insertamos.
                     _avisosCreados.insert(0, avisoLocal); 
                 }
             }
 
-            // 4. Guardamos la lista en SharedPreferences (Fallback)
+            // 4. Guardamos la lista en SharedPreferences (Válido para todas las plataformas)
             await _saveAvisosCreadosToPrefs(_avisosCreados, _prefsAvisosCreadosKey);
             
             // 5. Notificar a las vistas
             notifyListeners(); 
 
-            // Devolver éxito a la vista
             final String action = isNew ? 'creado' : 'actualizado';
             return {'success': true, 'message': 'Aviso ${action} con éxito. ID: $idAvisoServer'};
         
