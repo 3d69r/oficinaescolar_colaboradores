@@ -173,7 +173,7 @@ class DatabaseHelper {
         data TEXT NOT NULL
       )
     ''');
-    // ⭐️ NUEVO: Creación de la tabla para avisos creados por el colaborador ⭐️
+    // ⭐️ NUEVO: Creación de la tabla para avisos creados por el colaborador (CORREGIDO) ⭐️
     await db.execute('''
       CREATE TABLE $_avisosCreadosTable (
         id_aviso TEXT PRIMARY KEY,
@@ -186,9 +186,10 @@ class DatabaseHelper {
         fecha_fin TEXT NOT NULL,
         opcion_1 TEXT,
         opcion_2 TEXT,
-        opcion_3 TEXT
+        opcion_3 TEXT,
+        archivo TEXT       
       )
-    ''');
+    '''); // ⚠️ Se eliminó la coma extra después de 'archivo TEXT' y los comentarios de SQL.
     debugPrint('DatabaseHelper: Tablas creadas exitosamente.');
   }
 
@@ -235,7 +236,7 @@ class DatabaseHelper {
     // ⭐️ Limpiar tabla de encabezados de boleta
     await db.delete(_encabezadosBoletaTable); 
     // ⭐️ NUEVO: Limpiar la tabla de avisos creados ⭐️
-   // await db.delete(_avisosCreadosTable); 
+    // await db.delete(_avisosCreadosTable); // Dejo el comentario, ya que el usuario lo tenía comentado.
     
     debugPrint('DatabaseHelper: Todas las tablas limpiadas.');
   }
@@ -396,7 +397,7 @@ class DatabaseHelper {
     }).toList();
   }
 
-  // --- Métodos Específicos para Avisos Creados (NUEVOS) ---
+  // --- Métodos Específicos para Avisos Creados (ACTUALIZADOS) ---
 
   /// Guarda un aviso creado por el colaborador en la base de datos local.
   Future<void> saveAvisoCreado(Map<String, dynamic> avisoData) async {
@@ -422,6 +423,7 @@ class DatabaseHelper {
       'opcion_1': avisoData['opcion_1'],
       'opcion_2': avisoData['opcion_2'],
       'opcion_3': avisoData['opcion_3'],
+      'archivo': avisoData['archivo'], // ⭐️ ¡MODIFICACIÓN CLAVE: AGREGADO EL CAMPO ARCHIVO! ⭐️
     };
     
     await db.insert(

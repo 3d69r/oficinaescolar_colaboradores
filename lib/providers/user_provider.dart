@@ -707,32 +707,36 @@ String _mapDestinatarioToApiCode(String destinatario) {
 }
 
 Future<Map<String, dynamic>> saveAviso(Map<String, dynamic> avisoData) async {
-    final url = Uri.parse('${ApiConstants.apiBaseUrl}${ApiConstants.setCreaAvisoEndpoint}');
-
-    // --- 1. Inicializar IDs (Mantenido) ---
-    String idSalon = '0';
-    String idAlumno = '0';
-    String idColaboradorDestino = '0'; 
-
-    // Datos de la sesión
+    // --- 1. Preparación y URLs ---
     final String idTokenValue = _idToken ?? ''; 
     final String escuelaCode = _escuela;
     final String idEmpresaValue = _idEmpresa; 
     final String idCicloValue = _idCiclo;     
+    final String urlEndpoint = '${ApiConstants.apiBaseUrl}${ApiConstants.setCreaAvisoEndpoint}';
+    final Uri url = Uri.parse(urlEndpoint);
+
+    // Nuevas variables para el manejo de archivo
+    final String? rutaArchivo = avisoData['archivo'] as String?;
+    final bool hasFile = rutaArchivo != null && rutaArchivo.isNotEmpty;
+    
+    // --- 2. Inicializar IDs y Mapeos ---
+    String idSalon = '0';
+    String idAlumno = '0';
+    String idColaboradorDestino = '0'; 
     
     final String tipoDestinatario = avisoData['destinatario_tipo'];
     final String? valorEspecifico = avisoData['destinatario_valor'];
     final String tipoRespuesta = avisoData['requiere_respuesta'];
-    
     final RegExp regExp = RegExp(r'\((\d+)\)'); 
-
-    // --- 2. Determinar los IDs de Destino Específico (Mantenido) ---
+    
+    // Lógica corregida para obtener idSalon, idAlumno, idColaboradorDestino
     if (tipoDestinatario == 'Salón' && valorEspecifico != null) {
-         final AvisoSalaModel? salonData = colaboradorModel?.avisoSalones.firstWhere(
-            (s) => s.salon == valorEspecifico, 
-            // ignore: cast_from_null_always_fails
-            orElse: () => null as AvisoSalaModel , 
-         );
+        // ⭐️ CORRECCIÓN: Usamos where().cast().firstOrNull o find() ⭐️
+        final AvisoSalaModel? salonData = colaboradorModel?.avisoSalones
+            .where((s) => s.salon == valorEspecifico)
+            .cast<AvisoSalaModel?>() // Convertir a tipo nullable
+            .firstOrNull; 
+
          idSalon = salonData?.idSalon ?? '0';
          
     } else if (tipoDestinatario == 'Alumno Específico' && valorEspecifico != null) {
@@ -740,21 +744,20 @@ Future<Map<String, dynamic>> saveAviso(Map<String, dynamic> avisoData) async {
         idAlumno = match?.group(1) ?? '0';
         
     } else if (tipoDestinatario == 'Colaborador Específico' && valorEspecifico != null) {
-        final AvisoColaboradorModel? colaboradorData = colaboradorModel?.avisoColaboradores.firstWhere(
-            (c) => c.nombreCompleto == valorEspecifico,
-            // ignore: cast_from_null_always_fails
-            orElse: () => null as AvisoColaboradorModel, 
-        );
+        // ⭐️ CORRECCIÓN: Usamos where().cast().firstOrNull ⭐️
+        final AvisoColaboradorModel? colaboradorData = colaboradorModel?.avisoColaboradores
+            .where((c) => c.nombreCompleto == valorEspecifico)
+            .cast<AvisoColaboradorModel?>()
+            .firstOrNull;
+            
         idColaboradorDestino = colaboradorData?.idColaborador ?? '0';
-    } 
+    }
     
-    // --- 3. Mapeo de la Sección (seccion) (Mantenido) ---
     final String apiSeccionCode = _mapDestinatarioToApiCode(tipoDestinatario);
 
-    // Obtener la cadena de opciones concatenadas que viene de la vista
+    // Lógica para opciones múltiples
     final String opcionesConcatenadas = avisoData['opciones_multiples'] ?? '';
     List<String> opcionesList = [];
-
     if (tipoRespuesta == 'Seleccion' && opcionesConcatenadas.isNotEmpty) {
         opcionesList = opcionesConcatenadas
             .split(',')
@@ -766,9 +769,9 @@ Future<Map<String, dynamic>> saveAviso(Map<String, dynamic> avisoData) async {
     String opcion1 = opcionesList.isNotEmpty ? opcionesList[0] : '';
     String opcion2 = opcionesList.length > 1 ? opcionesList[1] : '';
     String opcion3 = opcionesList.length > 2 ? opcionesList[2] : '';
-
-    // --- 4. Preparar el Body para la API (Mantenido) ---
-    final Map<String, String> body = {
+    
+    // --- 3. Preparar los campos base para la API ---
+    final Map<String, String> baseFields = {
         'escuela': escuelaCode,
         'id_calendario': avisoData['id_calendario'] ?? '0', 
         'id_colaborador': idColaboradorDestino, 
@@ -776,7 +779,6 @@ Future<Map<String, dynamic>> saveAviso(Map<String, dynamic> avisoData) async {
         'id_alumno': idAlumno, 
         'id_token': idTokenValue, 
         'titulo': avisoData['titulo'],
-        'comentario': avisoData['cuerpo'],
         'id_empresa': idEmpresaValue,
         'id_ciclo': idCicloValue,
         'seccion': apiSeccionCode, 
@@ -787,14 +789,48 @@ Future<Map<String, dynamic>> saveAviso(Map<String, dynamic> avisoData) async {
         'opcion_2': opcion2, 
         'opcion_3': opcion3,
         if (tipoDestinatario == 'Nivel Educativo') 'nivel_educativo_valor': valorEspecifico ?? '',
+        // Campo 'comentario' solo se envía si NO hay archivo.
+        if (!hasFile) 'comentario': avisoData['cuerpo'], 
     };
 
-    debugPrint('UserProvider: Enviando aviso a API: $body');
+    debugPrint('UserProvider: Enviando aviso a API. ¿Tiene archivo? $hasFile');
         
-    // --- 5. Ejecución y Manejo de Respuesta ---
+    // --- 4. Ejecución y Manejo de Respuesta (Diferente según la presencia de archivo) ---
     try {
-        final response = await http.post(url, body: body);
+        http.Response response;
+        
+        if (hasFile) {
+            // ⚠️ OPCIÓN MULTIPART: Si hay archivo, usamos MultipartRequest
+            // Es crucial que la API esté configurada para recibir `multipart/form-data`
+            
+            // Verificamos si estamos en un entorno que soporta dart:io (ej. Mobile/Desktop)
+            // (La verificación 'kIsWeb' debe estar disponible si se usa)
+            if (kIsWeb) {
+                // Si estás en Web, la librería `http` no soporta la ruta local de `dart:io`.
+                // Necesitas usar la API de HTML File (o delegar el upload a un servicio).
+                // Por simplicidad, aquí solo mostramos el error:
+                return {'success': false, 'message': 'La subida de archivos locales no está soportada en Web a través de esta implementación de Provider.'};
+            }
+            
+            final request = http.MultipartRequest('POST', url);
+            
+            // Agregamos todos los campos base
+            request.fields.addAll(baseFields);
+            
+            // Agregamos el archivo
+            final file = await http.MultipartFile.fromPath('archivo', rutaArchivo);
+            request.files.add(file);
+            
+            // Enviamos la solicitud y convertimos la respuesta
+            final streamedResponse = await request.send();
+            response = await http.Response.fromStream(streamedResponse);
+            
+        } else {
+            // ➡️ OPCIÓN POST SIMPLE: Si no hay archivo, usamos el post simple
+            response = await http.post(url, body: baseFields);
+        }
 
+        // --- 5. Lógica de Respuesta Unificada ---
         debugPrint('UserProvider: Código de estado de la respuesta: ${response.statusCode}');
         
         if (response.body.isEmpty) {
@@ -805,8 +841,7 @@ Future<Map<String, dynamic>> saveAviso(Map<String, dynamic> avisoData) async {
 
         if (response.statusCode == 200 && result['status'] == 'Correcto') {
             
-            // ⭐️ LÓGICA DE PERSISTENCIA LOCAL (SOLO SI EL API ES EXITOSO) ⭐️
-            
+            // --- 6. Lógica de Persistencia Local ---
             final String originalId = avisoData['id_calendario'] ?? '0';
             final bool isNew = originalId == '0'; 
             
@@ -817,7 +852,8 @@ Future<Map<String, dynamic>> saveAviso(Map<String, dynamic> avisoData) async {
                 'id_aviso': idAvisoServer, 
                 'id_calendario': idAvisoServer, 
                 'titulo': avisoData['titulo'],
-                'comentario': avisoData['cuerpo'], 
+                // NOTA: Guardamos el comentario, o una nota si hay archivo
+                'comentario': hasFile ? 'Aviso con adjunto: ${rutaArchivo.split('/').last}' : avisoData['cuerpo'], 
                 'seccion': apiSeccionCode,
                 'valor_especifico': valorEspecifico ?? '', 
                 'tipo_respuesta': tipoRespuesta,
@@ -826,12 +862,13 @@ Future<Map<String, dynamic>> saveAviso(Map<String, dynamic> avisoData) async {
                 'opcion_1': opcion1,
                 'opcion_2': opcion2,
                 'opcion_3': opcion3,
+                'archivo': rutaArchivo, // ⭐️ Persistencia de la ruta del archivo ⭐️
             };
 
-            debugPrint('UserProvider: Aviso ${isNew ? 'creado' : 'editado'}. ID de calendario asignado para persistencia local: $idAvisoServer');
+            debugPrint('UserProvider: Aviso ${isNew ? 'creado' : 'editado'}. ID de calendario asignado: $idAvisoServer');
 
             // 2. Intentar guardar/actualizar en la Base de Datos (Móvil)
-            if (!kIsWeb) { // 👈 ÚNICO CAMBIO: Omitir en Web
+            if (!kIsWeb) { 
                 try {
                     await _dbHelper.saveAvisoCreado(avisoLocal); 
                     debugPrint('UserProvider: Aviso creado guardado/actualizado exitosamente en DB local (Mobile).');
@@ -842,7 +879,7 @@ Future<Map<String, dynamic>> saveAviso(Map<String, dynamic> avisoData) async {
                  debugPrint('UserProvider: Ejecutando en Web. Se omite el guardado en DB local.');
             }
             
-            // 3. Actualizar la lista en memoria (_avisosCreados) (Válido para todas las plataformas)
+            // 3. Actualizar la lista en memoria (_avisosCreados)
             if (isNew) {
                 _avisosCreados.insert(0, avisoLocal); 
             } else {
@@ -855,7 +892,7 @@ Future<Map<String, dynamic>> saveAviso(Map<String, dynamic> avisoData) async {
                 }
             }
 
-            // 4. Guardamos la lista en SharedPreferences (Válido para todas las plataformas)
+            // 4. Guardamos la lista en SharedPreferences
             await _saveAvisosCreadosToPrefs(_avisosCreados, _prefsAvisosCreadosKey);
             
             // 5. Notificar a las vistas
@@ -865,7 +902,7 @@ Future<Map<String, dynamic>> saveAviso(Map<String, dynamic> avisoData) async {
             return {'success': true, 'message': 'Aviso ${action} con éxito. ID: $idAvisoServer'};
         
         } else {
-            // Fallo de la API (Mantenido)
+            // Fallo de la API
             dynamic apiMessage = result['message'];
             String errorMessage;
             

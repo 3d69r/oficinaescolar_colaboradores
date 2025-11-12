@@ -1,8 +1,12 @@
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:oficinaescolar_colaboradores/providers/user_provider.dart';
 // ⭐️ IMPORTACIÓN NECESARIA para el Editor WYSIWYG ⭐️
 import 'package:html_editor_enhanced/html_editor.dart';
+
+// ⚠️ Se asume que has agregado 'package:file_picker/file_picker.dart'
+// para la funcionalidad de archivo. (No lo agrego aquí para no modificar la lista de imports proporcionada)
 
 class CrearAvisoScreen extends StatefulWidget {
   final Map<String, dynamic>? avisoParaEditar; // Null si es un nuevo aviso
@@ -18,15 +22,7 @@ class _CrearAvisoScreenState extends State<CrearAvisoScreen> {
 
   // Controladores y variables de estado para los campos
   final _tituloController = TextEditingController();
-  
-  // ⭐️ CONTROLADOR: Para el editor HTML ⭐️
   final HtmlEditorController _cuerpoEditorController = HtmlEditorController();
-  
-  // Variables de estado auxiliares (mantengo las que usabas)
-  // Color _colorSeleccionado = Colors.black;
-  // double _sizeSeleccionado = 16.0; 
-
-  // Controladores para las opciones de respuesta múltiple
   final _opcion1Controller = TextEditingController();
   final _opcion2Controller = TextEditingController();
   final _opcion3Controller = TextEditingController();
@@ -34,16 +30,17 @@ class _CrearAvisoScreenState extends State<CrearAvisoScreen> {
   // DINÁMICOS: Se llenan en initState con datos del Provider
   List<String> _destinatariosPrincipales = ['Todos'];
   String _destinatarioSeleccionado = 'Todos'; 
-  
   Map<String, List<String>> _opcionesEspecificas = {};
-  String? _seleccionEspecifica; // Valor seleccionado en el segundo combo
-  
+  String? _seleccionEspecifica;
   String _respuestaSeleccionada = 'Ninguna';
   DateTime _fechaInicio = DateTime.now();
   DateTime _fechaFin = DateTime.now().add(const Duration(days: 7));
-  
-  // ⭐️ NUEVA VARIABLE: Contenido HTML inicial para el editor ⭐️
   String _initialHtmlContent = ''; 
+
+  // ⭐️ NUEVOS ESTADOS PARA CONTROL DE ARCHIVO/COMENTARIO ⭐️
+  bool _mostrarEditor = false; // El cuadro de comentario se esconde por defecto
+  String? _rutaArchivoAdjunto; // Ruta local del archivo
+  // ----------------------------------------------------
 
   void _resetSeleccionEspecifica() {
     final String key = _destinatarioSeleccionado;
@@ -104,9 +101,15 @@ class _CrearAvisoScreenState extends State<CrearAvisoScreen> {
     // Llenar los campos si se está editando un aviso
     if (widget.avisoParaEditar != null) {
       _tituloController.text = widget.avisoParaEditar!['titulo'] as String? ?? '';
-      
-      // ⭐️ CORRECCIÓN CLAVE: Almacenar el contenido HTML inicial aquí ⭐️
       _initialHtmlContent = widget.avisoParaEditar!['comentario'] as String? ?? ''; 
+      
+      // Si el aviso tiene contenido HTML, mostramos el editor por defecto
+      if (_initialHtmlContent.isNotEmpty) {
+          _mostrarEditor = true;
+      }
+      
+      // ⚠️ NOTA: Si tu aviso guarda la ruta del archivo, DEBES cargarla aquí
+      // _rutaArchivoAdjunto = widget.avisoParaEditar!['ruta_archivo'] as String?;
       
       _destinatarioSeleccionado = widget.avisoParaEditar!['destinatario_tipo'] as String? ?? 'Todos'; 
       
@@ -127,7 +130,6 @@ class _CrearAvisoScreenState extends State<CrearAvisoScreen> {
       
       _seleccionEspecifica = widget.avisoParaEditar!['destinatario_valor'] as String?;
       
-      // Lógica de opciones múltiples (Asumiendo que 'opciones_multiples' es la clave correcta)
       final String? opciones = widget.avisoParaEditar!['opciones_multiples'] as String?; 
       if (opciones != null && opciones.isNotEmpty) {
           final List<String> parts = opciones.split(',');
@@ -177,24 +179,92 @@ class _CrearAvisoScreenState extends State<CrearAvisoScreen> {
       });
     }
   }
+  
+  // ⭐️ NUEVA FUNCIÓN: Seleccionar Archivo (con límite de tamaño) ⭐️
+Future<void> _seleccionarArchivo() async {
+  // Definimos la constante del tamaño máximo: 1 MB en bytes
+  const int maxFileSize = 1048576; 
+  
+  try {
+    final FilePickerResult? result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['pdf', 'jpg', 'jpeg', 'png'],
+    );
 
+    if (result != null && result.files.single.path != null) {
+      final PlatformFile pickedFile = result.files.single;
+
+      // 1. VALIDACIÓN DEL TAMAÑO DEL ARCHIVO
+      if (pickedFile.size > maxFileSize) {
+        // Muestra un mensaje de error si excede el límite
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('¡El archivo es demasiado grande! Máximo 1 MB.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        // Terminamos la función sin asignar la ruta
+        return; 
+      }
+      
+      setState(() {
+        _rutaArchivoAdjunto = pickedFile.path;
+        _mostrarEditor = false; // Deshabilita el editor si hay archivo
+        _cuerpoEditorController.clear(); // Limpia el editor
+      });
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Archivo seleccionado: ${pickedFile.name}')),
+      );
+      
+    } else {
+      // El usuario canceló la selección.
+    }
+  } catch (e) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Error al seleccionar archivo: $e')),
+    );
+  }
+}
+
+  // ⭐️ NUEVA FUNCIÓN: Mostrar Editor ⭐️
+  void _mostrarEditorComentario() {
+    setState(() {
+      _mostrarEditor = true;
+      _rutaArchivoAdjunto = null; // 🛑 Elimina el archivo si se elige escribir
+    });
+  }
+  
+  // ⭐️ Lógica de guardar Aviso (Crear/Editar) ⭐️
   void _guardarAviso() async { 
     if (_formKey.currentState!.validate()) {
       
       final userProvider = Provider.of<UserProvider>(context, listen: false);
       
-      // ⭐️ OBTENER EL CONTENIDO HTML DEL EDITOR ⭐️
-      // Usamos 'getText' y manejamos el posible error si se llama antes de cargar (aunque el paquete lo mitiga)
-      final String cuerpoHtml = await _cuerpoEditorController.getText();
+      String cuerpoHtml = '';
       
-      // Validación básica del contenido (ignorando etiquetas HTML vacías)
-      if (cuerpoHtml.trim().isEmpty || cuerpoHtml.trim() == '<p><br></p>') {
+      // ⚠️ VALIDACIÓN CLAVE: Debe haber un cuerpo de mensaje O un archivo adjunto
+      if (_rutaArchivoAdjunto == null && !_mostrarEditor) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('El campo de comentario no puede estar vacío.')),
+            const SnackBar(content: Text('Debe escribir un comentario o adjuntar un archivo (PDF/Imagen).')),
           );
           return;
       }
+      
+      if (_mostrarEditor) {
+          // Si el editor está visible, tomamos el texto
+          cuerpoHtml = await _cuerpoEditorController.getText();
 
+          // Validación de contenido de editor
+          if (cuerpoHtml.trim().isEmpty || cuerpoHtml.trim() == '<p><br></p>') {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('El campo de comentario no puede estar vacío.')),
+              );
+              return;
+          }
+      }
+      
+      // La lógica de respuesta múltiple (mantenida)
       String opcionesMultiples = '';
       String tipoRespuestaAPI = _respuestaSeleccionada; 
       
@@ -215,6 +285,7 @@ class _CrearAvisoScreenState extends State<CrearAvisoScreen> {
           }
       }
       
+      // Lógica de destinatario específico (mantenida)
       final bool esDestinatarioEspecifico = _opcionesEspecificas.containsKey(_destinatarioSeleccionado);
       final bool hayOpcionesDisponibles = _opcionesEspecificas[_destinatarioSeleccionado]?.isNotEmpty ?? false;
       
@@ -226,12 +297,11 @@ class _CrearAvisoScreenState extends State<CrearAvisoScreen> {
           destinatarioValor = null;
       }
       
-      // Usamos 'id_calendario' ya que es el campo que espera el Provider
       final String idAviso = widget.avisoParaEditar?['id_calendario'] as String? ?? '0';
 
       final avisoDataParaProvider = {
         'titulo': _tituloController.text,
-        'cuerpo': cuerpoHtml, // ⭐️ ENVIAMOS EL HTML generado ⭐️
+        'cuerpo': cuerpoHtml, // El cuerpo estará vacío si se adjuntó archivo
         'destinatario_tipo': _destinatarioSeleccionado,
         'destinatario_valor': destinatarioValor,
         'requiere_respuesta': tipoRespuestaAPI, 
@@ -239,13 +309,14 @@ class _CrearAvisoScreenState extends State<CrearAvisoScreen> {
         'fecha_fin': _fechaFin.toIso8601String().substring(0, 10),
         'id_calendario': idAviso, 
         'opciones_multiples': opcionesMultiples,
+        'archivo': _rutaArchivoAdjunto, // ⭐️ VARIABLE DE ARCHIVO ADJUNTO ⭐️
       };
 
-      print('--- CREACIÓN DE AVISO (ID: ${idAviso}) ---');
+      print('--- CREACIÓN/EDICIÓN DE AVISO (ID: ${idAviso}) ---');
       print('Datos enviados al Provider: $avisoDataParaProvider');
       print('-------------------------------------------');
       
-      // Mostrar indicador de carga
+      // (Resto de la lógica de la llamada a la API y el manejo de respuesta...)
       final snackBar = SnackBar(
         content: Row(
           children: const [
@@ -260,10 +331,8 @@ class _CrearAvisoScreenState extends State<CrearAvisoScreen> {
         ScaffoldMessenger.of(context).showSnackBar(snackBar);
       });
 
-      // Llamar a la API a través del Provider
       final result = await userProvider.saveAviso(avisoDataParaProvider);
 
-      // Manejo de la respuesta
       if (!mounted) return; 
 
       ScaffoldMessenger.of(context).hideCurrentSnackBar(); 
@@ -280,6 +349,7 @@ class _CrearAvisoScreenState extends State<CrearAvisoScreen> {
       }
     }
 }
+// ... (El resto de las funciones auxiliares se mantienen sin cambios) ...
 
   void _eliminarAviso() {
     // Implementar la lógica de eliminación aquí
@@ -290,10 +360,9 @@ class _CrearAvisoScreenState extends State<CrearAvisoScreen> {
     Navigator.pop(context); // Regresar a la pantalla de lista
   }
 
-  // ⭐️ FUNCIÓN AGREGADA: Construye la barra de herramientas como un widget separado ⭐️
   Widget _buildCustomToolbar(BuildContext context, Color dynamicPrimaryColor) {
+    // ... (Tu función _buildCustomToolbar se mantiene igual) ...
     return Container(
-      // Estilo para el contenedor de la barra (opcional, pero ayuda a delimitar)
       decoration: BoxDecoration(
         color: dynamicPrimaryColor.withOpacity(0.1), 
         borderRadius: BorderRadius.circular(5.0),
@@ -301,10 +370,9 @@ class _CrearAvisoScreenState extends State<CrearAvisoScreen> {
       ),
       padding: const EdgeInsets.symmetric(horizontal: 5.0, vertical: 8.0),
       child: ToolbarWidget(
-        controller: _cuerpoEditorController, // ¡Importante: pasar el controlador!
+        controller: _cuerpoEditorController,
         callbacks: Callbacks(),
         htmlToolbarOptions: const HtmlToolbarOptions(
-          // Definir los botones que queremos que aparezcan aquí
           defaultToolbarButtons: [
             FontButtons(
               strikethrough: false, 
@@ -322,12 +390,9 @@ class _CrearAvisoScreenState extends State<CrearAvisoScreen> {
               lineHeight: false, 
               caseConverter: false,
             ),
-            /*ListButtons(
-              listStyles: true, 
-            ),*/
             InsertButtons(
               link: true,       
-              picture: true, 
+              picture: false, 
               audio: false, 
               video: false, 
               table: false, 
@@ -338,7 +403,6 @@ class _CrearAvisoScreenState extends State<CrearAvisoScreen> {
       ),
     );
   }
-  // ⭐️ FIN DE FUNCIÓN AGREGADA ⭐️
 
   @override
   Widget build(BuildContext context) {
@@ -350,7 +414,6 @@ class _CrearAvisoScreenState extends State<CrearAvisoScreen> {
     final bool mostrarComboEspecifico = _opcionesEspecificas.containsKey(_destinatarioSeleccionado) && (_opcionesEspecificas[_destinatarioSeleccionado]?.isNotEmpty ?? false);
     final bool mostrarOpcionesMultiples = _respuestaSeleccionada == 'Seleccion multiple';
 
-    // ⭐️ CAMBIO CLAVE: Envolver el Scaffold con SafeArea ⭐️
     return SafeArea( 
       child: Scaffold(
         appBar: AppBar(
@@ -376,7 +439,7 @@ class _CrearAvisoScreenState extends State<CrearAvisoScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
-                // ... (todo el contenido original, Dropdowns, Fechas, TextFields y HtmlEditor) ...
+                // ... (Dropdowns y Fechas) ...
                 _buildFiltroDropdown(
                   label: 'Mostrar en Calendario de',
                   value: _destinatarioSeleccionado,
@@ -469,32 +532,94 @@ class _CrearAvisoScreenState extends State<CrearAvisoScreen> {
                 ),
                 const SizedBox(height: 20),
                 
-                const Text('Comentario:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                
+                // ⭐️ ÁREA DE SELECCIÓN: COMENTARIO vs ARCHIVO ⭐️
+                const Text('Contenido:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                 const SizedBox(height: 10),
-                _buildCustomToolbar(context, dynamicPrimaryColor),
-                const SizedBox(height: 10),
-                
-                HtmlEditor(
-                  controller: _cuerpoEditorController,
-                  htmlEditorOptions: HtmlEditorOptions(
-                    hint: "Escriba aquí el cuerpo del aviso...",
-                    initialText: _initialHtmlContent, 
-                    darkMode: Theme.of(context).brightness == Brightness.dark,
-                    adjustHeightForKeyboard: true,
-                  ),
-                  htmlToolbarOptions: const HtmlToolbarOptions(
-                    toolbarPosition: ToolbarPosition.custom, 
-                    toolbarType: ToolbarType.nativeGrid,
-                  ),
-                  otherOptions: OtherOptions(
-                    height: 400, 
+
+                // 1. Botones de Acción
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                  children: [
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: _seleccionarArchivo,
+                        icon: const Icon(Icons.attach_file),
+                        label: const Text('Adjuntar Archivo'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: _rutaArchivoAdjunto != null ? Colors.green : dynamicPrimaryColor,
+                          foregroundColor: Colors.white,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: _mostrarEditorComentario,
+                        icon: const Icon(Icons.edit),
+                        label: const Text('Escribir Comentario'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: _mostrarEditor ? Colors.green : dynamicPrimaryColor,
+                          foregroundColor: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 15),
+
+                // 2. Estado de Archivo Adjunto
+                if (_rutaArchivoAdjunto != null) 
+                  Container(
+                    padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      border: Border.all(color: Colors.grey.shade400),
-                      borderRadius: BorderRadius.circular(5.0),
+                      color: Colors.lightBlue.shade100,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.description, color: Colors.blue),
+                        const SizedBox(width: 10),
+                        Expanded(child: Text('Archivo adjunto: ${_rutaArchivoAdjunto!.split('/').last}', overflow: TextOverflow.ellipsis)),
+                        IconButton(
+                          icon: const Icon(Icons.close, color: Colors.red),
+                          onPressed: () => setState(() => _rutaArchivoAdjunto = null),
+                        ),
+                      ],
                     ),
                   ),
-                ),
+
+                // 3. Editor de Comentario (se muestra condicionalmente)
+                if (_mostrarEditor) ...[
+                  if (_rutaArchivoAdjunto != null) 
+                    const Padding(
+                      padding: EdgeInsets.only(bottom: 10),
+                      child: Text('⚠️ El archivo adjunto se eliminará al guardar si escribes un comentario.', style: TextStyle(color: Colors.orange)),
+                    ),
+                    
+                  _buildCustomToolbar(context, dynamicPrimaryColor),
+                  const SizedBox(height: 10),
+                  
+                  HtmlEditor(
+                    controller: _cuerpoEditorController,
+                    htmlEditorOptions: HtmlEditorOptions(
+                      hint: "Escriba aquí el cuerpo del aviso...",
+                      initialText: _initialHtmlContent, 
+                      darkMode: Theme.of(context).brightness == Brightness.dark,
+                      adjustHeightForKeyboard: true,
+                    ),
+                    htmlToolbarOptions: const HtmlToolbarOptions(
+                      toolbarPosition: ToolbarPosition.custom, 
+                      toolbarType: ToolbarType.nativeGrid,
+                    ),
+                    otherOptions: OtherOptions(
+                      height: 400, 
+                      decoration: BoxDecoration(
+                        border: Border.all(color: Colors.grey.shade400),
+                        borderRadius: BorderRadius.circular(5.0),
+                      ),
+                    ),
+                  ),
+                ],
                 
                 const SizedBox(height: 30),
                 // Botón de guardar
@@ -515,6 +640,7 @@ class _CrearAvisoScreenState extends State<CrearAvisoScreen> {
     );
   }
 
+  // ... (El resto de las funciones _buildFiltroDropdown, _buildDateInput, _buildOpcionTextField se mantienen sin cambios) ...
   // Widget para Dropdown (Mantenido)
   Widget _buildFiltroDropdown({
     required String label,
