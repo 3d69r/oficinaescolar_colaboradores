@@ -664,7 +664,7 @@ class _PerfilScreenState extends State<PerfilScreen>
                             field['value']!,
                             textAlign: TextAlign.center,
                             style: TextStyle(
-                              fontSize: 17, 
+                              fontSize: 15, 
                               letterSpacing: .5, 
                               color: colores.credLetraColor1,
                               fontWeight: FontWeight.normal, 
