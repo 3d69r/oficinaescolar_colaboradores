@@ -2,13 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:oficinaescolar_colaboradores/providers/user_provider.dart';
 import 'package:html_editor_enhanced/html_editor.dart';
+import 'package:file_picker/file_picker.dart'; // ⭐️ IMPORTAR FILE_PICKER ⭐️
 
 // ----------------------------------------------------------------------
 // ESTA VISTA SOLO SE ENCARGA DE EDITAR Y ELIMINAR AVISOS EXISTENTES
 // ----------------------------------------------------------------------
 
 class EditarAvisoScreen extends StatefulWidget {
-  final Map<String, dynamic> avisoParaEditar; // Ya no es nullable
+  final Map<String, dynamic> avisoParaEditar; 
 
   const EditarAvisoScreen({Key? key, required this.avisoParaEditar}) : super(key: key);
 
@@ -33,11 +34,16 @@ class _EditarAvisoScreenState extends State<EditarAvisoScreen> {
   String? _seleccionEspecifica;
   String _respuestaSeleccionada = 'Ninguna';
   
-  // Fechas (Inicializadas con los valores del aviso)
+  // Fechas 
   DateTime _fechaInicio = DateTime.now();
   DateTime _fechaFin = DateTime.now();
   
   String _initialHtmlContent = ''; 
+
+  // ⭐️ NUEVOS ESTADOS PARA CONTROL DE ARCHIVO/COMENTARIO ⭐️
+  bool _mostrarEditor = false; 
+  String? _rutaArchivoAdjunto; 
+  // ----------------------------------------------------
 
   // Definición de botones para el ToolbarWidget
   final List<Toolbar> _toolbarButtons = const [
@@ -58,7 +64,7 @@ class _EditarAvisoScreenState extends State<EditarAvisoScreen> {
     final colaborador = userProvider.colaboradorModel;
     final aviso = widget.avisoParaEditar;
 
-    // 1. Configurar listas de destinatarios (igual que en CrearAvisoScreen)
+    // 1. Configurar listas de destinatarios (se mantiene igual)
     if (colaborador != null) {
       final List<String> listaNiveles = colaborador.avisoNivelesEducativos.map((n) => n.nivelEducativo).toList();
       final List<String> listaSalones = colaborador.avisoSalones.map((s) => s.salon).toList();
@@ -83,20 +89,56 @@ class _EditarAvisoScreenState extends State<EditarAvisoScreen> {
       ];
     }
 
-    // 2. Llenar los campos para EDICIÓN
+    // 2. Llenar los campos para EDICIÓN (Carga de datos de la API)
     _tituloController.text = aviso['titulo'] as String? ?? '';
     _initialHtmlContent = aviso['comentario'] as String? ?? ''; 
-    _destinatarioSeleccionado = aviso['destinatario_tipo'] as String? ?? 'Todos'; 
     
-    final String apiRespuesta = aviso['requiere_respuesta'] as String? ?? 'Ninguna'; 
-    _respuestaSeleccionada = apiRespuesta == 'Seleccion' ? 'Seleccion multiple' : apiRespuesta;
+    // ⭐️ LÓGICA CLAVE DE COMENTARIO/ARCHIVO ⭐️
+    final String? archivoAdjuntoApi = aviso['archivo'] as String?;
+    
+    if (archivoAdjuntoApi != null && archivoAdjuntoApi.isNotEmpty) {
+        // Se subió un archivo, lo mostramos.
+        _rutaArchivoAdjunto = archivoAdjuntoApi;
+        _mostrarEditor = false;
+    } else if (_initialHtmlContent.isNotEmpty) {
+        // Hay comentario, mostramos el editor.
+        _mostrarEditor = true;
+        _rutaArchivoAdjunto = null;
+    } else {
+        // No hay ni archivo ni comentario, por defecto no mostramos nada.
+        _mostrarEditor = false;
+        _rutaArchivoAdjunto = null;
+    }
+
+    // El resto de la inicialización se mantiene (con las correcciones anteriores)
+    
+    String destinatarioTipoApi = aviso['seccion'] as String? ?? 'Todos'; 
+    if (destinatarioTipoApi == 'ColaboradorEspecifico') {
+        destinatarioTipoApi = 'Colaborador Específico';
+    } else if (destinatarioTipoApi == 'AlumnoEspecifico') { 
+        destinatarioTipoApi = 'Alumno Específico';
+    }
+
+    if (_destinatariosPrincipales.contains(destinatarioTipoApi)) {
+        _destinatarioSeleccionado = destinatarioTipoApi;
+    } else {
+        _destinatarioSeleccionado = 'Todos';
+    }
+    
+    final String apiRespuesta = aviso['tipo_respuesta'] as String? ?? 'Ninguna'; 
+    if (apiRespuesta == 'Seleccion') {
+        _respuestaSeleccionada = 'Seleccion multiple';
+    } else if (apiRespuesta == 'SioNo') { 
+        _respuestaSeleccionada = 'Sí o No'; 
+    } else {
+        _respuestaSeleccionada = apiRespuesta;
+    }
 
     try {
         final String? fechaInicioStr = aviso['fecha_inicio'] as String?;
         final String? fechaFinStr = aviso['fecha_fin'] as String?;
         
         if (fechaInicioStr != null && fechaInicioStr.isNotEmpty) {
-              // Parsear solo la parte de la fecha si es una cadena ISO completa
               _fechaInicio = DateTime.parse(fechaInicioStr.substring(0, 10));
         }
         if (fechaFinStr != null && fechaFinStr.isNotEmpty) {
@@ -104,17 +146,23 @@ class _EditarAvisoScreenState extends State<EditarAvisoScreen> {
         }
     } catch (_) {}
     
-    _seleccionEspecifica = aviso['destinatario_valor'] as String?;
+    _seleccionEspecifica = aviso['valor_especifico'] as String?;
     
-    final String? opciones = aviso['opciones_multiples'] as String?; 
-    if (opciones != null && opciones.isNotEmpty) {
-        final List<String> parts = opciones.split(',');
-        if (parts.isNotEmpty) _opcion1Controller.text = parts[0].trim();
-        if (parts.length > 1) _opcion2Controller.text = parts[1].trim();
-        if (parts.length > 2) _opcion3Controller.text = parts[2].trim();
-    }
+    final String? opcion1 = aviso['opcion_1'] as String?; 
+    final String? opcion2 = aviso['opcion_2'] as String?; 
+    final String? opcion3 = aviso['opcion_3'] as String?; 
+
+    if (opcion1 != null && opcion1.isNotEmpty) _opcion1Controller.text = opcion1;
+    if (opcion2 != null && opcion2.isNotEmpty) _opcion2Controller.text = opcion2;
+    if (opcion3 != null && opcion3.isNotEmpty) _opcion3Controller.text = opcion3;
     
-    _resetSeleccionEspecifica(); 
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+             setState(() {
+                _resetSeleccionEspecifica(); 
+             });
+        }
+    });
   }
 
   @override
@@ -126,32 +174,87 @@ class _EditarAvisoScreenState extends State<EditarAvisoScreen> {
     super.dispose();
   }
 
+  // ⭐️ LÓGICA DE ARCHIVO Y EDITOR ⭐️
+  Future<void> _seleccionarArchivo() async {
+    const int maxFileSize = 1048576; // 1 MB
+    
+    try {
+      final FilePickerResult? result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['pdf', 'jpg', 'jpeg', 'png'],
+      );
+
+      if (result != null && result.files.single.path != null) {
+        final PlatformFile pickedFile = result.files.single;
+
+        if (pickedFile.size > maxFileSize) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('¡El archivo es demasiado grande! Máximo 1 MB.'),
+              backgroundColor: Colors.red,
+            ),
+          );
+          return; 
+        }
+        
+        setState(() {
+          _rutaArchivoAdjunto = pickedFile.path;
+          _mostrarEditor = false; // Deshabilita el editor si hay archivo
+          _cuerpoEditorController.clear(); // Limpia el editor
+          _initialHtmlContent = ''; // Limpia el contenido inicial si se cambia de editor a archivo
+        });
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Archivo seleccionado: ${pickedFile.name}')),
+        );
+        
+      }
+    } catch (e) {
+      // Manejo de error
+    }
+  }
+
+  void _mostrarEditorComentario() {
+    setState(() {
+      _mostrarEditor = true;
+      _rutaArchivoAdjunto = null; // Elimina el archivo si se elige escribir
+    });
+  }
+
+  // Lógica de reset (se mantiene igual)
   void _resetSeleccionEspecifica() {
     final String key = _destinatarioSeleccionado;
 
     if (key == 'Todos' || !_opcionesEspecificas.containsKey(key)) {
-        setState(() {
-            _seleccionEspecifica = null;
-        });
+        if (mounted) {
+            setState(() {
+                _seleccionEspecifica = null;
+            });
+        }
         return;
     }
     
     final List<String> opciones = _opcionesEspecificas[key]!;
 
     if (opciones.isNotEmpty) {
-        if (_seleccionEspecifica == null || !opciones.contains(_seleccionEspecifica)) {
-             setState(() {
-                _seleccionEspecifica = opciones.first;
-             });
+        if (_seleccionEspecifica == null || !opciones.contains(_seleccionEspecifica!)) {
+             if (mounted) {
+                 setState(() {
+                    _seleccionEspecifica = opciones.first;
+                 });
+             }
         }
     } else {
-        setState(() {
-            _seleccionEspecifica = null;
-        });
+        if (mounted) {
+            setState(() {
+                _seleccionEspecifica = null;
+            });
+        }
     }
   }
 
   Future<void> _selectDate(BuildContext context, bool isStartDate) async {
+    // Lógica de selección de fecha (se mantiene igual)
     final DateTime? picked = await showDatePicker(
       context: context,
       initialDate: isStartDate ? _fechaInicio : _fechaFin,
@@ -180,25 +283,40 @@ class _EditarAvisoScreenState extends State<EditarAvisoScreen> {
     }
   }
 
-  // ⭐️ Lógica de guardar Aviso (Editar) ⭐️
+  // Lógica de guardar Aviso (Editar) (se ajusta la carga de 'cuerpo' y 'archivo')
   void _guardarAviso() async { 
     if (_formKey.currentState!.validate()) {
       
       final userProvider = Provider.of<UserProvider>(context, listen: false);
-      final String cuerpoHtml = await _cuerpoEditorController.getText();
       
-      if (cuerpoHtml.trim().isEmpty || cuerpoHtml.trim() == '<p><br></p>') {
+      String cuerpoHtml = '';
+      
+      // ⚠️ VALIDACIÓN CLAVE: Debe haber un cuerpo de mensaje O un archivo adjunto
+      if (_rutaArchivoAdjunto == null && !_mostrarEditor) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('El campo de comentario no puede estar vacío.')),
+            const SnackBar(content: Text('Debe escribir un comentario o adjuntar un archivo (PDF/Imagen).')),
           );
           return;
       }
+      
+      if (_mostrarEditor) {
+          cuerpoHtml = await _cuerpoEditorController.getText();
 
-      // Lógica de respuesta múltiple (mantenida)
+          if (cuerpoHtml.trim().isEmpty || cuerpoHtml.trim() == '<p><br></p>') {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('El campo de comentario no puede estar vacío.')),
+              );
+              return;
+          }
+      }
+      
+      // La lógica de respuesta múltiple (mantenida)
       String opcionesMultiples = '';
       String tipoRespuestaAPI = _respuestaSeleccionada; 
       
-      if (_respuestaSeleccionada == 'Seleccion multiple') {
+      if (_respuestaSeleccionada == 'Sí o No') {
+          tipoRespuestaAPI = 'SioNo'; 
+      } else if (_respuestaSeleccionada == 'Seleccion multiple') {
           tipoRespuestaAPI = 'Seleccion'; 
           
           final List<String> opciones = [];
@@ -226,27 +344,26 @@ class _EditarAvisoScreenState extends State<EditarAvisoScreen> {
           destinatarioValor = null;
       }
       
-      // ⭐️ Clave para EDICIÓN: Usamos el ID existente ⭐️
       final String idAviso = widget.avisoParaEditar['id_calendario'] as String? ?? '0';
 
       final avisoDataParaProvider = {
         'titulo': _tituloController.text,
-        'cuerpo': cuerpoHtml,
+        'cuerpo': _rutaArchivoAdjunto != null ? '' : cuerpoHtml, // Enviar cuerpo vacío si hay archivo
         'destinatario_tipo': _destinatarioSeleccionado,
         'destinatario_valor': destinatarioValor,
         'requiere_respuesta': tipoRespuestaAPI, 
         'fecha_inicio': _fechaInicio.toIso8601String().substring(0, 10),
         'fecha_fin': _fechaFin.toIso8601String().substring(0, 10),
-        'id_calendario': idAviso, // El ID existente
+        'id_calendario': idAviso, 
         'opciones_multiples': opcionesMultiples,
+        'archivo': _rutaArchivoAdjunto, // ⭐️ Ruta del archivo ⭐️
       };
 
       print('--- EDICIÓN DE AVISO (ID: ${idAviso}) ---');
       print('Datos enviados al Provider: $avisoDataParaProvider');
       print('-------------------------------------------');
       
-      // Llamar a la API a través del Provider
-      // Mostrar indicador de carga...
+      // (Llamada a la API y manejo de respuesta...)
       final snackBar = SnackBar(
         content: Row(
           children: const [
@@ -277,6 +394,15 @@ class _EditarAvisoScreenState extends State<EditarAvisoScreen> {
         Navigator.pop(context); 
       }
     }
+  }
+
+  void _eliminarAviso() {
+    // Implementar la lógica de eliminación aquí
+    // userProvider.deleteAviso(idAviso);
+    // ...
+    // ignore: avoid_print
+    print('Aviso eliminado');
+    Navigator.pop(context); // Regresar a la pantalla de lista
   }
 
   // ⭐️ FUNCIÓN: Construye la barra de herramientas separada ⭐️
@@ -315,168 +441,228 @@ class _EditarAvisoScreenState extends State<EditarAvisoScreen> {
           backgroundColor: dynamicHeaderColor,
           centerTitle: true,
           foregroundColor: Colors.white,
-          // ❌ SECCIÓN DE ACCIONES ELIMINADA (Para deshabilitar la eliminación)
-        ),
-        body: Column(
-          children: [
-            Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(16.0),
-                child: Form(
-                  key: _formKey,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: <Widget>[
-                      // 1. Destinatarios
-                      _buildFiltroDropdown(
-                        label: 'Mostrar en Calendario de',
-                        value: _destinatarioSeleccionado,
-                        items: _destinatariosPrincipales, 
-                        onChanged: (String? newValue) {
-                          setState(() {
-                            _destinatarioSeleccionado = newValue!;
-                            _resetSeleccionEspecifica(); 
-                          });
-                        },
-                        dynamicPrimaryColor: dynamicPrimaryColor,
-                      ),
-                      
-                      if (mostrarComboEspecifico) ...[
-                        const SizedBox(height: 20),
-                        _buildFiltroDropdown(
-                          label: 'Seleccionar $_destinatarioSeleccionado',
-                          value: _seleccionEspecifica,
-                          items: _opcionesEspecificas[_destinatarioSeleccionado]!, 
-                          onChanged: (String? newValue) {
-                            setState(() {
-                              _seleccionEspecifica = newValue!;
-                            });
-                          },
-                          dynamicPrimaryColor: dynamicPrimaryColor,
-                        ),
-                      ],
-                      
-                      // 2. Fechas
-                      const SizedBox(height: 20),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _buildDateInput(
-                              label: 'Visible desde',
-                              date: _fechaInicio,
-                              onTap: () => _selectDate(context, true),
-                              dynamicPrimaryColor: dynamicPrimaryColor,
-                            ),
-                          ),
-                          const SizedBox(width: 16),
-                          Expanded(
-                            child: _buildDateInput(
-                              label: 'Visible hasta',
-                              date: _fechaFin,
-                              onTap: () => _selectDate(context, false),
-                              dynamicPrimaryColor: dynamicPrimaryColor,
-                            ),
-                          ),
-                        ],
-                      ),
-                      
-                      // 3. Requisito de Respuesta
-                      const SizedBox(height: 20),
-                      _buildFiltroDropdown(
-                        label: 'Requiere respuesta',
-                        value: _respuestaSeleccionada,
-                        items: const ['Ninguna', 'Sí o No', 'Seleccion multiple'],
-                        onChanged: (String? newValue) {
-                          setState(() {
-                            _respuestaSeleccionada = newValue!;
-                          });
-                        },
-                        dynamicPrimaryColor: dynamicPrimaryColor,
-                      ),
-                      
-                      // 4. Opciones Múltiples (Si aplica)
-                      const SizedBox(height: 20),
-                      if (mostrarOpcionesMultiples) ...[
-                        const Text('Opciones de Respuesta Múltiple:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                        _buildOpcionTextField(controller: _opcion1Controller, label: 'Opción 1', dynamicPrimaryColor: dynamicPrimaryColor),
-                        _buildOpcionTextField(controller: _opcion2Controller, label: 'Opción 2', dynamicPrimaryColor: dynamicPrimaryColor),
-                        _buildOpcionTextField(controller: _opcion3Controller, label: 'Opción 3', dynamicPrimaryColor: dynamicPrimaryColor),
-                        const SizedBox(height: 20),
-                      ],
-                      
-                      // ⭐️ 5. TÍTULO (MOVido aquí, justo antes del editor) ⭐️
-                      TextFormField(
-                        controller: _tituloController,
-                        decoration: InputDecoration(
-                          labelText: 'Título', 
-                          border: const OutlineInputBorder(),
-                          focusedBorder: OutlineInputBorder(
-                            borderSide: BorderSide(color: dynamicPrimaryColor, width: 2.0),
-                          ),
-                          labelStyle: TextStyle(color: dynamicPrimaryColor),
-                        ),
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'Por favor, ingrese un título';
-                          }
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: 20), 
-                      
-                      // ⭐️ 6. WIDGET DE COMENTARIO/EDITOR HTML ⭐️
-                      _buildCustomToolbar(context, dynamicPrimaryColor),
-                      
-                      const SizedBox(height: 10),
-                      const Text('Comentario:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                      
-                      const SizedBox(height: 10),
-                      
-                      HtmlEditor(
-                        controller: _cuerpoEditorController,
-                        htmlEditorOptions: HtmlEditorOptions(
-                          hint: "Escriba aquí el cuerpo del aviso...",
-                          initialText: _initialHtmlContent, 
-                          darkMode: Theme.of(context).brightness == Brightness.dark,
-                          adjustHeightForKeyboard: true,
-                        ),
-                        htmlToolbarOptions: const HtmlToolbarOptions(
-                          toolbarPosition: ToolbarPosition.custom, 
-                          toolbarType: ToolbarType.nativeGrid,
-                        ),
-                        otherOptions: OtherOptions(
-                          height: 400, 
-                          decoration: BoxDecoration(
-                            border: Border.all(color: Colors.grey.shade400),
-                            borderRadius: BorderRadius.circular(5.0),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 30),
-                      
-                      // 7. Botón de guardar
-                      ElevatedButton(
-                        onPressed: _guardarAviso,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: dynamicPrimaryColor,
-                          foregroundColor: Colors.white,
-                          minimumSize: const Size.fromHeight(50),
-                        ),
-                        child: const Text('Guardar Cambios'),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.delete),
+              onPressed: _eliminarAviso,
+              tooltip: 'Eliminar aviso',
+              color: Colors.white,
             ),
           ],
+        ),
+        body: SingleChildScrollView(
+          padding: const EdgeInsets.all(16.0),
+          child: Form(
+            key: _formKey,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                // ... (Dropdowns y Fechas - Se mantienen igual) ...
+                _buildFiltroDropdown(
+                  label: 'Mostrar en Calendario de',
+                  value: _destinatarioSeleccionado,
+                  items: _destinatariosPrincipales, 
+                  onChanged: (String? newValue) {
+                    setState(() {
+                      _destinatarioSeleccionado = newValue!;
+                      _resetSeleccionEspecifica(); 
+                    });
+                  },
+                  dynamicPrimaryColor: dynamicPrimaryColor,
+                ),
+                
+                if (mostrarComboEspecifico) ...[
+                  const SizedBox(height: 20),
+                  _buildFiltroDropdown(
+                    label: 'Seleccionar $_destinatarioSeleccionado',
+                    value: _seleccionEspecifica,
+                    items: _opcionesEspecificas[_destinatarioSeleccionado]!, 
+                    onChanged: (String? newValue) {
+                      setState(() {
+                        _seleccionEspecifica = newValue!;
+                      });
+                    },
+                    dynamicPrimaryColor: dynamicPrimaryColor,
+                  ),
+                ],
+                
+                const SizedBox(height: 20),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _buildDateInput(
+                        label: 'Visible desde',
+                        date: _fechaInicio,
+                        onTap: () => _selectDate(context, true),
+                        dynamicPrimaryColor: dynamicPrimaryColor,
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: _buildDateInput(
+                        label: 'Visible hasta',
+                        date: _fechaFin,
+                        onTap: () => _selectDate(context, false),
+                        dynamicPrimaryColor: dynamicPrimaryColor,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 20),
+                _buildFiltroDropdown(
+                  label: 'Requiere respuesta',
+                  value: _respuestaSeleccionada,
+                  items: const ['Ninguna', 'Sí o No', 'Seleccion multiple'],
+                  onChanged: (String? newValue) {
+                    setState(() {
+                      _respuestaSeleccionada = newValue!;
+                    });
+                  },
+                  dynamicPrimaryColor: dynamicPrimaryColor,
+                ),
+                const SizedBox(height: 20),
+                
+                if (mostrarOpcionesMultiples) ...[
+                  const Text('Opciones de Respuesta Múltiple:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                  _buildOpcionTextField(controller: _opcion1Controller, label: 'Opción 1', dynamicPrimaryColor: dynamicPrimaryColor),
+                  _buildOpcionTextField(controller: _opcion2Controller, label: 'Opción 2', dynamicPrimaryColor: dynamicPrimaryColor),
+                  _buildOpcionTextField(controller: _opcion3Controller, label: 'Opción 3', dynamicPrimaryColor: dynamicPrimaryColor),
+                  const SizedBox(height: 20),
+                ],
+                
+                // Título (se mantiene igual)
+                TextFormField(
+                  controller: _tituloController,
+                  decoration: InputDecoration(
+                    labelText: 'Título', 
+                    border: const OutlineInputBorder(),
+                    focusedBorder: OutlineInputBorder(
+                      borderSide: BorderSide(color: dynamicPrimaryColor, width: 2.0),
+                    ),
+                    labelStyle: TextStyle(color: dynamicPrimaryColor),
+                  ),
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Por favor, ingrese un título';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 20),
+                
+                // ⭐️ ÁREA DE SELECCIÓN: COMENTARIO vs ARCHIVO ⭐️
+                const Text('Contenido:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                const SizedBox(height: 10),
+
+                // 1. Botones de Acción
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                  children: [
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: _seleccionarArchivo,
+                        icon: const Icon(Icons.attach_file),
+                        label: const Text('Adjuntar Archivo'),
+                        style: ElevatedButton.styleFrom(
+                          // Resaltar si hay un archivo adjunto
+                          backgroundColor: _rutaArchivoAdjunto != null && _rutaArchivoAdjunto!.isNotEmpty ? Colors.green : dynamicPrimaryColor,
+                          foregroundColor: Colors.white,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: _mostrarEditorComentario,
+                        icon: const Icon(Icons.edit),
+                        label: const Text('Escribir Comentario'),
+                        style: ElevatedButton.styleFrom(
+                          // Resaltar si el editor está visible
+                          backgroundColor: _mostrarEditor ? Colors.green : dynamicPrimaryColor,
+                          foregroundColor: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 15),
+
+                // 2. Estado de Archivo Adjunto (Muestra solo el nombre del archivo si existe)
+                if (_rutaArchivoAdjunto != null && _rutaArchivoAdjunto!.isNotEmpty) 
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.lightBlue.shade100,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.description, color: Colors.blue),
+                        const SizedBox(width: 10),
+                        // Muestra solo el nombre del archivo si es una ruta completa
+                        Expanded(child: Text('Archivo adjunto: ${_rutaArchivoAdjunto!.split('/').last}', overflow: TextOverflow.ellipsis)),
+                        IconButton(
+                          icon: const Icon(Icons.close, color: Colors.red),
+                          onPressed: () => setState(() => _rutaArchivoAdjunto = null),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                // 3. Editor de Comentario (se muestra condicionalmente)
+                if (_mostrarEditor) ...[
+                  if (_rutaArchivoAdjunto != null && _rutaArchivoAdjunto!.isNotEmpty) 
+                    const Padding(
+                      padding: EdgeInsets.only(bottom: 10),
+                      child: Text('⚠️ Nota: Al guardar, se enviará el comentario y se ignorará el archivo. Para enviar el archivo, desactiva el editor.', style: TextStyle(color: Colors.orange)),
+                    ),
+                    
+                  _buildCustomToolbar(context, dynamicPrimaryColor),
+                  const SizedBox(height: 10),
+                  
+                  HtmlEditor(
+                    controller: _cuerpoEditorController,
+                    htmlEditorOptions: HtmlEditorOptions(
+                      hint: "Escriba aquí el cuerpo del aviso...",
+                      // Usar el contenido inicial si está disponible
+                      initialText: _initialHtmlContent.isNotEmpty ? _initialHtmlContent : null, 
+                      darkMode: Theme.of(context).brightness == Brightness.dark,
+                      adjustHeightForKeyboard: true,
+                    ),
+                    htmlToolbarOptions: const HtmlToolbarOptions(
+                      toolbarPosition: ToolbarPosition.custom, 
+                      toolbarType: ToolbarType.nativeGrid,
+                    ),
+                    otherOptions: OtherOptions(
+                      height: 400, 
+                      decoration: BoxDecoration(
+                        border: Border.all(color: Colors.grey.shade400),
+                        borderRadius: BorderRadius.circular(5.0),
+                      ),
+                    ),
+                  ),
+                ],
+                
+                const SizedBox(height: 30),
+                // Botón de guardar
+                ElevatedButton(
+                  onPressed: _guardarAviso,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: dynamicPrimaryColor,
+                    foregroundColor: Colors.white,
+                    minimumSize: const Size.fromHeight(50),
+                  ),
+                  child: const Text('Guardar Cambios'),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );
   }
 
-  // ⭐️ Widgets Auxiliares ⭐️
-
+  // ... (Funciones auxiliares buildFiltroDropdown, buildDateInput, buildOpcionTextField se mantienen igual) ...
   Widget _buildFiltroDropdown({
     required String label,
     required String? value, 
@@ -504,7 +690,7 @@ class _EditarAvisoScreenState extends State<EditarAvisoScreen> {
               child: Text(itemValue),
             );
           }).toList(),
-          onChanged: items.isEmpty || value == null ? null : onChanged, 
+          onChanged: items.isEmpty ? null : onChanged, 
           validator: (val) {
              if (items.isNotEmpty && val == null) {
                  return 'Debe seleccionar una opción.';

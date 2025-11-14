@@ -321,8 +321,9 @@ Future<void> _confirmarYEliminar(BuildContext context, Map<String, dynamic> avis
       // 4. Mostrar resultado al usuario
       if (result['success'] == true) {
         if(mounted) {
+          userProvider.loadAvisosCreados();
             ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('✅ Aviso "$tituloAviso" eliminado con éxito.')),
+              SnackBar(content: Text('Aviso "$tituloAviso" eliminado con éxito.')),
             );
         }
       } else {
