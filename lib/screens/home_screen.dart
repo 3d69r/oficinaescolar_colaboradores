@@ -131,6 +131,8 @@ if (mounted) {
             .toList() ??
         [];
 
+        debugPrint('DEBUG PERMISOS: Contenido crudo de app_permisos: $permisosColab');
+
     // --- 1. Definir todas las páginas/ítems posibles EXCLUYENDO Avisos ---
     final List<Widget> pagesBeforeAvisos = [];
     final List<Widget> navItemsBeforeAvisos = [];
@@ -138,7 +140,7 @@ if (mounted) {
     final List<Widget> navItemsAfterAvisos = [];
 
     // Items que van antes/izquierda de Avisos
-    if (permisosColab.contains('Crud_Avisos')) {
+    if (permisosColab.contains('crud_avisos')) {
       pagesBeforeAvisos.add(const SubirAvisosScreen());
       navItemsBeforeAvisos.add(
         const Icon(Icons.campaign_outlined, size: 30, color: Colors.white),
@@ -150,20 +152,19 @@ if (mounted) {
         const Icon(Icons.public, size: 30, color: Colors.white),
       );
     }
-    if (permisosColab.contains('Asistencia')) {
+    if (permisosColab.contains('Materias_Calificacion')) {
       pagesBeforeAvisos.add(const AsistenciaScreen());
       navItemsBeforeAvisos.add(
         const Icon(Icons.check_circle_outline, size: 30, color: Colors.white),
       );
     }
 
-    if (permisos.contains('ArchivoCalificaciones')) { 
+    if (permisosColab.contains('ArchivoCalificaciones')) { 
       pagesBeforeAvisos.add(const AsistenciaCalificacionArchivoScreen());
       navItemsBeforeAvisos.add(
         const Icon(Icons.archive, size:30, color: Colors.white),
       );
     }
-
     
     // Items que van después/derecha de Avisos
     if (permisos.contains('Directorio')) {

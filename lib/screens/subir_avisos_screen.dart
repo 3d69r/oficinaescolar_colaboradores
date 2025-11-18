@@ -41,6 +41,8 @@ void _mostrarAvisoParaEdicion(Map<String, dynamic> aviso) {
     final String titulo = aviso['titulo'] as String? ?? 'Aviso sin Título';
     final String comentario = aviso['comentario'] as String? ?? 'Aviso sin Contenido';
     final String fechaStr = aviso.containsKey('fecha_inicio') ? aviso['fecha_inicio'] as String? ?? '' : '';
+
+    //print('DEBUG HTML (comentario): \n$comentario');
     
     String fechaFormateada = '';
     try {
@@ -468,7 +470,7 @@ Future<void> _confirmarYEliminar(BuildContext context, Map<String, dynamic> avis
                       final aviso = avisosFiltrados[index];
                       
                       final String titulo = aviso['titulo'] as String? ?? 'Sin título';
-                      // final String contenido = aviso['comentario'] as String? ?? 'Sin contenido'; // No usado en la vista actual
+                      //final String contenido = aviso['comentario'] as String? ?? 'Sin contenido'; // No usado en la vista actual
                       final String fechaInicio = aviso['fecha_inicio'] as String? ?? '';
                       final String fechaFin = aviso['fecha_fin'] as String? ?? '';
                       
@@ -498,7 +500,7 @@ Future<void> _confirmarYEliminar(BuildContext context, Map<String, dynamic> avis
                                       Text(
                                         '${_formatDate(fechaInicio)} - ${_formatDate(fechaFin)}',
                                         style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-                                      ),
+                                      ),                                    
                                     ],
                                   ),
                                 ),

@@ -36,6 +36,7 @@ class ColaboradorModel {
   final bool accesoActivo; // Convertido de String "1" a bool
   final String rutaFoto;
   final String puesto;
+  final String appPermisosColabDet;
 
   ColaboradorModel({
     required this.status,
@@ -66,6 +67,7 @@ class ColaboradorModel {
     required this.accesoActivo,
     required this.rutaFoto,
     required this.puesto,
+    required this.appPermisosColabDet 
   });
 
   factory ColaboradorModel.fromJson(Map<String, dynamic> json) {
@@ -136,7 +138,7 @@ class ColaboradorModel {
               .map((e) => AvisoColaboradorModel.fromJson(e))
               .toList()
           : [], 
-
+ 
       // Mapeo de campos de persona_data (EXISTENTES)
       idColaborador: personaData['id_colaborador'] as String? ?? '',
       nombre: personaData['nombre'] as String? ?? '',
@@ -150,6 +152,7 @@ class ColaboradorModel {
       idCredencial: personaData['id_credencial'] as String? ?? '',
       password: personaData['password'] as String? ?? '',
       puesto: personaData['puesto'] as String? ?? '',
+      appPermisosColabDet: personaData['app_permiso_colab_det']?.toString() ?? '',
       // Conversión segura de saldo
       cafeteriaSaldo: double.tryParse(personaData['cafeteria_saldo'] as String? ?? '0.0') ?? 0.0,
       afiliacion: personaData['afiliacion'] as String? ?? '',

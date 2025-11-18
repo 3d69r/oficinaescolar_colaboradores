@@ -40,6 +40,10 @@ class _AsistenciaCalificacionArchivoScreenState extends State<AsistenciaCalifica
   late UserProvider _userProvider;
   late VoidCallback _autoRefreshListener;
   Timer? _autoRefreshTimer;
+  
+  // ⭐️ NUEVAS VARIABLES: BANDERAS DE PERMISO ⭐️
+  bool _puedeVerSalones = false; // Mapea a 'califica'
+  bool _puedeVerClubes = false;  // Mapea a 'asis_clubes'
 
 
   @override
@@ -51,8 +55,23 @@ class _AsistenciaCalificacionArchivoScreenState extends State<AsistenciaCalifica
     
     // ⭐️ CORRECCIÓN CLAVE: Inicialización inmediata de _userProvider
     _userProvider = Provider.of<UserProvider>(context, listen: false);
-    _selectedOption = 'salon'; // ⭐️ INICIALIZAR EN 'SALONES' POR DEFECTO ⭐️
+    
+    // ⭐️ LÓGICA DE PERMISOS: Extracción y asignación ⭐️
+    final String permisos = _userProvider.colaboradorModel?.appPermisosColabDet ?? '';
+    final List<String> listaPermisos = permisos.split(',').map((e) => e.trim()).toList();
+    
+    _puedeVerSalones = listaPermisos.contains('califica');
+    _puedeVerClubes = listaPermisos.contains('asis_clubes');
 
+    // ⭐️ INICIALIZACIÓN DINÁMICA DE _selectedOption ⭐️
+    if (_puedeVerSalones) {
+        _selectedOption = 'salon'; // Si puede calificar, inicia en Salones
+    } else if (_puedeVerClubes) {
+        _selectedOption = 'clubes'; // Si solo puede asistir, inicia en Clubes
+    } else {
+        _selectedOption = null; // No tiene permisos para ninguna sección
+    }
+    
     // 1. Configuración del listener de auto-refresco del UserProvider
     _autoRefreshListener = () {
       debugPrint(
@@ -250,51 +269,63 @@ class _AsistenciaCalificacionArchivoScreenState extends State<AsistenciaCalifica
               ? const Center(child: CircularProgressIndicator())
               : _errorMessage != null
                   ? _buildErrorWidget() // Mostrar error
-                  : Column( // Contenido principal
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Text(
-                          'Selecciona la opcion deseada:',
-                          style: Theme.of(context).textTheme.titleLarge,
-                        ),
-                        const SizedBox(height: 20),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  // ⭐️ CONDICIÓN PARA MOSTRAR CONTENIDO O MENSAJE DE PERMISOS ⭐️
+                  : (_puedeVerSalones || _puedeVerClubes) 
+                      ? Column( // Contenido principal (si hay permisos)
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
-                            // ⭐️ BOTÓN MODIFICADO: Materia -> Salón ⭐️
-                            _construirBotonOpcion(
-                              context,
-                              title: 'Salones',
-                              icon: Icons.class_, // ⭐️ ICONO MODIFICADO ⭐️
-                              value: 'salon', // ⭐️ VALOR MODIFICADO ⭐️
-                              headerColor: headerColor
+                            Text(
+                              'Selecciona la opcion deseada:',
+                              style: Theme.of(context).textTheme.titleLarge,
                             ),
-                            _construirBotonOpcion( // Botón Clubes (sin cambios)
-                              context,
-                              title: 'Clubes',
-                              icon: Icons.sports_soccer,
-                              value: 'clubes',
-                              headerColor: headerColor
+                            const SizedBox(height: 20),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                              children: [
+                                // ⭐️ BOTÓN CONDICIONAL: Salones (permiso 'califica') ⭐️
+                                if (_puedeVerSalones)
+                                  _construirBotonOpcion(
+                                    context,
+                                    title: 'Salones',
+                                    icon: Icons.class_, // ⭐️ ICONO MODIFICADO ⭐️
+                                    value: 'salon', // ⭐️ VALOR MODIFICADO ⭐️
+                                    headerColor: headerColor
+                                  ),
+                                // ⭐️ BOTÓN CONDICIONAL: Clubes (permiso 'asis_clubes') ⭐️
+                                if (_puedeVerClubes)
+                                  _construirBotonOpcion( // Botón Clubes (sin cambios)
+                                    context,
+                                    title: 'Clubes',
+                                    icon: Icons.sports_soccer,
+                                    value: 'clubes',
+                                    headerColor: headerColor
+                                  ),
+                              ],
                             ),
-                          ],
-                        ),
-                        const SizedBox(height: 30),
+                            const SizedBox(height: 30),
 
-                        if (_selectedOption != null) ...[
-                          Text(
-                            _selectedOption == 'salon' ? 'Salones asignados:' : 'Clubes asignados:', // ⭐️ ETIQUETA MODIFICADA ⭐️
-                            style: Theme.of(context).textTheme.titleLarge,
+                            if (_selectedOption != null) ...[
+                              Text(
+                                _selectedOption == 'salon' ? 'Salones asignados:' : 'Clubes asignados:', // ⭐️ ETIQUETA MODIFICADA ⭐️
+                                style: Theme.of(context).textTheme.titleLarge,
+                              ),
+                              const SizedBox(height: 20),
+                              Expanded(
+                                // ⭐️ MÉTODO MODIFICADO: Redirigimos a la lista correcta ⭐️
+                                child: _selectedOption == 'salon' 
+                                    ? _construirListaSalones(userProvider)
+                                    : _construirListaClubes(userProvider), // Mantenemos lista de clubes
+                              ),
+                            ],
+                          ],
+                      )
+                      : Center( // Si no tiene NINGÚN permiso
+                          child: Text(
+                            'No tienes permisos de Asistencia o Calificación asignados.',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(color: Colors.grey.shade600, fontSize: 18, fontWeight: FontWeight.bold),
                           ),
-                          const SizedBox(height: 20),
-                          Expanded(
-                            // ⭐️ MÉTODO MODIFICADO: Redirigimos a la lista correcta ⭐️
-                            child: _selectedOption == 'salon' 
-                                ? _construirListaSalones(userProvider)
-                                : _construirListaClubes(userProvider), // Mantenemos lista de clubes
-                          ),
-                        ],
-                      ],
-                    ),
+                        ),
         ),
       ),
     );

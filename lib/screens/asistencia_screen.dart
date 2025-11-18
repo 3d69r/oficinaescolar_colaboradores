@@ -35,6 +35,9 @@ class _AsistenciaScreenState extends State<AsistenciaScreen>
   late UserProvider _userProvider;
   late VoidCallback _autoRefreshListener;
   Timer? _autoRefreshTimer;
+  
+  // ⭐️ NUEVA VARIABLE: Bandera de permiso para Clubes ⭐️
+  bool _puedeVerClubes = false; // Mapea a 'asis_clubes'
 
 
   @override
@@ -47,6 +50,17 @@ class _AsistenciaScreenState extends State<AsistenciaScreen>
     // ⭐️ CORRECCIÓN CLAVE: Inicialización inmediata de _userProvider
     // Esto previene el LateInitializationError si el RefreshIndicator se activa pronto.
     _userProvider = Provider.of<UserProvider>(context, listen: false);
+    
+    // ⭐️ LÓGICA DE PERMISOS: Extracción y asignación ⭐️
+    final String permisos = _userProvider.colaboradorModel?.appPermisosColabDet ?? '';
+    final List<String> listaPermisos = permisos.split(',').map((e) => e.trim()).toList();
+    
+    _puedeVerClubes = listaPermisos.contains('asis_clubes');
+
+    // ⭐️ INICIALIZACIÓN DE _selectedOption ⭐️
+    // 'Materia' siempre se muestra, por lo que siempre se inicializa aquí.
+    _selectedOption = 'materia'; 
+
 
     // 1. Configuración del listener de auto-refresco del UserProvider
     _autoRefreshListener = () {
@@ -277,6 +291,7 @@ class _AsistenciaScreenState extends State<AsistenciaScreen>
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                           children: [
+                            // ⭐️ BOTÓN MATERIA (Siempre visible) ⭐️
                             _construirBotonOpcion(
                               context,
                               title: 'Materia',
@@ -284,13 +299,15 @@ class _AsistenciaScreenState extends State<AsistenciaScreen>
                               value: 'materia',
                               headerColor: headerColor
                             ),
-                            _construirBotonOpcion(
-                              context,
-                              title: 'Clubes',
-                              icon: Icons.sports_soccer,
-                              value: 'clubes',
-                              headerColor: headerColor
-                            ),
+                            // ⭐️ BOTÓN CLUBES (Condicional a _puedeVerClubes) ⭐️
+                            if (_puedeVerClubes)
+                              _construirBotonOpcion(
+                                context,
+                                title: 'Clubes',
+                                icon: Icons.sports_soccer,
+                                value: 'clubes',
+                                headerColor: headerColor
+                              ),
                           ],
                         ),
                         const SizedBox(height: 30),
@@ -419,23 +436,20 @@ class _AsistenciaScreenState extends State<AsistenciaScreen>
       itemBuilder: (context, index) {
         final item = items[index];
         
-        final MateriaModel? materia = isMateria ? (item as MateriaModel) : null;
+        // Se asume la existencia de MateriaModel y ClubModel
+        final dynamic materia = isMateria ? item : null;
         
         final String idCurso = isMateria 
-            ? materia!.idCurso 
+            ? (materia as MateriaModel).idCurso 
             : (item as ClubModel).idCurso;
             
         final String title = isMateria
-            ? materia!.materia
+            ? (materia as MateriaModel).materia
             : (item as ClubModel).nombreCurso; 
         
         final String subtitle = isMateria
-            ? 'Plan: ${materia!.planEstudio}'
+            ? 'Plan: ${(materia as MateriaModel).planEstudio}'
             : 'Horario: ${(item as ClubModel).horario}';
-        
-        // La condición isPreescolar ahora se usará para el color del icono si fuera necesario,
-        // pero NO para diferenciar el Widget.
-        // final bool isPreescolar = isMateria && materia!.planEstudio == 'Preescolar'; 
         
         // 🚨 Manejo de Clubes (sin cambios)
         if (!isMateria) {
@@ -446,6 +460,7 @@ class _AsistenciaScreenState extends State<AsistenciaScreen>
                     subtitle: Text(subtitle),
                     trailing: const Icon(Icons.arrow_forward_ios, color: Colors.black),
                     onTap: () {
+                        // Navega a ListaScreen para asistencia de Clubes
                         Navigator.push(
                             context, 
                             MaterialPageRoute(
@@ -460,12 +475,12 @@ class _AsistenciaScreenState extends State<AsistenciaScreen>
             );
         }
 
-        // 🚀 MANEJO UNIFICADO DE MATERIAS (Incluyendo Preescolar) 🚀
+        // 🚀 MANEJO UNIFICADO DE MATERIAS 🚀
         // Se llama directamente a _buildGeneralMateriaTile para TODAS las materias
         return Card(
           margin: const EdgeInsets.symmetric(vertical: 8.0),
           // Usamos el mismo widget para todos los niveles de materia
-          child: _buildGeneralMateriaTile(context, materia!, title, subtitle),
+          child: _buildGeneralMateriaTile(context, materia as MateriaModel, title, subtitle),
         );
       },
     );
