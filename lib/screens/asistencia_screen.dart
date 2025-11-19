@@ -36,8 +36,9 @@ class _AsistenciaScreenState extends State<AsistenciaScreen>
   late VoidCallback _autoRefreshListener;
   Timer? _autoRefreshTimer;
   
-  // ⭐️ NUEVA VARIABLE: Bandera de permiso para Clubes ⭐️
-  bool _puedeVerClubes = false; // Mapea a 'asis_clubes'
+  // ⭐️ NUEVAS VARIABLES: BANDERAS DE PERMISO ⭐️
+  bool _puedeVerMaterias = false; // Mapea a 'materia_asis'
+  bool _puedeVerClubes = false;  // Mapea a 'asis_clubes'
 
 
   @override
@@ -50,16 +51,22 @@ class _AsistenciaScreenState extends State<AsistenciaScreen>
     // ⭐️ CORRECCIÓN CLAVE: Inicialización inmediata de _userProvider
     // Esto previene el LateInitializationError si el RefreshIndicator se activa pronto.
     _userProvider = Provider.of<UserProvider>(context, listen: false);
-    
+
     // ⭐️ LÓGICA DE PERMISOS: Extracción y asignación ⭐️
     final String permisos = _userProvider.colaboradorModel?.appPermisosColabDet ?? '';
     final List<String> listaPermisos = permisos.split(',').map((e) => e.trim()).toList();
     
+    _puedeVerMaterias = listaPermisos.contains('materia_asis');
     _puedeVerClubes = listaPermisos.contains('asis_clubes');
 
-    // ⭐️ INICIALIZACIÓN DE _selectedOption ⭐️
-    // 'Materia' siempre se muestra, por lo que siempre se inicializa aquí.
-    _selectedOption = 'materia'; 
+    // ⭐️ INICIALIZACIÓN DINÁMICA DE _selectedOption ⭐️
+    if (_puedeVerMaterias) {
+        _selectedOption = 'materia'; // Prioridad a Materias
+    } else if (_puedeVerClubes) {
+        _selectedOption = 'clubes'; // Si no hay Materias, usa Clubes
+    } else {
+        _selectedOption = null; // No tiene permisos para esta vista
+    }
 
 
     // 1. Configuración del listener de auto-refresco del UserProvider
@@ -280,50 +287,60 @@ class _AsistenciaScreenState extends State<AsistenciaScreen>
               ? const Center(child: CircularProgressIndicator())
               : _errorMessage != null
                   ? _buildErrorWidget() // Mostrar error
-                  : Column( // Contenido principal
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Text(
-                          'Selecciona la opcion deseada:',
-                          style: Theme.of(context).textTheme.titleLarge,
-                        ),
-                        const SizedBox(height: 20),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  // ⭐️ CONDICIÓN PRINCIPAL DE VISIBILIDAD ⭐️
+                  : (_puedeVerMaterias || _puedeVerClubes) 
+                      ? Column( // Contenido principal
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
-                            // ⭐️ BOTÓN MATERIA (Siempre visible) ⭐️
-                            _construirBotonOpcion(
-                              context,
-                              title: 'Materia',
-                              icon: Icons.school,
-                              value: 'materia',
-                              headerColor: headerColor
+                            Text(
+                              'Selecciona la opcion deseada:',
+                              style: Theme.of(context).textTheme.titleLarge,
                             ),
-                            // ⭐️ BOTÓN CLUBES (Condicional a _puedeVerClubes) ⭐️
-                            if (_puedeVerClubes)
-                              _construirBotonOpcion(
-                                context,
-                                title: 'Clubes',
-                                icon: Icons.sports_soccer,
-                                value: 'clubes',
-                                headerColor: headerColor
-                              ),
-                          ],
-                        ),
-                        const SizedBox(height: 30),
+                            const SizedBox(height: 20),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                              children: [
+                                // ⭐️ BOTÓN CONDICIONAL: Materia ('materia_asis') ⭐️
+                                if (_puedeVerMaterias)
+                                  _construirBotonOpcion(
+                                    context,
+                                    title: 'Materia',
+                                    icon: Icons.school,
+                                    value: 'materia',
+                                    headerColor: headerColor
+                                  ),
+                                // ⭐️ BOTÓN CONDICIONAL: Clubes ('asis_clubes') ⭐️
+                                if (_puedeVerClubes)
+                                  _construirBotonOpcion(
+                                    context,
+                                    title: 'Clubes',
+                                    icon: Icons.sports_soccer,
+                                    value: 'clubes',
+                                    headerColor: headerColor
+                                  ),
+                              ],
+                            ),
+                            const SizedBox(height: 30),
 
-                        if (_selectedOption != null) ...[
-                          Text(
-                            _selectedOption == 'materia' ? 'Materias asignadas:' : 'Clubes asignados:',
-                            style: Theme.of(context).textTheme.titleLarge,
+                            if (_selectedOption != null) ...[
+                              Text(
+                                _selectedOption == 'materia' ? 'Materias asignadas:' : 'Clubes asignados:',
+                                style: Theme.of(context).textTheme.titleLarge,
+                              ),
+                              const SizedBox(height: 20),
+                              Expanded(
+                                child: _construirListaCursos(userProvider),
+                              ),
+                            ],
+                          ],
+                        )
+                      : Center( // Mensaje si no tiene NINGÚN permiso
+                          child: Text(
+                            'No tienes permisos de Asistencia o Calificación asignados.',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(color: Colors.grey.shade600, fontSize: 18, fontWeight: FontWeight.bold),
                           ),
-                          const SizedBox(height: 20),
-                          Expanded(
-                            child: _construirListaCursos(userProvider),
-                          ),
-                        ],
-                      ],
-                    ),
+                        ),
         ),
       ),
     );
@@ -383,7 +400,11 @@ class _AsistenciaScreenState extends State<AsistenciaScreen>
         ),
         child: InkWell(
           onTap: () {
-            if (mounted) {
+            // Solo permitir el cambio si el usuario tiene el permiso para esa vista
+            final bool isMateriaPermitted = value == 'materia' && _puedeVerMaterias;
+            final bool isClubesPermitted = value == 'clubes' && _puedeVerClubes;
+
+            if (mounted && (isMateriaPermitted || isClubesPermitted)) {
               setState(() {
                 _selectedOption = value;
               });
@@ -437,21 +458,23 @@ class _AsistenciaScreenState extends State<AsistenciaScreen>
         final item = items[index];
         
         // Se asume la existencia de MateriaModel y ClubModel
-        final dynamic materia = isMateria ? item : null;
+        final MateriaModel? materia = isMateria ? (item as MateriaModel) : null;
+        final ClubModel? club = !isMateria ? (item as ClubModel) : null;
         
         final String idCurso = isMateria 
-            ? (materia as MateriaModel).idCurso 
-            : (item as ClubModel).idCurso;
+            ? materia!.idCurso 
+            : club!.idCurso;
             
         final String title = isMateria
-            ? (materia as MateriaModel).materia
-            : (item as ClubModel).nombreCurso; 
+            ? materia!.materia
+            : club!.nombreCurso; 
         
         final String subtitle = isMateria
-            ? 'Plan: ${(materia as MateriaModel).planEstudio}'
-            : 'Horario: ${(item as ClubModel).horario}';
+            ? 'Plan: ${materia!.planEstudio}'
+            : 'Horario: ${club!.horario}';
         
-        // 🚨 Manejo de Clubes (sin cambios)
+        
+        // 🚨 Manejo de Clubes 
         if (!isMateria) {
             return Card(
                 margin: const EdgeInsets.symmetric(vertical: 8.0),
@@ -460,7 +483,7 @@ class _AsistenciaScreenState extends State<AsistenciaScreen>
                     subtitle: Text(subtitle),
                     trailing: const Icon(Icons.arrow_forward_ios, color: Colors.black),
                     onTap: () {
-                        // Navega a ListaScreen para asistencia de Clubes
+                        // Navegación a ListaScreen (Asistencia) para clubes
                         Navigator.push(
                             context, 
                             MaterialPageRoute(
@@ -476,11 +499,10 @@ class _AsistenciaScreenState extends State<AsistenciaScreen>
         }
 
         // 🚀 MANEJO UNIFICADO DE MATERIAS 🚀
-        // Se llama directamente a _buildGeneralMateriaTile para TODAS las materias
+        // Navegación a CapturaCalificacionesScreen para materias
         return Card(
           margin: const EdgeInsets.symmetric(vertical: 8.0),
-          // Usamos el mismo widget para todos los niveles de materia
-          child: _buildGeneralMateriaTile(context, materia as MateriaModel, title, subtitle),
+          child: _buildGeneralMateriaTile(context, materia!, title, subtitle),
         );
       },
     );

@@ -140,10 +140,10 @@ if (mounted) {
     final List<Widget> navItemsAfterAvisos = [];
 
     // Items que van antes/izquierda de Avisos
-    if (permisosColab.contains('crud_avisos')) {
+    if (permisosColab.contains('Crud_Avisos')) {
       pagesBeforeAvisos.add(const SubirAvisosScreen());
       navItemsBeforeAvisos.add(
-        const Icon(Icons.campaign_outlined, size: 30, color: Colors.white),
+        const Icon(Icons.campaign, size: 30, color: Colors.white),
       );
     }
     if (permisos.contains('Sitios de Interes')) {
@@ -155,7 +155,7 @@ if (mounted) {
     if (permisosColab.contains('Materias_Calificacion')) {
       pagesBeforeAvisos.add(const AsistenciaScreen());
       navItemsBeforeAvisos.add(
-        const Icon(Icons.check_circle_outline, size: 30, color: Colors.white),
+        const Icon(Icons.check_circle, size: 30, color: Colors.white),
       );
     }
 
