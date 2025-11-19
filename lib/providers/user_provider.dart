@@ -800,15 +800,7 @@ Future<Map<String, dynamic>> saveAviso(Map<String, dynamic> avisoData) async {
         http.Response response;
         
         if (hasFile) {
-            // ⚠️ OPCIÓN MULTIPART: Si hay archivo, usamos MultipartRequest
-            // Es crucial que la API esté configurada para recibir `multipart/form-data`
-            
-            // Verificamos si estamos en un entorno que soporta dart:io (ej. Mobile/Desktop)
-            // (La verificación 'kIsWeb' debe estar disponible si se usa)
             if (kIsWeb) {
-                // Si estás en Web, la librería `http` no soporta la ruta local de `dart:io`.
-                // Necesitas usar la API de HTML File (o delegar el upload a un servicio).
-                // Por simplicidad, aquí solo mostramos el error:
                 return {'success': false, 'message': 'La subida de archivos locales no está soportada en Web a través de esta implementación de Provider.'};
             }
             
@@ -846,6 +838,12 @@ Future<Map<String, dynamic>> saveAviso(Map<String, dynamic> avisoData) async {
             final bool isNew = originalId == '0'; 
             
             final String idAvisoServer = result['message']?.toString() ?? originalId;
+
+            // ⭐️ NUEVO: OBTENER LA RUTA DEL ARCHIVO DEVUELTA POR LA API ⭐️
+            // Si la API devuelve 'ruta_archivo', la usamos. Si no, usamos la ruta local si existe.
+            final String? apiFilePath = result['ruta_archivo'] as String?;
+            final String? finalFilePath = apiFilePath ?? (hasFile ? rutaArchivo : null);
+
             
             // 1. Crear el mapa de datos para guardar localmente (DB/SP)
             final Map<String, dynamic> avisoLocal = {
@@ -862,10 +860,11 @@ Future<Map<String, dynamic>> saveAviso(Map<String, dynamic> avisoData) async {
                 'opcion_1': opcion1,
                 'opcion_2': opcion2,
                 'opcion_3': opcion3,
-                'archivo': rutaArchivo, // ⭐️ Persistencia de la ruta del archivo ⭐️
+                'archivo': finalFilePath, // ⭐️ Persistencia de la ruta final del archivo ⭐️
             };
 
             debugPrint('UserProvider: Aviso ${isNew ? 'creado' : 'editado'}. ID de calendario asignado: $idAvisoServer');
+            debugPrint('UserProvider: Ruta de archivo almacenada localmente: $finalFilePath');
 
             // 2. Intentar guardar/actualizar en la Base de Datos (Móvil)
             if (!kIsWeb) { 
@@ -899,7 +898,7 @@ Future<Map<String, dynamic>> saveAviso(Map<String, dynamic> avisoData) async {
             notifyListeners(); 
 
             final String action = isNew ? 'creado' : 'actualizado';
-            return {'success': true, 'message': 'Aviso ${action} con éxito. ID: $idAvisoServer'};
+            return {'success': true, 'message': 'Aviso ${action} con éxito. ID: $idAvisoServer', 'ruta_archivo': finalFilePath};
         
         } else {
             // Fallo de la API

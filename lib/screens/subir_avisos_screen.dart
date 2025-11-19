@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:oficinaescolar_colaboradores/config/api_constants.dart';
 import 'package:oficinaescolar_colaboradores/screens/editar_aviso_screen.dart';
 import 'package:provider/provider.dart'; 
 import 'package:intl/intl.dart'; 
@@ -6,6 +7,11 @@ import 'crear_aviso_screen.dart';
 import 'package:oficinaescolar_colaboradores/providers/user_provider.dart'; 
 // import 'avisos_archivados_screen.dart'; // ❌ ELIMINADA: Ya no se usa
 import 'package:flutter_html/flutter_html.dart'; 
+// ⭐️ IMPORTACIONES NECESARIAS PARA IMAGEN ⭐️
+import 'dart:io'; 
+import 'package:flutter/foundation.dart' show kIsWeb; // Para verificar si es web
+// ⚠️ IMPORTACIÓN NECESARIA PARA API CONSTANTS ⚠️
+
 
 // CLASE AUXILIAR DE PINTURA (Se mantiene)
 
@@ -14,7 +20,7 @@ import 'package:flutter_html/flutter_html.dart';
 // ----------------------------------------------------------------------
 
 class SubirAvisosScreen extends StatefulWidget {
-  const SubirAvisosScreen({Key? key}) : super(key: key);
+  const SubirAvisosScreen({super.key});
 
   @override
   State<SubirAvisosScreen> createState() => _SubirAvisosScreenState();
@@ -33,7 +39,7 @@ class _SubirAvisosScreenState extends State<SubirAvisosScreen> {
     });
   }
 
-  // ⭐️ 1. FUNCIÓN PARA EL MODAL SIMPLIFICADO DE VISUALIZACIÓN/EDICIÓN (Mantenida) ⭐️
+  // ⭐️ 1. FUNCIÓN PARA EL MODAL SIMPLIFICADO DE VISUALIZACIÓN/EDICIÓN (MODIFICADA) ⭐️
 void _mostrarAvisoParaEdicion(Map<String, dynamic> aviso) {
     final userProvider = Provider.of<UserProvider>(context, listen: false); 
     final colores = userProvider.colores;
@@ -41,12 +47,36 @@ void _mostrarAvisoParaEdicion(Map<String, dynamic> aviso) {
     final String titulo = aviso['titulo'] as String? ?? 'Aviso sin Título';
     final String comentario = aviso['comentario'] as String? ?? 'Aviso sin Contenido';
     final String fechaStr = aviso.containsKey('fecha_inicio') ? aviso['fecha_inicio'] as String? ?? '' : '';
+    
+    // ⭐️ LÓGICA CLAVE PARA EL ARCHIVO (ACTUALIZADA) ⭐️
+    final String? rutaArchivoAlmacenada = aviso['archivo'] as String?;
+    final bool tieneArchivo = rutaArchivoAlmacenada != null && rutaArchivoAlmacenada.isNotEmpty;
+    
+    String? rutaFinalParaVisualizar;
+    
+    if (tieneArchivo) {
+        // La ruta es una URL completa si empieza con 'http'
+        if (rutaArchivoAlmacenada.toLowerCase().startsWith('http')) {
+            rutaFinalParaVisualizar = rutaArchivoAlmacenada;
+        } else {
+            // Si la ruta NO es una URL completa (como 'assets/...'), prefijamos.
+            // Usamos la constante API para prefijar y asegurar que no haya doble barra
+            String limpiaRuta = rutaArchivoAlmacenada.startsWith('/') ? rutaArchivoAlmacenada.substring(1) : rutaArchivoAlmacenada;
+            rutaFinalParaVisualizar = ApiConstants.assetsBaseUrl + limpiaRuta;
+        }
+    } else {
+        rutaFinalParaVisualizar = null;
+    }
 
-    //print('DEBUG HTML (comentario): \n$comentario');
+    // Usamos rutaFinalParaVisualizar para determinar si es una URL funcional
+    final bool esURL = rutaFinalParaVisualizar != null && rutaFinalParaVisualizar.toLowerCase().startsWith('http');
+    
+    // ---------------------------------------------------------------------------------
     
     String fechaFormateada = '';
     try {
         final DateTime fecha = DateTime.parse(fechaStr);
+        // Asegúrate de que DateFormat use el idioma español si está configurado en el proyecto
         fechaFormateada = DateFormat('EEEE d \'de\' MMMM \'del\' yyyy', 'es').format(fecha);
     } catch (e) {
         fechaFormateada = 'Fecha no disponible';
@@ -116,8 +146,69 @@ void _mostrarAvisoParaEdicion(Map<String, dynamic> aviso) {
                         const Divider(color: Colors.grey, thickness: 0.5),
                         const SizedBox(height: 10),
                         
-                        const SizedBox(height: 15),
+                        // ⭐️ WIDGET DE IMAGEN CONDICIONAL (SI TIENE ARCHIVO) ⭐️
+                        if (tieneArchivo) ...[
 
+                            
+                            const SizedBox(height: 10),
+                            // Lógica para mostrar la imagen según la plataforma y la ruta
+                            Container(
+                              padding: const EdgeInsets.all(5.0),
+                              decoration: BoxDecoration(
+                                border: Border.all(color: Colors.grey.shade300),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Builder(
+                                builder: (context) {
+                                  // Si es una URL (la hemos construido arriba), usa Image.network
+                                  if (esURL) {
+                                    return Image.network(
+                                      rutaFinalParaVisualizar!, // ⭐️ USAMOS LA RUTA FINAL AQUÍ ⭐️
+                                      fit: BoxFit.contain,
+                                      height: 200, // Altura máxima para el modal
+                                      loadingBuilder: (context, child, loadingProgress) {
+                                        if (loadingProgress == null) return child;
+                                        return const SizedBox(
+                                          height: 200,
+                                          child: Center(child: CircularProgressIndicator()),
+                                        );
+                                      },
+                                      errorBuilder: (context, error, stackTrace) {
+                                        return const SizedBox(
+                                          height: 100,
+                                          child: Center(child: Text('Error al cargar imagen remota. Verifique la URL y la conexión.')),
+                                        );
+                                      },
+                                    );
+                                  // Si es una ruta local y NO es web, usa Image.file
+                                  } else if (!kIsWeb) {
+                                    return Image.file(
+                                      // ⚠️ Nota: Si rutaArchivoAlmacenada contiene 'assets/...' no funcionará en Image.file ⚠️
+                                      // Usamos la ruta almacenada original para Image.file, esperando que sea una ruta de sistema válida.
+                                      File(rutaArchivoAlmacenada), 
+                                      fit: BoxFit.contain,
+                                      height: 200,
+                                      errorBuilder: (context, error, stackTrace) {
+                                        // Muestra un widget si el archivo no existe localmente
+                                        return const SizedBox(
+                                          height: 100,
+                                          child: Center(child: Text('Archivo local no encontrado o no es una imagen.')),
+                                        );
+                                      },
+                                    );
+                                  } else {
+                                    // Web no puede acceder a rutas locales por seguridad, solo a URLs
+                                    return const SizedBox(
+                                        height: 50,
+                                        child: Center(child: Text('Archivo adjunto no disponible.')),
+                                      );
+                                  }
+                                },
+                              ),
+                            ),
+                            const SizedBox(height: 20),
+                        ],
+                        
                         // ⭐️ CONTENIDO DEL AVISO CON FORMATO HTML ⭐️
                         Html(
                           data: comentario,
@@ -407,10 +498,6 @@ Future<void> _confirmarYEliminar(BuildContext context, Map<String, dynamic> avis
                           // ⭐️ Esto hace que avisoParaEditar sea null por defecto ⭐️
                           MaterialPageRoute(builder: (context) => const CrearAvisoScreen()), 
                         );
-                        // Forzar la recarga al regresar del formulario de creación
-                        /*/if (mounted) {
-                            Provider.of<UserProvider>(context, listen: false).loadAvisosCreados();
-                        }*/
                         },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: dynamicPrimaryColor, 
@@ -479,7 +566,9 @@ Future<void> _confirmarYEliminar(BuildContext context, Map<String, dynamic> avis
                         elevation: 4,
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
                         child: InkWell(
-                          onTap: () => _mostrarAvisoParaEdicion(aviso),
+                          onTap: () { // ⭐️ El print de debug se mantiene para la consola ⭐️                
+                              _mostrarAvisoParaEdicion(aviso);
+                          },
                           child: Padding(
                             padding: const EdgeInsets.all(16.0),
                             child: Row(
