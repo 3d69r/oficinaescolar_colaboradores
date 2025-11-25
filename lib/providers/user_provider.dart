@@ -24,6 +24,8 @@ import 'package:oficinaescolar_colaboradores/providers/tipo_curso.dart';
 import 'package:oficinaescolar_colaboradores/screens/lista_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:oficinaescolar_colaboradores/utils/log_util.dart';
+
 class UserProvider with ChangeNotifier {
   // --- Datos de Sesión y Control (Variables Privadas) ---
   String _idColaborador = ''; 
@@ -145,25 +147,25 @@ class UserProvider with ChangeNotifier {
 
   /// ⭐️ [FINAL] Carga la lista de avisos creados usando lógica dual (DB > SharedPreferences o Solo SP en Web).
 Future<void> loadAvisosCreados() async {
-    debugPrint('UserProvider: Intentando cargar avisos creados...');
+    appLog('UserProvider: Intentando cargar avisos creados...');
     
     List<Map<String, dynamic>> loadedActivos = [];
     
     if (kIsWeb) {
         // 🚀 MODO WEB: Saltamos la DB, vamos directo a SharedPreferences.
         loadedActivos = await _getAvisosCreadosFromPrefs(_prefsAvisosCreadosKey);
-        debugPrint('UserProvider: ${loadedActivos.length} activos cargados directamente desde SharedPreferences (Web).');
+        appLog('UserProvider: ${loadedActivos.length} activos cargados directamente desde SharedPreferences (Web).');
     } else {
         // 📱 MODO MÓVIL/DESKTOP: Intentamos DB primero.
         try {
             loadedActivos = await _dbHelper.getAvisosCreados(); 
-            debugPrint('UserProvider: ${loadedActivos.length} avisos creados (activos) cargados desde DB (Móvil).');
+            appLog('UserProvider: ${loadedActivos.length} avisos creados (activos) cargados desde DB (Móvil).');
         } catch (e) {
             // Fallback si la DB local falla o no existe (ej. primer arranque en iOS/Android).
-            debugPrint('UserProvider: Fallo al cargar avisos desde DB. Intentando SharedPreferences. Error: $e');
+            appLog('UserProvider: Fallo al cargar avisos desde DB. Intentando SharedPreferences. Error: $e');
             
             loadedActivos = await _getAvisosCreadosFromPrefs(_prefsAvisosCreadosKey);
-            debugPrint('UserProvider: ${loadedActivos.length} activos cargados desde SharedPreferences (Fallback Móvil).');
+            appLog('UserProvider: ${loadedActivos.length} activos cargados desde SharedPreferences (Fallback Móvil).');
         }
     }
 
@@ -179,9 +181,9 @@ Future<void> loadAvisosCreados() async {
       // Serializar toda la lista de Mapas a una cadena JSON
       final String jsonString = json.encode(avisos);
       await prefs.setString(key, jsonString); 
-      debugPrint('UserProvider: ${avisos.length} avisos guardados en SharedPreferences con clave: $key.');
+      appLog('UserProvider: ${avisos.length} avisos guardados en SharedPreferences con clave: $key.');
     } catch (e) {
-      debugPrint('UserProvider: Error al guardar avisos en SharedPreferences: $e');
+      appLog('UserProvider: Error al guardar avisos en SharedPreferences: $e');
     }
   }
 
@@ -203,13 +205,13 @@ Future<List<Map<String, dynamic>>> _getAvisosCreadosFromPrefs(String key) async 
       
       return avisos;
     } catch (e) {
-      debugPrint('UserProvider: Error al obtener avisos desde SharedPreferences con clave $key: $e');
+      appLog('UserProvider: Error al obtener avisos desde SharedPreferences con clave $key: $e');
       return [];
     }
 }
 
   Future<void> loadAppColorsFromDb() async {
-    debugPrint('UserProvider: Intentando cargar colores desde la base de datos...');
+    appLog('UserProvider: Intentando cargar colores desde la base de datos...');
     
     // 1. INTENTO DE CARGA DESDE DB LOCAL (Móvil)
     _colores = await DatabaseHelper.instance.getColoresData(); 
@@ -222,17 +224,17 @@ Future<List<Map<String, dynamic>>> _getAvisosCreadosFromPrefs(String key) async 
       if (prefsData['app_color_header'] != null && prefsData['app_color_header'].isNotEmpty) {
         try {
             _colores = Colores.fromMap(prefsData); 
-            debugPrint('UserProvider: Colores cargados desde SharedPreferences (Web/Fallback).');
+            appLog('UserProvider: Colores cargados desde SharedPreferences (Web/Fallback).');
         } catch (e) {
             // Manejar un posible error de formato si la data de prefs es incorrecta
-            debugPrint('Error al parsear colores desde SharedPreferences: $e');
+            appLog('Error al parsear colores desde SharedPreferences: $e');
         }
         
       } else {
-        debugPrint('UserProvider: No se encontraron colores en la base de datos ni en SharedPreferences.');
+        appLog('UserProvider: No se encontraron colores en la base de datos ni en SharedPreferences.');
       }
     } else {
-      debugPrint('UserProvider: Colores cargados desde la base de datos (Móvil).');
+      appLog('UserProvider: Colores cargados desde la base de datos (Móvil).');
     }
     
     notifyListeners(); 
@@ -278,11 +280,11 @@ Future<List<Map<String, dynamic>>> _getAvisosCreadosFromPrefs(String key) async 
       await prefs.setString(key, valueToSave);
     }
     
-    debugPrint('UserProvider: Todos los colores y configuraciones de diseño guardados en SharedPreferences.');
+    appLog('UserProvider: Todos los colores y configuraciones de diseño guardados en SharedPreferences.');
   }
 
     Future<void> loadUserDataFromDb() async {
-    debugPrint('UserProvider: Intentando cargar datos de usuario desde la base de datos...');
+    appLog('UserProvider: Intentando cargar datos de usuario desde la base de datos...');
 
     final cachedData = await DatabaseHelper.instance.getSessionData('session_data');
     bool dataLoaded = false;
@@ -291,7 +293,7 @@ Future<List<Map<String, dynamic>>> _getAvisosCreadosFromPrefs(String key) async 
     // 1. INTENTO DE CARGA DESDE DB LOCAL (Móvil)
     if (cachedData != null) {
       sessionJson = cachedData['data_json'] as Map<String, dynamic>;
-      debugPrint('UserProvider: Datos de colaborador cargados desde la base de datos (Móvil).');
+      appLog('UserProvider: Datos de colaborador cargados desde la base de datos (Móvil).');
       dataLoaded = true;
     }
 
@@ -313,10 +315,10 @@ Future<List<Map<String, dynamic>>> _getAvisosCreadosFromPrefs(String key) async 
 
       // Verificar si la sesión esencial está presente
       if (sessionJson['idColaborador'].isNotEmpty) {
-        debugPrint('UserProvider: Datos de colaborador cargados desde SharedPreferences (Web/Fallback).');
+        appLog('UserProvider: Datos de colaborador cargados desde SharedPreferences (Web/Fallback).');
         dataLoaded = true;
       } else {
-        debugPrint('UserProvider: No se encontraron datos de usuario en la base de datos ni en SharedPreferences.');
+        appLog('UserProvider: No se encontraron datos de usuario en la base de datos ni en SharedPreferences.');
       }
     }
 
@@ -337,14 +339,14 @@ Future<List<Map<String, dynamic>>> _getAvisosCreadosFromPrefs(String key) async 
           // Carga exitosa desde DB (Móvil)
           _idToken = tokenData['id_token'] ?? '';
           _fcmToken = tokenData['token_celular'] ?? '';
-          debugPrint('UserProvider: Tokens cargados desde la base de datos (DB).');
+          appLog('UserProvider: Tokens cargados desde la base de datos (DB).');
         } else if (sessionJson['idToken'] != null && sessionJson['idToken'].isNotEmpty) {
           // Usar tokens recuperados de SharedPreferences (Web)
           _idToken = sessionJson['idToken'] ?? '';
           _fcmToken = sessionJson['fcmToken'] ?? '';
-          debugPrint('UserProvider: Tokens cargados desde SharedPreferences (Web).');
+          appLog('UserProvider: Tokens cargados desde SharedPreferences (Web).');
         } else {
-          debugPrint('UserProvider: No se encontraron tokens.');
+          appLog('UserProvider: No se encontraron tokens.');
         }
       }
     }
@@ -364,7 +366,7 @@ Future<List<Map<String, dynamic>>> _getAvisosCreadosFromPrefs(String key) async 
         'fechaHora': _fechaHora,
       },
     );
-    debugPrint('UserProvider: Datos de sesión guardados en la base de datos.');
+    appLog('UserProvider: Datos de sesión guardados en la base de datos.');
   }
 
   // Nuevo método para asignación en memoria (Web)
@@ -394,7 +396,7 @@ Future<void> saveColaboradorSessionToPrefs({
   await prefs.setString('idToken', idToken ?? ''); 
   await prefs.setString('fcmToken', fcmToken ?? '');
 
-  debugPrint('UserProvider: Sesión de Colaborador guardada en SharedPreferences.');
+  appLog('UserProvider: Sesión de Colaborador guardada en SharedPreferences.');
 }
 
   Future<void> setUserData({
@@ -432,7 +434,7 @@ Future<void> saveColaboradorSessionToPrefs({
       fcmToken: fcmToken,
     );
     
-    debugPrint('UserProvider: Datos de sesión establecidos.');
+    appLog('UserProvider: Datos de sesión establecidos.');
     notifyListeners();
   }
 
@@ -469,7 +471,7 @@ Future<void> saveColaboradorSessionToPrefs({
 
   Future<void> enviarComentario(Comentario comentario) async {
     if (_escuela.isEmpty || _idColaborador.isEmpty) {
-      debugPrint('UserProvider: Datos de sesión incompletos para enviar comentario.');
+      appLog('UserProvider: Datos de sesión incompletos para enviar comentario.');
       throw Exception('Datos de sesión incompletos. Por favor, reinicia la app.');
     }
 
@@ -486,20 +488,20 @@ Future<void> saveColaboradorSessionToPrefs({
       final response = await http.post(url, body: body);
 
       if (response.statusCode == 200) {
-        debugPrint('Comentario enviado exitosamente. ¡Gracias!');
+        appLog('Comentario enviado exitosamente. ¡Gracias!');
       } else {
         String errorMessage = 'Ocurrió un error al enviar el comentario.';
         try {
           final responseData = json.decode(response.body);
           errorMessage = responseData['message'] ?? errorMessage;
         } catch (e) {
-          debugPrint('Error decodificando la respuesta del servidor: $e');
+          appLog('Error decodificando la respuesta del servidor: $e');
         }
-        debugPrint('Error de servidor: ${response.statusCode} - $errorMessage');
+        appLog('Error de servidor: ${response.statusCode} - $errorMessage');
         throw Exception(errorMessage);
       }
     } catch (e) {
-      debugPrint('Excepción al enviar comentario: $e');
+      appLog('Excepción al enviar comentario: $e');
       throw Exception('No se pudo conectar al servidor. Revisa tu conexión a internet.');
     }
   }
@@ -534,7 +536,7 @@ Future<void> saveColaboradorSessionToPrefs({
       return {'status': 'error', 'message': 'Datos de sesión o alumno/salón incompletos.'};
     }
     
-    debugPrint('UserProvider: Preparando subida de archivos a $fullApiUrl para Alumno: $idAlumno, Salón: $idSalon');
+    appLog('UserProvider: Preparando subida de archivos a $fullApiUrl para Alumno: $idAlumno, Salón: $idSalon');
 
     try {
       // 1. Crear la solicitud Multipart
@@ -549,16 +551,16 @@ Future<void> saveColaboradorSessionToPrefs({
       request.fields['id_salon'] = idSalon;
 
       // ⭐️ IMPRESIÓN DE DEPURACIÓN DE PARÁMETROS DE TEXTO ⭐️
-      debugPrint('DEBUG SUBIDA: Parámetros de Texto:');
+      appLog('DEBUG SUBIDA: Parámetros de Texto:');
       request.fields.forEach((key, value) {
-        debugPrint('  - $key: $value');
+        appLog('  - $key: $value');
       });
       
       // 3. Agregar los archivos opcionales (archivo_calif_#)
       bool hasFilesToUpload = false;
       
       // ⭐️ IMPRESIÓN DE DEPURACIÓN DE ARCHIVOS A ADJUNTAR ⭐️
-      debugPrint('DEBUG SUBIDA: Archivos a Adjuntar:');
+      appLog('DEBUG SUBIDA: Archivos a Adjuntar:');
       
       // 🔑 BUCLE CORREGIDO: Itera sobre el nuevo modelo de archivo
       for (final archivo in archivosParaSubir) {
@@ -579,9 +581,9 @@ Future<void> saveColaboradorSessionToPrefs({
                   filename: '${campoArchivo}_${idAlumno}_${DateTime.now().millisecondsSinceEpoch}.pdf',
                 ),
               );
-              debugPrint('  - Móvil: Campo API: $campoArchivo, Ruta Local: $localPath');
+              appLog('  - Móvil: Campo API: $campoArchivo, Ruta Local: $localPath');
             } else {
-              debugPrint('Advertencia Móvil: Archivo local no encontrado en la ruta: $localPath');
+              appLog('Advertencia Móvil: Archivo local no encontrado en la ruta: $localPath');
             }
           }
         } else {
@@ -600,9 +602,9 @@ Future<void> saveColaboradorSessionToPrefs({
                 filename: nombre,
               ),
             );
-            debugPrint('  - Web: Campo API: $campoArchivo, Nombre Archivo: $nombre');
+            appLog('  - Web: Campo API: $campoArchivo, Nombre Archivo: $nombre');
           } else {
-             debugPrint('Advertencia Web: Bytes o nombre del archivo no disponibles para: $campoArchivo');
+             appLog('Advertencia Web: Bytes o nombre del archivo no disponibles para: $campoArchivo');
           }
         }
       }
@@ -615,7 +617,7 @@ Future<void> saveColaboradorSessionToPrefs({
       final streamedResponse = await request.send();
       final response = await http.Response.fromStream(streamedResponse);
       
-      debugPrint('Respuesta de subida HTTP Status: ${response.statusCode}');
+      appLog('Respuesta de subida HTTP Status: ${response.statusCode}');
 
       if (response.statusCode == 200) {
         // 5. Procesar la respuesta
@@ -658,7 +660,7 @@ Future<void> saveColaboradorSessionToPrefs({
             return json.decode(response.body);
         } else {
             // Manejar errores HTTP, por ejemplo, devolviendo un mapa de error
-            //debugPrint(response.body);
+            //appLog(response.body);
             return {'status': 'error', 'message': 'Fallo en la conexión al servidor. Código: ${response.statusCode}'};
         }
     }
@@ -773,7 +775,7 @@ Future<Map<String, dynamic>> saveAviso(Map<String, dynamic> avisoData) async {
         if (!hasFile) 'comentario': avisoData['cuerpo'], 
     };
 
-    debugPrint('UserProvider: Enviando aviso a API. ¿Tiene archivo? $hasFile');
+    appLog('UserProvider: Enviando aviso a API. ¿Tiene archivo? $hasFile');
         
     // --- 4. Ejecución y Manejo de Respuesta (Diferente según la presencia de archivo) ---
     try {
@@ -803,7 +805,7 @@ Future<Map<String, dynamic>> saveAviso(Map<String, dynamic> avisoData) async {
         }
 
         // --- 5. Lógica de Respuesta Unificada ---
-        debugPrint('UserProvider: Código de estado de la respuesta: ${response.statusCode}');
+        appLog('UserProvider: Código de estado de la respuesta: ${response.statusCode}');
         
         if (response.body.isEmpty) {
             return {'success': false, 'message': 'Respuesta vacía del servidor (${response.statusCode}).'};
@@ -843,19 +845,19 @@ Future<Map<String, dynamic>> saveAviso(Map<String, dynamic> avisoData) async {
                 'archivo': finalFilePath, // ⭐️ Persistencia de la ruta final del archivo ⭐️
             };
 
-            debugPrint('UserProvider: Aviso ${isNew ? 'creado' : 'editado'}. ID de calendario asignado: $idAvisoServer');
-            debugPrint('UserProvider: Ruta de archivo almacenada localmente: $finalFilePath');
+            appLog('UserProvider: Aviso ${isNew ? 'creado' : 'editado'}. ID de calendario asignado: $idAvisoServer');
+            appLog('UserProvider: Ruta de archivo almacenada localmente: $finalFilePath');
 
             // 2. Intentar guardar/actualizar en la Base de Datos (Móvil)
             if (!kIsWeb) { 
                 try {
                     await _dbHelper.saveAvisoCreado(avisoLocal); 
-                    debugPrint('UserProvider: Aviso creado guardado/actualizado exitosamente en DB local (Mobile).');
+                    appLog('UserProvider: Aviso creado guardado/actualizado exitosamente en DB local (Mobile).');
                 } catch (e) {
-                    debugPrint('UserProvider: Fallo al guardar aviso creado en DB. Usando SharedPreferences. Error: $e');
+                    appLog('UserProvider: Fallo al guardar aviso creado en DB. Usando SharedPreferences. Error: $e');
                 }
             } else {
-                 debugPrint('UserProvider: Ejecutando en Web. Se omite el guardado en DB local.');
+                 appLog('UserProvider: Ejecutando en Web. Se omite el guardado en DB local.');
             }
             
             // 3. Actualizar la lista en memoria (_avisosCreados)
@@ -894,7 +896,7 @@ Future<Map<String, dynamic>> saveAviso(Map<String, dynamic> avisoData) async {
             return {'success': false, 'message': errorMessage};
         }
     } catch (e) {
-        debugPrint('UserProvider: Excepción al guardar aviso: $e');
+        appLog('UserProvider: Excepción al guardar aviso: $e');
         return {'success': false, 'message': 'Error de conexión: ${e.toString()}'};
     }
 }
@@ -916,14 +918,14 @@ Future<Map<String, dynamic>> deleteAvisoCreado(String idAviso) async {
     };
 
     // ⭐️ DEBUG PRINT AÑADIDO: Muestra la URL completa ⭐️
-    debugPrint('UserProvider: URL de eliminación: $url');
+    appLog('UserProvider: URL de eliminación: $url');
     // ⭐️ DEBUG PRINT EXISTENTE: Muestra el cuerpo (parámetros) de la solicitud ⭐️
-    debugPrint('UserProvider: Enviando solicitud de eliminación para ID: $idAviso con BODY: $body');
+    appLog('UserProvider: Enviando solicitud de eliminación para ID: $idAviso con BODY: $body');
 
     try {
         final response = await http.post(url, body: body);
 
-        debugPrint('UserProvider: Código de estado de la respuesta: ${response.statusCode}');
+        appLog('UserProvider: Código de estado de la respuesta: ${response.statusCode}');
         
         if (response.body.isEmpty) {
             return {'success': false, 'message': 'Respuesta vacía del servidor (${response.statusCode}).'};
@@ -932,22 +934,22 @@ Future<Map<String, dynamic>> deleteAvisoCreado(String idAviso) async {
         final Map<String, dynamic> result = json.decode(response.body);
 
         // ⭐️ DEBUG PRINT ADICIONAL: Muestra la respuesta de la API ⭐️
-        debugPrint('UserProvider: Respuesta de API (JSON): $result');
+        appLog('UserProvider: Respuesta de API (JSON): $result');
 
         if (response.statusCode == 200 && result['status'] == 'Correcto') {
             
             // 1. Eliminar de la Base de Datos Local (Móvil)
             try {
                 await _dbHelper.deleteAvisoCreado(idAviso);
-                debugPrint('UserProvider: Aviso con ID $idAviso eliminado de la DB local.');
+                appLog('UserProvider: Aviso con ID $idAviso eliminado de la DB local.');
             } catch (e) {
-                debugPrint('UserProvider: Fallo al eliminar aviso creado de DB. Continuando con memoria/prefs. Error: $e');
+                appLog('UserProvider: Fallo al eliminar aviso creado de DB. Continuando con memoria/prefs. Error: $e');
             }
             
             // 2. Eliminar de la lista en memoria (_avisosCreados)
             // La clave de búsqueda es 'id_calendario'
             _avisosCreados.removeWhere((aviso) => aviso['id_calendario'] == idAviso);
-            debugPrint('UserProvider: Aviso con ID $idAviso eliminado de la lista en memoria.');
+            appLog('UserProvider: Aviso con ID $idAviso eliminado de la lista en memoria.');
 
             // 3. Guardamos la lista actualizada en SharedPreferences (Fallback)
             await _saveAvisosCreadosToPrefs(_avisosCreados, _prefsAvisosCreadosKey);
@@ -965,7 +967,7 @@ Future<Map<String, dynamic>> deleteAvisoCreado(String idAviso) async {
             return {'success': false, 'message': 'Error de API al eliminar aviso: $errorMessage'};
         }
     } catch (e) {
-        debugPrint('UserProvider: Excepción al eliminar aviso: $e');
+        appLog('UserProvider: Excepción al eliminar aviso: $e');
         return {'success': false, 'message': 'Error de conexión: ${e.toString()}'};
     }
 }
@@ -982,7 +984,7 @@ Future<Map<String, dynamic>> deleteAvisoCreado(String idAviso) async {
       final String fechaHoraApiCall = _fechaHora.isNotEmpty ? _fechaHora : generateApiFechaHora();
 
       if (escuelaCode.isEmpty || idColaborador.isEmpty || idCurso.isEmpty) {
-        debugPrint('UserProvider: Datos de sesión o idCurso incompletos para cargar alumnos.');
+        appLog('UserProvider: Datos de sesión o idCurso incompletos para cargar alumnos.');
         return [];
       }
       
@@ -996,7 +998,7 @@ Future<Map<String, dynamic>> deleteAvisoCreado(String idAviso) async {
 
       final alumnosDataUrl = Uri.parse(apiEndpoint);
       
-      debugPrint('UserProvider: Llamando a API de alumnos para ${tipoCurso.name} (ID: $idCurso): $alumnosDataUrl');
+      appLog('UserProvider: Llamando a API de alumnos para ${tipoCurso.name} (ID: $idCurso): $alumnosDataUrl');
       
       try {
         final response = await http.get(alumnosDataUrl);
@@ -1004,8 +1006,8 @@ Future<Map<String, dynamic>> deleteAvisoCreado(String idAviso) async {
         if (response.statusCode == 200) {
 
           // 🚨 NUEVOS PRINTS PARA DEBUGGING 🚨
-          debugPrint('UserProvider: Status de respuesta de alumnos: ${response.statusCode}');
-          debugPrint('UserProvider: Cuerpo de la respuesta de alumnos: ${response.body}'); // ✅ ESTO TE MOSTRARÁ EL JSON
+          appLog('UserProvider: Status de respuesta de alumnos: ${response.statusCode}');
+          appLog('UserProvider: Cuerpo de la respuesta de alumnos: ${response.body}'); // ✅ ESTO TE MOSTRARÁ EL JSON
 
           final rawData = json.decode(response.body);
 
@@ -1015,22 +1017,22 @@ Future<Map<String, dynamic>> deleteAvisoCreado(String idAviso) async {
                 .map((e) => AlumnoAsistenciaModel.fromJson(e as Map<String, dynamic>))
                 .toList();
                 
-            debugPrint('UserProvider: Se cargaron ${alumnos.length} alumnos para el curso ID $idCurso.');
+            appLog('UserProvider: Se cargaron ${alumnos.length} alumnos para el curso ID $idCurso.');
             return alumnos;
           } else {
-            debugPrint('UserProvider: La API devolvió un formato inesperado (no es una lista).');
+            appLog('UserProvider: La API devolvió un formato inesperado (no es una lista).');
             return [];
           }
         } else {
-          debugPrint('UserProvider: Error HTTP al cargar alumnos (${response.statusCode}).');
+          appLog('UserProvider: Error HTTP al cargar alumnos (${response.statusCode}).');
           return [];
         }
       } on SocketException {
-        debugPrint('UserProvider: SocketException al cargar alumnos. Sin conexión.');
+        appLog('UserProvider: SocketException al cargar alumnos. Sin conexión.');
       } on http.ClientException {
-        debugPrint('UserProvider: ClientException al cargar alumnos. Problema de red.');
+        appLog('UserProvider: ClientException al cargar alumnos. Problema de red.');
       } catch (e) {
-        debugPrint('UserProvider: Excepción general al cargar alumnos: $e.');
+        appLog('UserProvider: Excepción general al cargar alumnos: $e.');
       }
 
       return [];
@@ -1050,7 +1052,7 @@ Future<Map<String, dynamic>> deleteAvisoCreado(String idAviso) async {
       final String fechaHoraApiCall = _fechaHora.isNotEmpty ? _fechaHora : generateApiFechaHora();
 
       if (escuelaCode.isEmpty || idColaborador.isEmpty || idMateriaClase.isEmpty) {
-        debugPrint('UserProvider: Datos de sesión o idCurso/idMateriaClase incompletos para cargar alumnos para calificar.');
+        appLog('UserProvider: Datos de sesión o idCurso/idMateriaClase incompletos para cargar alumnos para calificar.');
         return [];
       }
       
@@ -1065,10 +1067,10 @@ Future<Map<String, dynamic>> deleteAvisoCreado(String idAviso) async {
       }
 
       final alumnosDataUrl = Uri.parse(apiEndpoint);
-       debugPrint('--- [API CALIFICACIONES - CONSULTA] ---');
-      debugPrint('URL de la API: $alumnosDataUrl');
+       appLog('--- [API CALIFICACIONES - CONSULTA] ---');
+      appLog('URL de la API: $alumnosDataUrl');
       
-      debugPrint('UserProvider: Llamando a API de alumnos para CALIFICAR ${tipoCurso.name} (ID: $idCurso): $alumnosDataUrl');
+      appLog('UserProvider: Llamando a API de alumnos para CALIFICAR ${tipoCurso.name} (ID: $idCurso): $alumnosDataUrl');
       
       try {
         final response = await http.get(alumnosDataUrl);
@@ -1076,8 +1078,8 @@ Future<Map<String, dynamic>> deleteAvisoCreado(String idAviso) async {
         if (response.statusCode == 200) {
 
           final rawData = json.decode(response.body);
-            debugPrint('JSON de Respuesta (Status 200): ${response.body}');
-          debugPrint('--- [FIN LOG CALIFICACIONES - CONSULTA] ---');
+            appLog('JSON de Respuesta (Status 200): ${response.body}');
+          appLog('--- [FIN LOG CALIFICACIONES - CONSULTA] ---');
 
           if (rawData is List) {
             // 2. Devolvemos la lista de Map<String, dynamic> (JSON crudo)
@@ -1086,22 +1088,22 @@ Future<Map<String, dynamic>> deleteAvisoCreado(String idAviso) async {
                 .whereType<Map<String, dynamic>>()
                 .toList();
                 
-            debugPrint('UserProvider: Se cargaron ${alumnosData.length} alumnos para CALIFICAR (ID $idCurso).');
+            appLog('UserProvider: Se cargaron ${alumnosData.length} alumnos para CALIFICAR (ID $idCurso).');
             return alumnosData;
           } else {
-            debugPrint('UserProvider: La API devolvió un formato inesperado para calificaciones (no es una lista).');
+            appLog('UserProvider: La API devolvió un formato inesperado para calificaciones (no es una lista).');
             return [];
           }
         } else {
-          debugPrint('UserProvider: Error HTTP al cargar alumnos para calificar (${response.statusCode}).');
+          appLog('UserProvider: Error HTTP al cargar alumnos para calificar (${response.statusCode}).');
           return [];
         }
       } on SocketException {
-        debugPrint('UserProvider: SocketException al cargar alumnos para calificar. Sin conexión.');
+        appLog('UserProvider: SocketException al cargar alumnos para calificar. Sin conexión.');
       } on http.ClientException {
-        debugPrint('UserProvider: ClientException al cargar alumnos para calificar. Problema de red.');
+        appLog('UserProvider: ClientException al cargar alumnos para calificar. Problema de red.');
       } catch (e) {
-        debugPrint('UserProvider: Excepción general al cargar alumnos para calificar: $e.');
+        appLog('UserProvider: Excepción general al cargar alumnos para calificar: $e.');
       }
 
       return [];
@@ -1113,7 +1115,7 @@ Future<Map<String, dynamic>> deleteAvisoCreado(String idAviso) async {
       _selectedCafeteriaCicloId = idCiclo;
       notifyListeners();
 
-      debugPrint('UserProvider: Filtro de cafetería cambiado a Periodo: $idPeriodo, Ciclo: $idCiclo. Recargando movimientos.');
+      appLog('UserProvider: Filtro de cafetería cambiado a Periodo: $idPeriodo, Ciclo: $idCiclo. Recargando movimientos.');
       await fetchAndLoadCafeteriaMovimientosData(
         idColaborador: _idColaborador, // ✅ [REF] Cambiado de idAlumno
         idPeriodo: _selectedCafeteriaPeriodId,
@@ -1173,7 +1175,7 @@ Future<Map<String, dynamic>> deleteAvisoCreado(String idAviso) async {
 
     // 2. 🚀 CRÍTICO: Limpiar Shared Preferences (Web/Fallback)
     await _clearColaboradorPrefs();
-    debugPrint('UserProvider: Datos de usuario y base de datos local limpiados.');
+    appLog('UserProvider: Datos de usuario y base de datos local limpiados.');
   }
 
   String generateApiFechaHora() {
@@ -1191,63 +1193,63 @@ Future<Map<String, dynamic>> deleteAvisoCreado(String idAviso) async {
 
   void triggerAutoRefresh() {
     autoRefreshTrigger.value = null;
-    debugPrint('UserProvider: Señal de auto-refresco activada.');
+    appLog('UserProvider: Señal de auto-refresco activada.');
   }
 
   bool shouldFetchSchoolDataFromApi() {
     if (_lastSchoolDataFetch == null) {
-      debugPrint('UserProvider: No hay marca de tiempo para datos de escuela. Se necesita API.');
+      appLog('UserProvider: No hay marca de tiempo para datos de escuela. Se necesita API.');
       return true;
     }
     final tenMinutesAgo = DateTime.now().subtract(const Duration(minutes: ApiConstants.minutosRecarga));
     final bool needsFetch = _lastSchoolDataFetch!.isBefore(tenMinutesAgo);
-    debugPrint('UserProvider: Última carga de escuela: $_lastSchoolDataFetch. Hace 10 min: $tenMinutesAgo. ¿Necesita API? $needsFetch');
+    appLog('UserProvider: Última carga de escuela: $_lastSchoolDataFetch. Hace 10 min: $tenMinutesAgo. ¿Necesita API? $needsFetch');
     return needsFetch;
   }
   
   bool shouldFetchColaboradorDataFromApi() {
     // ✅ [REF] Nuevo método para la lógica de caché del colaborador
     if (_lastColaboradorDataFetch == null) {
-      debugPrint('UserProvider: No hay marca de tiempo para datos de colaborador. Se necesita API.');
+      appLog('UserProvider: No hay marca de tiempo para datos de colaborador. Se necesita API.');
       return true;
     }
     final tenMinutesAgo = DateTime.now().subtract(const Duration(minutes: ApiConstants.minutosRecarga));
     final bool needsFetch = _lastColaboradorDataFetch!.isBefore(tenMinutesAgo);
-    debugPrint('UserProvider: Última carga de colaborador: $_lastColaboradorDataFetch. Hace 10 min: $tenMinutesAgo. ¿Necesita API? $needsFetch');
+    appLog('UserProvider: Última carga de colaborador: $_lastColaboradorDataFetch. Hace 10 min: $tenMinutesAgo. ¿Necesita API? $needsFetch');
     return needsFetch;
   }
   
   bool shouldFetchAvisosDataFromApi() {
     // ... (este método no cambia)
     if (_lastAvisosDataFetch == null) {
-      debugPrint('UserProvider: No hay marca de tiempo para datos de avisos. Se necesita API.');
+      appLog('UserProvider: No hay marca de tiempo para datos de avisos. Se necesita API.');
       return true;
     }
     final tenMinutesAgo = DateTime.now().subtract(const Duration(minutes: ApiConstants.minutosRecarga));
     final bool needsFetch = _lastAvisosDataFetch!.isBefore(tenMinutesAgo);
-    debugPrint('UserProvider: Última carga de avisos: $_lastAvisosDataFetch. Hace 10 min: $tenMinutesAgo. ¿Necesita API? $needsFetch');
+    appLog('UserProvider: Última carga de avisos: $_lastAvisosDataFetch. Hace 10 min: $tenMinutesAgo. ¿Necesita API? $needsFetch');
     return needsFetch;
   }
 
   bool shouldFetchArticulosCafDataFromApi() {
     if (_lastArticulosCafDataFetch == null) {
-      debugPrint('UserProvider: No hay marca de tiempo para datos de artículos de cafetería. Se necesita API.');
+      appLog('UserProvider: No hay marca de tiempo para datos de artículos de cafetería. Se necesita API.');
       return true;
     }
     final tenMinutesAgo = DateTime.now().subtract(const Duration(minutes: ApiConstants.minutosRecarga));
     final bool needsFetch = _lastArticulosCafDataFetch!.isBefore(tenMinutesAgo);
-    debugPrint('UserProvider: Última carga de artículos de cafetería: $_lastArticulosCafDataFetch. Hace 10 min: $tenMinutesAgo. ¿Necesita API? $needsFetch');
+    appLog('UserProvider: Última carga de artículos de cafetería: $_lastArticulosCafDataFetch. Hace 10 min: $tenMinutesAgo. ¿Necesita API? $needsFetch');
     return needsFetch;
   }
   
   bool shouldFetchCafeteriaMovimientosDataFromApi() {
     if (_lastCafeteriaMovimientosDataFetch == null) {
-      debugPrint('UserProvider: No hay marca de tiempo para movimientos de cafetería. Se necesita API.');
+      appLog('UserProvider: No hay marca de tiempo para movimientos de cafetería. Se necesita API.');
       return true;
     }
     final tenMinutesAgo = DateTime.now().subtract(const Duration(minutes: ApiConstants.minutosRecarga));
     final bool needsFetch = _lastCafeteriaMovimientosDataFetch!.isBefore(tenMinutesAgo);
-    debugPrint('UserProvider: Última carga de movimientos de cafetería: $_lastCafeteriaMovimientosDataFetch. Hace 10 min: $tenMinutesAgo. ¿Necesita API? $needsFetch');
+    appLog('UserProvider: Última carga de movimientos de cafetería: $_lastCafeteriaMovimientosDataFetch. Hace 10 min: $tenMinutesAgo. ¿Necesita API? $needsFetch');
     return needsFetch;
   }
 
@@ -1318,13 +1320,13 @@ Future<Map<String, dynamic>> deleteAvisoCreado(String idAviso) async {
         }
       };
 
-      debugPrint('Enviando actualización token con body: $body');
+      appLog('Enviando actualización token con body: $body');
 
       final response = await http.post(url, body: body);
       final responseData = json.decode(response.body);
 
       if (response.statusCode == 200 && responseData['status'] == 'correcto') {
-        debugPrint('Token actualizado correctamente');
+        appLog('Token actualizado correctamente');
         final String idToken = responseData['id_token']?.toString() ?? '';
         _idToken = idToken;
         _tokenCelular = tokenCelular;
@@ -1334,20 +1336,20 @@ Future<Map<String, dynamic>> deleteAvisoCreado(String idAviso) async {
             // SOLO EN MÓVIL: Intentar guardar en la base de datos (SQLite)
             if (!kIsWeb) {
                 await DatabaseHelper.instance.saveTokens(idColaborador, _idToken!, _tokenCelular!);
-                debugPrint('UserProvider: Tokens guardados en la base de datos local.');
+                appLog('UserProvider: Tokens guardados en la base de datos local.');
             } else {
-                debugPrint('UserProvider: Tokens actualizados en memoria (Web).');
+                appLog('UserProvider: Tokens actualizados en memoria (Web).');
             }
         } else {
-            debugPrint('El ID Token retornado está vacío o es nulo.');
+            appLog('El ID Token retornado está vacío o es nulo.');
         }
 
         notifyListeners();
       } else {
-        debugPrint('Error actualizando token: ${response.statusCode}');
+        appLog('Error actualizando token: ${response.statusCode}');
       }
     } catch (e) {
-      debugPrint('Excepción actualizando token: $e');
+      appLog('Excepción actualizando token: $e');
     }
   }
   
@@ -1356,7 +1358,7 @@ Future<Map<String, dynamic>> deleteAvisoCreado(String idAviso) async {
     final newColores = Colores.fromMap(apiResponse);
     await DatabaseHelper.instance.saveColoresData(newColores);
     _colores = newColores;
-    debugPrint('UserProvider: Colores de la app guardados y estado actualizado.');
+    appLog('UserProvider: Colores de la app guardados y estado actualizado.');
     notifyListeners();
   }
 
@@ -1369,26 +1371,26 @@ Future<Map<String, dynamic>> deleteAvisoCreado(String idAviso) async {
     final String idToken = _idToken ?? '';
 
     if (escuelaCode.isEmpty || idEmpresa.isEmpty || fechaHoraApiCall.isEmpty) {
-      debugPrint('UserProvider: Datos de sesión incompletos para cargar datos de la escuela.');
+      appLog('UserProvider: Datos de sesión incompletos para cargar datos de la escuela.');
       _escuelaModel = null;
       notifyListeners();
       return null;
     }
 
     Map<String, dynamic>? schoolJsonData;
-    debugPrint('UserProvider: Intentando cargar datos de la escuela desde el caché local...');
+    appLog('UserProvider: Intentando cargar datos de la escuela desde el caché local...');
     final cachedData = await DatabaseHelper.instance.getSchoolData(idEmpresa);
 
     if (cachedData != null) {
       schoolJsonData = cachedData['data_json'];
       _lastSchoolDataFetch = cachedData['last_fetch_time'];
-      debugPrint('UserProvider: Datos de la escuela cargados desde el caché local.');
+      appLog('UserProvider: Datos de la escuela cargados desde el caché local.');
     }
 
     notifyListeners();
 
     if (forceRefresh || shouldFetchSchoolDataFromApi()) {
-      debugPrint('UserProvider: Intentando obtener datos de la escuela desde la API...');
+      appLog('UserProvider: Intentando obtener datos de la escuela desde la API...');
       try {
         final schoolDataUrl = Uri.parse(ApiConstants.getSchoolData(escuelaCode, idEmpresa, fechaHoraApiCall, idColaborador, idPersonaParam, idToken));
         final schoolResponse = await http.get(schoolDataUrl);
@@ -1398,20 +1400,20 @@ Future<Map<String, dynamic>> deleteAvisoCreado(String idAviso) async {
           if (rawData['status'] == 'success' && rawData['school'] != null) {
             await DatabaseHelper.instance.saveSchoolData(idEmpresa, rawData);
             _lastSchoolDataFetch = DateTime.now();
-            debugPrint('UserProvider: Datos de la escuela obtenidos y guardados desde la API.');
+            appLog('UserProvider: Datos de la escuela obtenidos y guardados desde la API.');
             schoolJsonData = rawData;
           } else {
-            debugPrint('UserProvider: La API de la escuela devolvió estado no exitoso o sin datos. Manteniendo caché.');
+            appLog('UserProvider: La API de la escuela devolvió estado no exitoso o sin datos. Manteniendo caché.');
           }
         } else {
-          debugPrint('UserProvider: Error HTTP al cargar datos de la escuela (${schoolResponse.statusCode}). Manteniendo caché.');
+          appLog('UserProvider: Error HTTP al cargar datos de la escuela (${schoolResponse.statusCode}). Manteniendo caché.');
         }
       } on SocketException {
-        debugPrint('UserProvider: SocketException al cargar datos de la escuela. Sin conexión. Mostrando datos cacheados.');
+        appLog('UserProvider: SocketException al cargar datos de la escuela. Sin conexión. Mostrando datos cacheados.');
       } on http.ClientException {
-        debugPrint('UserProvider: ClientException al cargar datos de la escuela. Problema de red. Mostrando datos cacheados.');
+        appLog('UserProvider: ClientException al cargar datos de la escuela. Problema de red. Mostrando datos cacheados.');
       } catch (e) {
-        debugPrint('UserProvider: Excepción al cargar datos de la escuela: $e. Mostrando datos cacheados.');
+        appLog('UserProvider: Excepción al cargar datos de la escuela: $e. Mostrando datos cacheados.');
       }
     }
 
@@ -1421,10 +1423,10 @@ Future<Map<String, dynamic>> deleteAvisoCreado(String idAviso) async {
         _idCiclo = _escuelaModel!.cicloEscolar.idCiclo;
         _rutaLogoEscuela = _escuelaModel!.rutaLogo;
         notifyListeners();
-        debugPrint('UserProvider: EscuelaModel actualizado (final).');
+        appLog('UserProvider: EscuelaModel actualizado (final).');
         return _escuelaModel;
       } catch (e) {
-        debugPrint('UserProvider: Error al parsear EscuelaModel (final): $e');
+        appLog('UserProvider: Error al parsear EscuelaModel (final): $e');
         _escuelaModel = null;
         notifyListeners();
         return null;
@@ -1433,7 +1435,7 @@ Future<Map<String, dynamic>> deleteAvisoCreado(String idAviso) async {
 
     _escuelaModel = null;
     notifyListeners();
-    debugPrint('UserProvider: No se pudieron cargar los datos de la escuela desde la API o el caché.');
+    appLog('UserProvider: No se pudieron cargar los datos de la escuela desde la API o el caché.');
     return null;
   }
 
@@ -1446,7 +1448,7 @@ Future<Map<String, dynamic>> deleteAvisoCreado(String idAviso) async {
         .map((e) => AlumnoSalonModel.fromJson(e as Map<String, dynamic>))
         .toList();
 
-    debugPrint('UserProvider: Se procesaron ${_alumnosSalon.length} registros de alumnos por salón.');
+    appLog('UserProvider: Se procesaron ${_alumnosSalon.length} registros de alumnos por salón.');
 }
 
   Future<ColaboradorModel?> fetchAndLoadColaboradorData({bool forceRefresh = false}) async {
@@ -1458,7 +1460,7 @@ Future<Map<String, dynamic>> deleteAvisoCreado(String idAviso) async {
     final String idToken = _idToken ?? ''; 
 
     if (escuelaCode.isEmpty || idColaborador.isEmpty || idEmpresa.isEmpty || fechaHoraApiCall.isEmpty || idCicloEscolar.isEmpty) {
-      debugPrint('UserProvider: Datos de sesión incompletos para cargar datos del colaborador. Faltan: escuelaCode=$escuelaCode, idColaborador=$idColaborador, idEmpresa=$idEmpresa, fechaHoraApiCall=$fechaHoraApiCall, idCicloEscolar=$idCicloEscolar');
+      appLog('UserProvider: Datos de sesión incompletos para cargar datos del colaborador. Faltan: escuelaCode=$escuelaCode, idColaborador=$idColaborador, idEmpresa=$idEmpresa, fechaHoraApiCall=$fechaHoraApiCall, idCicloEscolar=$idCicloEscolar');
       _colaboradorModel = null;
       _currentColaboradorDetails = null;
       notifyListeners();
@@ -1469,7 +1471,7 @@ Future<Map<String, dynamic>> deleteAvisoCreado(String idAviso) async {
     Map<String, dynamic>? colaboradorJsonData;
     ColaboradorModel? tempColaboradorModel;
 
-    debugPrint('UserProvider: Intentando cargar datos del colaborador desde el caché local...');
+    appLog('UserProvider: Intentando cargar datos del colaborador desde el caché local...');
     final cachedData = await DatabaseHelper.instance.getColaboradorData(idColaborador);
     
     // ⭐️ INTEGRACIÓN (INICIO): Cargar la estructura de la boleta desde el caché/DB
@@ -1478,7 +1480,7 @@ Future<Map<String, dynamic>> deleteAvisoCreado(String idAviso) async {
     if (cachedData != null) {
       colaboradorJsonData = cachedData['data_json'];
       _lastColaboradorDataFetch = cachedData['last_fetch_time'];
-      debugPrint('UserProvider: Datos del colaborador cargados desde el caché local.');
+      appLog('UserProvider: Datos del colaborador cargados desde el caché local.');
       
       try {
         // ✅ Carga inicial desde caché (para mostrar algo rápido)
@@ -1497,29 +1499,29 @@ Future<Map<String, dynamic>> deleteAvisoCreado(String idAviso) async {
 
       } catch (e) {
         // Fallo de parseo debido a formato obsoleto de caché
-        debugPrint('UserProvider: Error al parsear ColaboradorModel desde el caché. Esto es común si la estructura de la API cambió. Forzando API: $e');
+        appLog('UserProvider: Error al parsear ColaboradorModel desde el caché. Esto es común si la estructura de la API cambió. Forzando API: $e');
         _colaboradorModel = null;
         _currentColaboradorDetails = null;
         forceRefresh = true; // Forzar API si falla la caché
       }
     } else {
-      debugPrint('UserProvider: No hay datos de colaborador en caché.');
+      appLog('UserProvider: No hay datos de colaborador en caché.');
     }
 
     // 2. Lógica de API
     if (forceRefresh || shouldFetchColaboradorDataFromApi()) {
-      debugPrint('UserProvider: Intentando obtener datos del colaborador desde la API...');
+      appLog('UserProvider: Intentando obtener datos del colaborador desde la API...');
       try {
         // ✅ [USO CORRECTO DE LA URL]: Patrón: id_colaborador/id_escuela/id_ciclo_escolar/fechahora/id_token
         final colaboradorDataUrl = Uri.parse(
           ApiConstants.getColaboradorAllData(escuelaCode,idColaborador, idEmpresa, idCicloEscolar, fechaHoraApiCall, idToken)
         );
-        debugPrint('UserProvider: Llamando a la URL de la API: $colaboradorDataUrl');
+        appLog('UserProvider: Llamando a la URL de la API: $colaboradorDataUrl');
         
         final colaboradorResponse = await http.get(colaboradorDataUrl);
         
-        debugPrint('UserProvider: Status de respuesta: ${colaboradorResponse.statusCode}');
-        debugPrint('UserProvider: Cuerpo de la respuesta: ${colaboradorResponse.body}');
+        appLog('UserProvider: Status de respuesta: ${colaboradorResponse.statusCode}');
+        appLog('UserProvider: Cuerpo de la respuesta: ${colaboradorResponse.body}');
 
         if (colaboradorResponse.statusCode == 200) {
           final rawData = json.decode(colaboradorResponse.body);
@@ -1533,20 +1535,20 @@ Future<Map<String, dynamic>> deleteAvisoCreado(String idAviso) async {
             // Guardamos el JSON COMPLETO en la caché.
             await DatabaseHelper.instance.saveColaboradorData(idColaborador, rawData);
             _lastColaboradorDataFetch = DateTime.now();
-            debugPrint('UserProvider: Datos del colaborador obtenidos y guardados desde la API.');
+            appLog('UserProvider: Datos del colaborador obtenidos y guardados desde la API.');
             
           } else {
-            debugPrint('UserProvider: La API devolvió estado no exitoso o sin datos. Manteniendo caché si existe.');
+            appLog('UserProvider: La API devolvió estado no exitoso o sin datos. Manteniendo caché si existe.');
           }
         } else {
-          debugPrint('UserProvider: Error HTTP al cargar datos del colaborador (${colaboradorResponse.statusCode}). Manteniendo caché si existe.');
+          appLog('UserProvider: Error HTTP al cargar datos del colaborador (${colaboradorResponse.statusCode}). Manteniendo caché si existe.');
         }
       } on SocketException {
-        debugPrint('UserProvider: SocketException al cargar datos del colaborador. Sin conexión. Mostrando datos cacheados.');
+        appLog('UserProvider: SocketException al cargar datos del colaborador. Sin conexión. Mostrando datos cacheados.');
       } on http.ClientException {
-        debugPrint('UserProvider: ClientException al cargar datos del colaborador. Problema de red. Mostrando datos cacheados.');
+        appLog('UserProvider: ClientException al cargar datos del colaborador. Problema de red. Mostrando datos cacheados.');
       } catch (e) {
-        debugPrint('UserProvider: Excepción general al cargar datos del colaborador desde la API: $e. Mostrando datos cacheados.');
+        appLog('UserProvider: Excepción general al cargar datos del colaborador desde la API: $e. Mostrando datos cacheados.');
       }
     }
     
@@ -1564,24 +1566,24 @@ Future<Map<String, dynamic>> deleteAvisoCreado(String idAviso) async {
              await DatabaseHelper.instance.saveBoletaEncabezados(tempColaboradorModel.encabezadosBoleta);
              // Actualizar la variable del Provider con la data fresca de la API
              _boletaEncabezados = tempColaboradorModel.encabezadosBoleta; 
-             debugPrint('UserProvider: Estructura de Boleta guardada/actualizada.');
+             appLog('UserProvider: Estructura de Boleta guardada/actualizada.');
           }
           
           _colaboradorModel = tempColaboradorModel;
           _currentColaboradorDetails = tempColaboradorModel;
           notifyListeners();
-          debugPrint('UserProvider: ColaboradorModel actualizado (final).');
+          appLog('UserProvider: ColaboradorModel actualizado (final).');
           return _colaboradorModel;
         }
       } catch (e) {
-        debugPrint('UserProvider: Error al parsear ColaboradorModel (final): $e');
+        appLog('UserProvider: Error al parsear ColaboradorModel (final): $e');
       }
     }
 
     _colaboradorModel = null;
     _currentColaboradorDetails = null;
     notifyListeners();
-    debugPrint('UserProvider: No se pudieron cargar los datos del colaborador desde la API o el caché.');
+    appLog('UserProvider: No se pudieron cargar los datos del colaborador desde la API o el caché.');
     return null;
   }
 
@@ -1594,7 +1596,7 @@ Future<Map<String, dynamic>> deleteAvisoCreado(String idAviso) async {
 
     // ⭐️ CAMBIO CLAVE 1: Devolver URL de red si es la web
     if (kIsWeb) {
-      debugPrint('UserProvider: Devolviendo URL de red para Web: $imageUrl');
+      appLog('UserProvider: Devolviendo URL de red para Web: $imageUrl');
       return imageUrl; // 🛑 Devuelve la URL de red completa
     }
 
@@ -1607,12 +1609,12 @@ Future<Map<String, dynamic>> deleteAvisoCreado(String idAviso) async {
     if (aviso.imagenLocalPath != null && !isCacheExpired) {
       final localFile = File(aviso.imagenLocalPath!);
       if (await localFile.exists()) {
-        debugPrint('UserProvider: Usando imagen desde caché local para ${aviso.idCalendario}');
+        appLog('UserProvider: Usando imagen desde caché local para ${aviso.idCalendario}');
         return localFile.path;
       }
     }
 
-    debugPrint('UserProvider: Descargando y cacheadando imagen para ${aviso.idCalendario}');
+    appLog('UserProvider: Descargando y cacheadando imagen para ${aviso.idCalendario}');
     try {
       final fileInfo = await DefaultCacheManager().downloadFile(imageUrl);
       aviso.imagenLocalPath = fileInfo.file.path;
@@ -1622,7 +1624,7 @@ Future<Map<String, dynamic>> deleteAvisoCreado(String idAviso) async {
       await DatabaseHelper.instance.updateAvisoWithImageCache(aviso, cacheId);
       return fileInfo.file.path; // 🛑 Devuelve la ruta local para móvil
     } catch (e) {
-      debugPrint('UserProvider: Error al descargar la imagen: $e');
+      appLog('UserProvider: Error al descargar la imagen: $e');
       return null;
     }
   }
@@ -1639,31 +1641,31 @@ Future<Map<String, dynamic>> deleteAvisoCreado(String idAviso) async {
     final String idColaborador = _idColaborador; 
 
     if (escuelaCode.isEmpty || idEmpresa.isEmpty || fechaHoraApiCall.isEmpty || idColaborador.isEmpty) {
-      debugPrint('UserProvider: Datos de sesión incompletos para cargar avisos.');
+      appLog('UserProvider: Datos de sesión incompletos para cargar avisos.');
       _avisos = [];
       notifyListeners();
       return _avisos;
     }
     final String cacheId = '${idEmpresa}_$idColaborador'; 
     List<AvisoModel> fetchedAvisos = [];
-    debugPrint('UserProvider: fetchAndLoadAvisosData - Intentando cargar avisos desde el caché local para el colaborador $idColaborador...');
+    appLog('UserProvider: fetchAndLoadAvisosData - Intentando cargar avisos desde el caché local para el colaborador $idColaborador...');
     fetchedAvisos = await DatabaseHelper.instance.getAvisosData(cacheId);
     if (fetchedAvisos.isNotEmpty) {
-      debugPrint('UserProvider: fetchAndLoadAvisosData - Avisos cargados desde el caché local: ${fetchedAvisos.length} avisos.');
+      appLog('UserProvider: fetchAndLoadAvisosData - Avisos cargados desde el caché local: ${fetchedAvisos.length} avisos.');
       _avisos = fetchedAvisos;
       notifyListeners();
     } else {
       _avisos = [];
       notifyListeners();
-      debugPrint('UserProvider: fetchAndLoadAvisosData - No hay avisos en caché para el colaborador $idColaborador.');
+      appLog('UserProvider: fetchAndLoadAvisosData - No hay avisos en caché para el colaborador $idColaborador.');
     }
     if (forceRefresh || shouldFetchAvisosDataFromApi()) {
-      debugPrint('UserProvider: fetchAndLoadAvisosData - Intentando obtener avisos desde la API...');
+      appLog('UserProvider: fetchAndLoadAvisosData - Intentando obtener avisos desde la API...');
       try {
         final avisosDataUrl = Uri.parse(
           ApiConstants.getAvisos(escuelaCode, idEmpresa, fechaHoraApiCall,idAlumnoParam , idSalonParam, nivelEducativoParam, idPersonaParam, idToken,idColaborador) 
         );
-        debugPrint('UserProvider: fetchAndLoadAvisosData - URL de la API de avisos: $avisosDataUrl');
+        appLog('UserProvider: fetchAndLoadAvisosData - URL de la API de avisos: $avisosDataUrl');
         final avisosResponse = await http.get(avisosDataUrl);
         
         
@@ -1686,25 +1688,25 @@ Future<Map<String, dynamic>> deleteAvisoCreado(String idAviso) async {
             }).toList();
             await DatabaseHelper.instance.saveAvisosData(cacheId, finalAvisosToSave);
             _lastAvisosDataFetch = DateTime.now();
-            debugPrint('UserProvider: fetchAndLoadAvisosData - Datos de avisos obtenidos y guardados desde la API.');
+            appLog('UserProvider: fetchAndLoadAvisosData - Datos de avisos obtenidos y guardados desde la API.');
             fetchedAvisos = finalAvisosToSave;
           } else {
-            debugPrint('UserProvider: fetchAndLoadAvisosData - La API de avisos devolvió un formato inesperado. Manteniendo caché si existe.');
+            appLog('UserProvider: fetchAndLoadAvisosData - La API de avisos devolvió un formato inesperado. Manteniendo caché si existe.');
           }
         } else {
-          debugPrint('UserProvider: fetchAndLoadAvisosData - Error HTTP al cargar avisos (${avisosResponse.statusCode}). Manteniendo caché si existe.');
+          appLog('UserProvider: fetchAndLoadAvisosData - Error HTTP al cargar avisos (${avisosResponse.statusCode}). Manteniendo caché si existe.');
         }
       } on SocketException {
-        debugPrint('UserProvider: fetchAndLoadAvisosData - SocketException al cargar avisos. Sin conexión. Mostrando datos cacheados.');
+        appLog('UserProvider: fetchAndLoadAvisosData - SocketException al cargar avisos. Sin conexión. Mostrando datos cacheados.');
       } on http.ClientException {
-        debugPrint('UserProvider: fetchAndLoadAvisosData - ClientException al cargar avisos. Problema de red. Mostrando datos cacheados.');
+        appLog('UserProvider: fetchAndLoadAvisosData - ClientException al cargar avisos. Problema de red. Mostrando datos cacheados.');
       } catch (e) {
-        debugPrint('UserProvider: fetchAndLoadAvisosData - Excepción general al cargar avisos desde la API: $e. Mostrando datos cacheados.');
+        appLog('UserProvider: fetchAndLoadAvisosData - Excepción general al cargar avisos desde la API: $e. Mostrando datos cacheados.');
       }
     }
     _avisos = fetchedAvisos;
     notifyListeners();
-    debugPrint('UserProvider: fetchAndLoadAvisosData - Avisos actualizados (final).');
+    appLog('UserProvider: fetchAndLoadAvisosData - Avisos actualizados (final).');
     return _avisos;
   }
   
@@ -1718,7 +1720,7 @@ Future<Map<String, dynamic>> deleteAvisoCreado(String idAviso) async {
     final String idToken = _idToken ?? ''; 
 
     if (escuelaCode.isEmpty || idEmpresa.isEmpty || tipoCafeteria.isEmpty || fechaHoraApiCall.isEmpty) {
-      debugPrint('UserProvider: Datos de sesión incompletos para cargar artículos de cafetería.');
+      appLog('UserProvider: Datos de sesión incompletos para cargar artículos de cafetería.');
       _articulosCaf = [];
       notifyListeners();
       return _articulosCaf;
@@ -1728,28 +1730,28 @@ Future<Map<String, dynamic>> deleteAvisoCreado(String idAviso) async {
 
     List<dynamic>? articulosCafJsonList;
 
-    debugPrint('UserProvider: Intentando cargar artículos de cafetería desde el caché local...');
+    appLog('UserProvider: Intentando cargar artículos de cafetería desde el caché local...');
     final cachedData = await DatabaseHelper.instance.getArticulosCafData(cacheId);
     if (cachedData != null) {
       articulosCafJsonList = cachedData['data_json'] as List<dynamic>;
       _lastArticulosCafDataFetch = cachedData['last_fetch_time'];
-      debugPrint('UserProvider: Artículos de cafetería cargados desde el caché local.');
+      appLog('UserProvider: Artículos de cafetería cargados desde el caché local.');
       try {
         _articulosCaf = articulosCafJsonList.map((e) => Articulo.fromJson(e as Map<String, dynamic>)).toList();
         notifyListeners();
       } catch (e) {
-        debugPrint('UserProvider: Error al parsear ArticulosCaf cacheados: $e');
+        appLog('UserProvider: Error al parsear ArticulosCaf cacheados: $e');
         _articulosCaf = [];
         notifyListeners();
       }
     } else {
       _articulosCaf = [];
       notifyListeners();
-      debugPrint('UserProvider: No hay artículos de cafetería en caché.');
+      appLog('UserProvider: No hay artículos de cafetería en caché.');
     }
 
     if (forceRefresh || shouldFetchArticulosCafDataFromApi()) {
-      debugPrint('UserProvider: Intentando obtener artículos de cafetería desde la API...');
+      appLog('UserProvider: Intentando obtener artículos de cafetería desde la API...');
       try {
         final articulosCafDataUrl = Uri.parse(
           ApiConstants.getArticulosCaf(escuelaCode, idEmpresa, tipoCafeteria, fechaHoraApiCall, idPersonaParam, idColaborador, idToken) // ✅ [REF] Cambiado a idColaborador
@@ -1762,29 +1764,29 @@ Future<Map<String, dynamic>> deleteAvisoCreado(String idAviso) async {
             articulosCafJsonList = rawData;
             await DatabaseHelper.instance.saveArticulosCafData(cacheId, rawData);
             _lastArticulosCafDataFetch = DateTime.now();
-            debugPrint('UserProvider: Datos de artículos de cafetería obtenidos y guardados desde la API.');
+            appLog('UserProvider: Datos de artículos de cafetería obtenidos y guardados desde la API.');
           } else {
-            debugPrint('UserProvider: La API de artículos de cafetería devolvió un formato inesperado. Manteniendo caché si existe.');
+            appLog('UserProvider: La API de artículos de cafetería devolvió un formato inesperado. Manteniendo caché si existe.');
           }
         } else {
-          debugPrint('UserProvider: Error HTTP al cargar artículos de cafetería (${articulosCafResponse.statusCode}). Manteniendo caché si existe.');
+          appLog('UserProvider: Error HTTP al cargar artículos de cafetería (${articulosCafResponse.statusCode}). Manteniendo caché si existe.');
         }
       } on SocketException {
-        debugPrint('UserProvider: SocketException al cargar artículos de cafetería. Sin conexión a internet. Mostrando datos cacheados.');
+        appLog('UserProvider: SocketException al cargar artículos de cafetería. Sin conexión a internet. Mostrando datos cacheados.');
       } on http.ClientException {
-        debugPrint('UserProvider: ClientException al cargar artículos de cafetería. Problema de red. Mostrando datos cacheados.');
+        appLog('UserProvider: ClientException al cargar artículos de cafetería. Problema de red. Mostrando datos cacheados.');
       } catch (e) {
-        debugPrint('UserProvider: Excepción general al cargar artículos de cafetería desde la API: $e. Mostrando datos cacheados.');
+        appLog('UserProvider: Excepción general al cargar artículos de cafetería desde la API: $e. Mostrando datos cacheados.');
       }
     }
     if (articulosCafJsonList != null) {
       try {
         _articulosCaf = articulosCafJsonList.map((e) => Articulo.fromJson(e as Map<String, dynamic>)).toList();
         notifyListeners();
-        debugPrint('UserProvider: Artículos de cafetería actualizados (final).');
+        appLog('UserProvider: Artículos de cafetería actualizados (final).');
         return _articulosCaf;
       } catch (e) {
-        debugPrint('UserProvider: Error al parsear ArticulosCaf (final): $e');
+        appLog('UserProvider: Error al parsear ArticulosCaf (final): $e');
         _articulosCaf = [];
         notifyListeners();
         return _articulosCaf;
@@ -1792,7 +1794,7 @@ Future<Map<String, dynamic>> deleteAvisoCreado(String idAviso) async {
     }
     _articulosCaf = [];
     notifyListeners();
-    debugPrint('UserProvider: No se pudieron cargar los artículos de cafetería desde la API o el caché.');
+    appLog('UserProvider: No se pudieron cargar los artículos de cafetería desde la API o el caché.');
     return _articulosCaf;
   }
 
@@ -1817,14 +1819,14 @@ Future<Map<String, dynamic>> deleteAvisoCreado(String idAviso) async {
     
 
     if (escuelaCode.isEmpty || idColaborador.isEmpty || fechaHoraApiCallFormatted.isEmpty) {
-      debugPrint('UserProvider: Datos de sesión o parámetros incompletos para cargar movimientos de cafetería.');
+      appLog('UserProvider: Datos de sesión o parámetros incompletos para cargar movimientos de cafetería.');
       _cafeteriaMovimientos = [];
       notifyListeners();
       return;
     }
 
     final String cacheId = '${escuelaCode}_${idColaborador}_${periodParam.isEmpty ? 'NO_PERIOD' : periodParam}_${cicloParam.isEmpty ? 'NO_CICLO' : cicloParam}'; // ✅ [REF] Cambiado de idAlumno
-    debugPrint('UserProvider: Intentando cargar desde el caché local...');
+    appLog('UserProvider: Intentando cargar desde el caché local...');
     final cachedData = await DatabaseHelper.instance.getCafeteriaData(cacheId);
     if (cachedData != null) {
       try {
@@ -1848,25 +1850,25 @@ Future<Map<String, dynamic>> deleteAvisoCreado(String idAviso) async {
           };
         }).toList();
         notifyListeners();
-        debugPrint('UserProvider: Movimientos de cafetería cargados desde el caché local.');
+        appLog('UserProvider: Movimientos de cafetería cargados desde el caché local.');
       } catch (e) {
-        debugPrint('UserProvider: Error al parsear movimientos de cafetería cacheados: $e');
+        appLog('UserProvider: Error al parsear movimientos de cafetería cacheados: $e');
         _cafeteriaMovimientos = [];
         notifyListeners();
       }
     } else {
       _cafeteriaMovimientos = [];
       notifyListeners();
-      debugPrint('UserProvider: No hay movimientos de cafetería en caché.');
+      appLog('UserProvider: No hay movimientos de cafetería en caché.');
     }
 
     if (forceRefresh || shouldFetchCafeteriaMovimientosDataFromApi()) {
-      debugPrint('UserProvider: Intentando obtener datos desde la API...');
+      appLog('UserProvider: Intentando obtener datos desde la API...');
       try {
         final movimientosDataUrl = Uri.parse(
           ApiConstants.getEdoCtaCafeteria(escuelaCode, idAlumno, idColaborador, periodParam, cicloParam, fechaHoraApiCallFormatted,idEmpresa,idToken)
         );
-        debugPrint('UserProvider: API URL para movimientos de cafetería: $movimientosDataUrl');
+        appLog('UserProvider: API URL para movimientos de cafetería: $movimientosDataUrl');
         final movimientosResponse = await http.get(movimientosDataUrl);
 
         if (movimientosResponse.statusCode == 200) {
@@ -1892,24 +1894,24 @@ Future<Map<String, dynamic>> deleteAvisoCreado(String idAviso) async {
               await DatabaseHelper.instance.saveCafeteriaData(cacheId, apiSaldo, movimientosList);
               _lastCafeteriaMovimientosDataFetch = DateTime.now();
               notifyListeners();
-              debugPrint('UserProvider: Datos de cafetería obtenidos, procesados y guardados desde la API.');
+              appLog('UserProvider: Datos de cafetería obtenidos, procesados y guardados desde la API.');
             } else {
-              debugPrint('UserProvider: La API devolvió un formato inesperado o el saldo es nulo.');
+              appLog('UserProvider: La API devolvió un formato inesperado o el saldo es nulo.');
             }
           } on FormatException catch (e) {
-            debugPrint('UserProvider: FormatException al decodificar JSON: $e');
+            appLog('UserProvider: FormatException al decodificar JSON: $e');
           }
         }
       } on SocketException {
-        debugPrint('UserProvider: SocketException. Sin conexión.');
+        appLog('UserProvider: SocketException. Sin conexión.');
       } on http.ClientException {
-        debugPrint('UserProvider: ClientException. Problema de red.');
+        appLog('UserProvider: ClientException. Problema de red.');
       } catch (e) {
-        debugPrint('UserProvider: Excepción general al cargar desde la API: $e.');
+        appLog('UserProvider: Excepción general al cargar desde la API: $e.');
       }
     }
     if (_cafeteriaMovimientos.isEmpty && cachedData == null) {
-      debugPrint('UserProvider: No se pudieron cargar los movimientos desde la API o el caché.');
+      appLog('UserProvider: No se pudieron cargar los movimientos desde la API o el caché.');
     }
   }
 
@@ -1917,7 +1919,7 @@ Future<Map<String, dynamic>> deleteAvisoCreado(String idAviso) async {
 
  Future<void> markAvisoAsRead(String idCalendario, {String? respuesta}) async {
     if (_escuela.isEmpty || _idEmpresa.isEmpty || _idColaborador.isEmpty) {
-      debugPrint('UserProvider: Datos de sesión incompletos para marcar aviso o enviar respuesta.');
+      appLog('UserProvider: Datos de sesión incompletos para marcar aviso o enviar respuesta.');
       return;
     }
      final String idTokenParam = _idToken ?? '0'; 
@@ -1934,14 +1936,14 @@ Future<Map<String, dynamic>> deleteAvisoCreado(String idAviso) async {
 
     final url = Uri.parse('${ApiConstants.apiBaseUrl}${ApiConstants.setAvisoLeidoEndpoint}');
 
-    debugPrint('➡️ API Petición POST a: $url');
-    debugPrint('➡️ Parámetros BODY enviados: $body');
+    appLog('➡️ API Petición POST a: $url');
+    appLog('➡️ Parámetros BODY enviados: $body');
     
     try {
       final response = await http.post(url, body: body);
 
       if (response.statusCode == 200) {
-        debugPrint('Aviso $idCalendario marcado como leído y/o respuesta enviada.');
+        appLog('Aviso $idCalendario marcado como leído y/o respuesta enviada.');
         final avisoIndex = _avisos.indexWhere((a) => a.idCalendario == idCalendario);
         
         if (avisoIndex != -1) {
@@ -1982,21 +1984,21 @@ Future<Map<String, dynamic>> deleteAvisoCreado(String idAviso) async {
         }
         notifyListeners();
       } else {
-        debugPrint('Error de servidor al marcar aviso: ${response.statusCode}');
+        appLog('Error de servidor al marcar aviso: ${response.statusCode}');
       }
     } catch (e) {
-      debugPrint('Excepción al marcar aviso: $e');
+      appLog('Excepción al marcar aviso: $e');
       // 🛑 NOTA: Si ves errores de CORS en la web, se capturarán aquí
     }
   }
 
   Future<void> initializeAllUserData({bool forceRefresh = false}) async {
-    debugPrint('UserProvider: Iniciando initializeAllUserData (forceRefresh: $forceRefresh)');
+    appLog('UserProvider: Iniciando initializeAllUserData (forceRefresh: $forceRefresh)');
 
     await loadUserDataFromDb();
 
     if (_idColaborador.isEmpty || _idEmpresa.isEmpty || _escuela.isEmpty) { // ✅ [REF] Cambiado de idAlumno
-      debugPrint('UserProvider: Faltan datos de sesión esenciales. No se pueden inicializar.');
+      appLog('UserProvider: Faltan datos de sesión esenciales. No se pueden inicializar.');
       return;
     }
     
@@ -2005,19 +2007,19 @@ Future<Map<String, dynamic>> deleteAvisoCreado(String idAviso) async {
     if (_idColaborador.isNotEmpty) { // ✅ [REF] Cambiado de idAlumno
       await fetchAndLoadAllColaboradorSpecificData(_idColaborador, forceRefresh: forceRefresh); // ✅ [REF] Nuevo método de orquestación
     } else {
-      debugPrint('UserProvider: No se encontró ningún colaborador, no se cargarán datos específicos.');
+      appLog('UserProvider: No se encontró ningún colaborador, no se cargarán datos específicos.');
     }
-    debugPrint('UserProvider: initializeAllUserData completado.');
+    appLog('UserProvider: initializeAllUserData completado.');
   }
 
   Future<void> fetchAndLoadAllColaboradorSpecificData(String idColaborador, {bool forceRefresh = false}) async {
     // ✅ [REF] Nuevo método para orquestar la carga de datos del colaborador
-    debugPrint('UserProvider: Iniciando fetchAndLoadAllColaboradorSpecificData para el colaborador: $idColaborador (forceRefresh: $forceRefresh)');
+    appLog('UserProvider: Iniciando fetchAndLoadAllColaboradorSpecificData para el colaborador: $idColaborador (forceRefresh: $forceRefresh)');
     
     await fetchAndLoadColaboradorData(forceRefresh: forceRefresh);
 
     if (_currentColaboradorDetails == null) {
-      debugPrint('UserProvider: _currentColaboradorDetails no está listo. Abortando carga de datos específicos.');
+      appLog('UserProvider: _currentColaboradorDetails no está listo. Abortando carga de datos específicos.');
       return;
     }
 
@@ -2033,29 +2035,29 @@ Future<Map<String, dynamic>> deleteAvisoCreado(String idAviso) async {
         final matchingPeriod = availablePeriods.firstWhere((p) => p.idPeriodo == _escuelaModel!.cafPeriodoActual);
         effectivePeriodId = matchingPeriod.idPeriodo;
         effectiveCicloId = matchingPeriod.idCiclo;
-        debugPrint('UserProvider: Predeterminando periodo de cafetería al actual de la API: Periodo: "$effectivePeriodId", Ciclo: "$effectiveCicloId"');
+        appLog('UserProvider: Predeterminando periodo de cafetería al actual de la API: Periodo: "$effectivePeriodId", Ciclo: "$effectiveCicloId"');
       }
       else if (availablePeriods.any((p) => p.activo == '1')) {
         final activePeriod = availablePeriods.firstWhere((p) => p.activo == '1');
         effectivePeriodId = activePeriod.idPeriodo;
         effectiveCicloId = activePeriod.idCiclo;
-        debugPrint('UserProvider: Predeterminando periodo de cafetería al primer activo: Periodo: "$effectivePeriodId", Ciclo: "$effectiveCicloId"');
+        appLog('UserProvider: Predeterminando periodo de cafetería al primer activo: Periodo: "$effectivePeriodId", Ciclo: "$effectiveCicloId"');
       }
       else {
         effectivePeriodId = availablePeriods.first.idPeriodo;
         effectiveCicloId = availablePeriods.first.idCiclo;
-        debugPrint('UserProvider: Predeterminando periodo de cafetería al primer disponible: Periodo: "$effectivePeriodId", Ciclo: "$effectiveCicloId"');
+        appLog('UserProvider: Predeterminando periodo de cafetería al primer disponible: Periodo: "$effectivePeriodId", Ciclo: "$effectiveCicloId"');
       }
       _selectedCafeteriaPeriodId = effectivePeriodId;
       _selectedCafeteriaCicloId = effectiveCicloId;
     } else if (_selectedCafeteriaPeriodId != null) {
       effectivePeriodId = _selectedCafeteriaPeriodId!;
       effectiveCicloId = _selectedCafeteriaCicloId!;
-      debugPrint('UserProvider: Usando periodo de cafetería ya seleccionado: Periodo: "$effectivePeriodId", Ciclo: "$effectiveCicloId"');
+      appLog('UserProvider: Usando periodo de cafetería ya seleccionado: Periodo: "$effectivePeriodId", Ciclo: "$effectiveCicloId"');
     } else {
       effectivePeriodId = '';
       effectiveCicloId = _idCiclo.isNotEmpty ? _idCiclo : '';
-      debugPrint('UserProvider: No se encontró un período de cafetería válido, usando cadenas vacías. Periodo: "$effectivePeriodId", Ciclo: "$effectiveCicloId"');
+      appLog('UserProvider: No se encontró un período de cafetería válido, usando cadenas vacías. Periodo: "$effectivePeriodId", Ciclo: "$effectiveCicloId"');
     }
 
     await fetchAndLoadCafeteriaMovimientosData(
@@ -2064,7 +2066,7 @@ Future<Map<String, dynamic>> deleteAvisoCreado(String idAviso) async {
       idCiclo: effectiveCicloId,
       forceRefresh: forceRefresh,
     );
-    debugPrint('UserProvider: fetchAndLoadAllColaboradorSpecificData completado para el colaborador: $idColaborador');
+    appLog('UserProvider: fetchAndLoadAllColaboradorSpecificData completado para el colaborador: $idColaborador');
   }
 
   /// Envía el estado de asistencia de todos los alumnos de un curso o club a la API.
@@ -2135,15 +2137,15 @@ Future<Map<String, dynamic>> deleteAvisoCreado(String idAviso) async {
     final url = Uri.parse('${ApiConstants.apiBaseUrl}${ApiConstants.setAsistenciaClubes}');
     
     // ⭐️ LOG DE DEPURACIÓN DETALLADO ⭐️
-    debugPrint('--- [API ASISTENCIA - FORM-ENCODE] ---');
-    debugPrint('URL de API: $url');
-    debugPrint('BODY MAP ENVIADO: $body'); 
-    debugPrint('JSON ARRAY ENVIADO EN EL CAMPO "asistencia": $asistenciaDataJsonString');
-    debugPrint('--- [FIN LOG ASISTENCIA] ---');
+    appLog('--- [API ASISTENCIA - FORM-ENCODE] ---');
+    appLog('URL de API: $url');
+    appLog('BODY MAP ENVIADO: $body'); 
+    appLog('JSON ARRAY ENVIADO EN EL CAMPO "asistencia": $asistenciaDataJsonString');
+    appLog('--- [FIN LOG ASISTENCIA] ---');
 
     // 4. VALIDACIÓN DE SESIÓN (SOLO ESCUELA Y COLABORADOR REQUERIDOS)
     if (_escuela.isEmpty || _idColaborador.isEmpty) {
-      debugPrint('UserProvider: Datos de sesión (Escuela o Colaborador) incompletos.');
+      appLog('UserProvider: Datos de sesión (Escuela o Colaborador) incompletos.');
       return {'status': 'error', 'message': 'Error de sesión. Faltan datos esenciales (Escuela/Colaborador).'};
     }
 
@@ -2161,7 +2163,7 @@ Future<Map<String, dynamic>> deleteAvisoCreado(String idAviso) async {
     final bool isSuccess = serverStatus.toLowerCase() == 'success' || serverStatus.toLowerCase() == 'correcto';
 
     if (isSuccess) {
-      debugPrint('Asistencia enviada exitosamente.');
+      appLog('Asistencia enviada exitosamente.');
       
       // Devolvemos el status tal cual viene del servidor ('correcto')
       return {'status': serverStatus, 'message': responseData['message'] ?? 'Asistencia guardada con éxito.'};
@@ -2169,24 +2171,24 @@ Future<Map<String, dynamic>> deleteAvisoCreado(String idAviso) async {
       String errorMessage = responseData['message'] ?? 'Ocurrió un error al guardar la asistencia.';
       
       // El log de error aquí es correcto, ya que el status no es éxito (por ejemplo, 'fallido')
-      debugPrint('Error de API: $errorMessage');
-      debugPrint('Respuesta de error completa del servidor: ${response.body}');
+      appLog('Error de API: $errorMessage');
+      appLog('Respuesta de error completa del servidor: ${response.body}');
       
       return {'status': 'error', 'message': errorMessage};
     }
   } else {
-    debugPrint('Error de servidor HTTP: ${response.statusCode}');
-    debugPrint('Cuerpo de la respuesta del servidor: ${response.body}');
+    appLog('Error de servidor HTTP: ${response.statusCode}');
+    appLog('Cuerpo de la respuesta del servidor: ${response.body}');
     return {'status': 'error', 'message': 'Error de conexión con el servidor (${response.statusCode}).'};
   }
     } on SocketException {
-      debugPrint('Excepción al enviar asistencia: SocketException');
+      appLog('Excepción al enviar asistencia: SocketException');
       return {'status': 'error', 'message': 'No se pudo conectar al servidor. Revisa tu conexión a internet.'};
     } on http.ClientException {
-      debugPrint('Excepción al enviar asistencia: ClientException');
+      appLog('Excepción al enviar asistencia: ClientException');
       return {'status': 'error', 'message': 'Problema de red al enviar datos.'};
     } catch (e) {
-      debugPrint('Excepción general al enviar asistencia: $e');
+      appLog('Excepción general al enviar asistencia: $e');
       return {'status': 'error', 'message': 'Ocurrió un error inesperado al guardar la asistencia.'};
     }
   }
@@ -2205,7 +2207,7 @@ Future<Map<String, dynamic>> deleteAvisoCreado(String idAviso) async {
     
     // 1. Validar datos mínimos
     if (_escuela.isEmpty || _idColaborador.isEmpty || idCurso.isEmpty) {
-      debugPrint('UserProvider: Datos de sesión incompletos para guardar calificaciones.');
+      appLog('UserProvider: Datos de sesión incompletos para guardar calificaciones.');
       return {'status': 'error', 'message': 'Error de sesión. Faltan datos esenciales (Escuela/Colaborador/Curso).'};
     }
 
@@ -2223,7 +2225,7 @@ Future<Map<String, dynamic>> deleteAvisoCreado(String idAviso) async {
 
     // Añadir todas las claves de comentarios (OBSERVACION_FINAL, etc.)
     clavesDeCalificacion.addAll(estructuraBoleta.comentarios.keys);
-    debugPrint('Claves de Boleta a enviar: ${clavesDeCalificacion.toList()}');
+    appLog('Claves de Boleta a enviar: ${clavesDeCalificacion.toList()}');
 
     // 2. Transformar la lista de alumnos para incluir SOLO los IDs y las calificaciones.
     final List<Map<String, dynamic>> listaCalificacionesAEnviar = calificacionesLista.map((alumno) {
@@ -2263,18 +2265,18 @@ Future<Map<String, dynamic>> deleteAvisoCreado(String idAviso) async {
     final url = Uri.parse('${ApiConstants.apiBaseUrl}${ApiConstants.setMateriasCalif}');
     
     // ⭐️ LOG DE DEPURACIÓN DETALLADO ⭐️
-    debugPrint('--- [API CALIFICACIONES] ---');
-    debugPrint('URL de API: $url');
-    debugPrint('Body (escuela): $_escuela');
-    debugPrint('Body (id_curso): $idCurso');
-    //debugPrint('Body (id_alumno - colaborador): $idColaborador');
-    debugPrint('Body (fechahora): $fechaActualApiCall');
-    debugPrint('Body (calificacion length): ${calificacionesDataJsonString.length} bytes');
+    appLog('--- [API CALIFICACIONES] ---');
+    appLog('URL de API: $url');
+    appLog('Body (escuela): $_escuela');
+    appLog('Body (id_curso): $idCurso');
+    //appLog('Body (id_alumno - colaborador): $idColaborador');
+    appLog('Body (fechahora): $fechaActualApiCall');
+    appLog('Body (calificacion length): ${calificacionesDataJsonString.length} bytes');
     
     // ✅ MODIFICACIÓN: Imprimir el JSON completo que se está enviando en 'calificacion'
-    debugPrint('JSON COMPLETO ENVIADO EN EL CAMPO "calificacion": $calificacionesDataJsonString');
+    appLog('JSON COMPLETO ENVIADO EN EL CAMPO "calificacion": $calificacionesDataJsonString');
     
-    debugPrint('--- [FIN LOG CALIFICACIONES] ---' );
+    appLog('--- [FIN LOG CALIFICACIONES] ---' );
 
     // 4. LLAMADA HTTP
     try {
@@ -2284,25 +2286,25 @@ Future<Map<String, dynamic>> deleteAvisoCreado(String idAviso) async {
         final responseData = json.decode(response.body);
         
         // ✅ MODIFICACIÓN: Print para ver el JSON de respuesta
-        debugPrint('UserProvider: JSON retornado por la API: ${response.body}');
+        appLog('UserProvider: JSON retornado por la API: ${response.body}');
         
         if (responseData['status'] == 'correcto') { // Usamos 'correcto' basado en las imágenes
-          debugPrint('Calificaciones guardadas exitosamente.');
+          appLog('Calificaciones guardadas exitosamente.');
           return {'status': 'success', 'message': responseData['message'] ?? 'Calificaciones guardadas con éxito.'};
         } else {
           String errorMessage = responseData['message'] ?? 'Error al guardar calificaciones.';
-          debugPrint('Error de API: $errorMessage');
-          debugPrint('Respuesta de error completa del servidor: ${response.body}');
+          appLog('Error de API: $errorMessage');
+          appLog('Respuesta de error completa del servidor: ${response.body}');
           return {'status': 'error', 'message': errorMessage};
         }
       } else {
-        debugPrint('Error de servidor HTTP: ${response.statusCode}');
+        appLog('Error de servidor HTTP: ${response.statusCode}');
         return {'status': 'error', 'message': 'Error de conexión con el servidor (${response.statusCode}).'};
       }
     } on SocketException {
       return {'status': 'error', 'message': 'No se pudo conectar al servidor. Revisa tu conexión a internet.'};
     } catch (e) {
-      debugPrint('Excepción general al guardar calificaciones: $e');
+      appLog('Excepción general al guardar calificaciones: $e');
       return {'status': 'error', 'message': 'Ocurrió un error inesperado al guardar calificaciones.'};
     }
   }

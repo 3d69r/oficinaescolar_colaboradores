@@ -5,7 +5,7 @@ import 'package:oficinaescolar_colaboradores/models/boleta_encabezado_model.dart
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 import 'package:flutter/foundation.dart'; // Necesario para kIsWeb y defaultTargetPlatform
-
+import 'package:oficinaescolar_colaboradores/utils/log_util.dart';
 import 'package:oficinaescolar_colaboradores/models/aviso_model.dart';
 import 'package:oficinaescolar_colaboradores/models/colores_model.dart';
 // ⭐️ IMPORTANTE: Asegúrate de que esta importación apunte a tu modelo BoletaEncabezadoModel
@@ -52,7 +52,7 @@ class DatabaseHelper {
   Future<Database> get database async {
     // ⭐️ PROTECCIÓN DE ACCESO: Si está deshabilitada, no continuar ⭐️
     if (_debeDeshabilitarDb) {
-      debugPrint('DatabaseHelper: Acceso a DB denegado (Web/Desktop).');
+      appLog('DatabaseHelper: Acceso a DB denegado (Web/Desktop).');
       throw UnsupportedError('La base de datos SQLite está inhabilitada en esta plataforma.');
     }
     
@@ -64,14 +64,14 @@ class DatabaseHelper {
   Future<Database> _initDb() async {
     // ⭐️ PROTECCIÓN DE INICIALIZACIÓN ⭐️
     if (_debeDeshabilitarDb) {
-      debugPrint('DatabaseHelper: Ejecutando en Web/Desktop. Se lanza UnsupportedError para prevenir el uso de SQLite.');
+      appLog('DatabaseHelper: Ejecutando en Web/Desktop. Se lanza UnsupportedError para prevenir el uso de SQLite.');
       throw UnsupportedError('La inicialización de la base de datos SQLite está restringida en plataformas Web o de escritorio en esta versión.');
     }
     // FIN PROTECCIÓN DE INICIALIZACIÓN
     
     final databasePath = await getDatabasesPath();
     final path = join(databasePath, _dbName);
-    debugPrint('DatabaseHelper: Ruta de la base de datos: $path');
+    appLog('DatabaseHelper: Ruta de la base de datos: $path');
 
     return await openDatabase(
       path,
@@ -83,7 +83,7 @@ class DatabaseHelper {
   }
 
   Future<void> _onCreate(Database db, int version) async {
-    debugPrint('DatabaseHelper: Creando tablas de la base de datos...');
+    appLog('DatabaseHelper: Creando tablas de la base de datos...');
     await db.execute('''
       CREATE TABLE $_schoolDataTable (
         id TEXT PRIMARY KEY,
@@ -190,22 +190,22 @@ class DatabaseHelper {
         archivo TEXT       
       )
     '''); // ⚠️ Se eliminó la coma extra después de 'archivo TEXT' y los comentarios de SQL.
-    debugPrint('DatabaseHelper: Tablas creadas exitosamente.');
+    appLog('DatabaseHelper: Tablas creadas exitosamente.');
   }
 
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
-    debugPrint('DatabaseHelper: Iniciando migración de la base de datos de la versión $oldVersion a $newVersion.');
+    appLog('DatabaseHelper: Iniciando migración de la base de datos de la versión $oldVersion a $newVersion.');
     // Si la versión anterior era 1 y la nueva es 2, se podría añadir la tabla aquí.
     // if (oldVersion < 2) { 
     //   await db.execute(sql para crear _avisosCreadosTable);
     // }
-    debugPrint('DatabaseHelper: Migración completada.');
+    appLog('DatabaseHelper: Migración completada.');
   }
 
   Future<void> close() async {
     // ⭐️ PROTECCIÓN ⭐️
     if (_debeDeshabilitarDb) {
-      debugPrint('DatabaseHelper: Cierre de DB omitido (Web/Desktop).');
+      appLog('DatabaseHelper: Cierre de DB omitido (Web/Desktop).');
       return;
     }
     // FIN PROTECCIÓN
@@ -213,13 +213,13 @@ class DatabaseHelper {
     final db = await instance.database;
     await db.close();
     _database = null;
-    debugPrint('DatabaseHelper: Base de datos cerrada.');
+    appLog('DatabaseHelper: Base de datos cerrada.');
   }
 
   Future<void> clearAllData() async {
     // ⭐️ PROTECCIÓN ⭐️
     if (_debeDeshabilitarDb) {
-      debugPrint('DatabaseHelper: Limpieza de DB omitida (Web/Desktop).');
+      appLog('DatabaseHelper: Limpieza de DB omitida (Web/Desktop).');
       return;
     }
     // FIN PROTECCIÓN
@@ -238,14 +238,14 @@ class DatabaseHelper {
     // ⭐️ NUEVO: Limpiar la tabla de avisos creados ⭐️
     // await db.delete(_avisosCreadosTable); // Dejo el comentario, ya que el usuario lo tenía comentado.
     
-    debugPrint('DatabaseHelper: Todas las tablas limpiadas.');
+    appLog('DatabaseHelper: Todas las tablas limpiadas.');
   }
 
   // --- Métodos Genéricos para Guardar y Obtener Datos ---
   Future<void> _saveData(String tableName, String id, Map<String, dynamic> dataJson, {bool isSessionData = false}) async {
     // ⭐️ PROTECCIÓN ⭐️
     if (_debeDeshabilitarDb) {
-      debugPrint('DatabaseHelper: Guardado de $tableName omitido (Web/Desktop).');
+      appLog('DatabaseHelper: Guardado de $tableName omitido (Web/Desktop).');
       return;
     }
     // FIN PROTECCIÓN
@@ -263,13 +263,13 @@ class DatabaseHelper {
       },
       conflictAlgorithm: ConflictAlgorithm.replace,
     );
-    debugPrint('DatabaseHelper: Datos guardados/actualizados en $tableName para ID: $id');
+    appLog('DatabaseHelper: Datos guardados/actualizados en $tableName para ID: $id');
   }
 
   Future<void> _saveListData(String tableName, String id, List<dynamic> dataJsonList) async {
     // ⭐️ PROTECCIÓN ⭐️
     if (_debeDeshabilitarDb) {
-      debugPrint('DatabaseHelper: Guardado de lista $tableName omitido (Web/Desktop).');
+      appLog('DatabaseHelper: Guardado de lista $tableName omitido (Web/Desktop).');
       return;
     }
     // FIN PROTECCIÓN
@@ -283,13 +283,13 @@ class DatabaseHelper {
       {'id': id, 'data_json': jsonString, 'last_fetch_time': timestamp},
       conflictAlgorithm: ConflictAlgorithm.replace,
     );
-    debugPrint('DatabaseHelper: Lista de datos guardada/actualizada en $tableName para ID: $id');
+    appLog('DatabaseHelper: Lista de datos guardada/actualizada en $tableName para ID: $id');
   }
   
   Future<Map<String, dynamic>?> _getData(String tableName, String id, {bool isSessionData = false}) async {
     // ⭐️ PROTECCIÓN ⭐️
     if (_debeDeshabilitarDb) {
-      debugPrint('DatabaseHelper: Obtención de datos de $tableName omitida (Web/Desktop).');
+      appLog('DatabaseHelper: Obtención de datos de $tableName omitida (Web/Desktop).');
       return null;
     }
     // FIN PROTECCIÓN
@@ -303,13 +303,13 @@ class DatabaseHelper {
 
     if (maps.isNotEmpty) {
       final data = maps.first;
-      debugPrint('DatabaseHelper: Datos obtenidos de $tableName para ID: $id');
+      appLog('DatabaseHelper: Datos obtenidos de $tableName para ID: $id');
       return {
         'data_json': json.decode(data['data_json'] as String),
         'last_fetch_time': DateTime.fromMillisecondsSinceEpoch(data[isSessionData ? 'last_update_time' : 'last_fetch_time'] as int),
       };
     }
-    debugPrint('DatabaseHelper: No se encontraron datos en $tableName para ID: $id');
+    appLog('DatabaseHelper: No se encontraron datos en $tableName para ID: $id');
     return null;
   }
   
@@ -336,7 +336,7 @@ class DatabaseHelper {
   Future<void> saveBoletaEncabezados(List<BoletaEncabezadoModel> encabezados) async {
     // ⭐️ PROTECCIÓN ⭐️
     if (_debeDeshabilitarDb) {
-      debugPrint('DatabaseHelper: Guardado de encabezados omitido (Web/Desktop).');
+      appLog('DatabaseHelper: Guardado de encabezados omitido (Web/Desktop).');
       return;
     }
     // FIN PROTECCIÓN
@@ -345,7 +345,7 @@ class DatabaseHelper {
     
     // Borrar todo antes de guardar, ya que es una configuración de lista global
     await db.delete(_encabezadosBoletaTable); 
-    debugPrint('DatabaseHelper: Limpiada la tabla $_encabezadosBoletaTable.');
+    appLog('DatabaseHelper: Limpiada la tabla $_encabezadosBoletaTable.');
 
     for (final enc in encabezados) {
         // Creamos un Map que puede ser serializado a JSON para la columna 'data'
@@ -366,14 +366,14 @@ class DatabaseHelper {
             conflictAlgorithm: ConflictAlgorithm.replace
         );
     }
-    debugPrint('DatabaseHelper: ${encabezados.length} estructuras de boleta guardadas.');
+    appLog('DatabaseHelper: ${encabezados.length} estructuras de boleta guardadas.');
   }
 
   /// Obtiene la lista de estructuras de encabezados de boleta desde la base de datos local.
   Future<List<BoletaEncabezadoModel>> getBoletaEncabezados() async {
     // ⭐️ PROTECCIÓN ⭐️
     if (_debeDeshabilitarDb) {
-      debugPrint('DatabaseHelper: Obtención de encabezados omitida (Web/Desktop).');
+      appLog('DatabaseHelper: Obtención de encabezados omitida (Web/Desktop).');
       return [];
     }
     // FIN PROTECCIÓN
@@ -403,7 +403,7 @@ class DatabaseHelper {
   Future<void> saveAvisoCreado(Map<String, dynamic> avisoData) async {
     // ⭐️ PROTECCIÓN ⭐️
     if (_debeDeshabilitarDb) {
-      debugPrint('DatabaseHelper: Guardado de aviso creado omitido (Web/Desktop).');
+      appLog('DatabaseHelper: Guardado de aviso creado omitido (Web/Desktop).');
       return;
     }
     // FIN PROTECCIÓN
@@ -431,14 +431,14 @@ class DatabaseHelper {
       dataToSave, 
       conflictAlgorithm: ConflictAlgorithm.replace
     );
-    debugPrint('DatabaseHelper: Aviso creado con ID ${avisoData['id_aviso']} guardado localmente.');
+    appLog('DatabaseHelper: Aviso creado con ID ${avisoData['id_aviso']} guardado localmente.');
   }
 
   /// Obtiene todos los avisos creados por el colaborador.
   Future<List<Map<String, dynamic>>> getAvisosCreados() async {
     // ⭐️ PROTECCIÓN ⭐️
     if (_debeDeshabilitarDb) {
-      debugPrint('DatabaseHelper: Obtención de avisos creados omitida (Web/Desktop).');
+      appLog('DatabaseHelper: Obtención de avisos creados omitida (Web/Desktop).');
       return [];
     }
     // FIN PROTECCIÓN
@@ -451,7 +451,7 @@ class DatabaseHelper {
     );
 
     if (maps.isNotEmpty) {
-      debugPrint('DatabaseHelper: ${maps.length} avisos creados obtenidos de la base de datos.');
+      appLog('DatabaseHelper: ${maps.length} avisos creados obtenidos de la base de datos.');
       return maps; // Retorna la lista de Mapas directamente
     }
     return [];
@@ -461,7 +461,7 @@ class DatabaseHelper {
   Future<void> deleteAvisoCreado(String idAviso) async {
     // ⭐️ PROTECCIÓN ⭐️
     if (_debeDeshabilitarDb) {
-      debugPrint('DatabaseHelper: Eliminación de aviso creado omitida (Web/Desktop).');
+      appLog('DatabaseHelper: Eliminación de aviso creado omitida (Web/Desktop).');
       return;
     }
     // FIN PROTECCIÓN
@@ -472,14 +472,14 @@ class DatabaseHelper {
       where: 'id_aviso = ?',
       whereArgs: [idAviso],
     );
-    debugPrint('DatabaseHelper: Aviso creado con ID $idAviso eliminado localmente.');
+    appLog('DatabaseHelper: Aviso creado con ID $idAviso eliminado localmente.');
   }
 
 
   Future<void> saveAvisosData(String cacheId, List<AvisoModel> avisos) async {
     // ⭐️ PROTECCIÓN ⭐️
     if (_debeDeshabilitarDb) {
-      debugPrint('DatabaseHelper: Guardado de avisos omitido (Web/Desktop).');
+      appLog('DatabaseHelper: Guardado de avisos omitido (Web/Desktop).');
       return;
     }
     // FIN PROTECCIÓN
@@ -490,7 +490,7 @@ class DatabaseHelper {
       where: 'id_empresa_colaborador_cache_id = ?', // ✅ [REF] Cambiado de id_empresa_alumno_cache_id
       whereArgs: [cacheId],
     );
-    debugPrint('DatabaseHelper: Eliminados avisos antiguos para cacheId: $cacheId de $_individualAvisosTable.');
+    appLog('DatabaseHelper: Eliminados avisos antiguos para cacheId: $cacheId de $_individualAvisosTable.');
 
     for (final aviso in avisos) {
       final avisoData = aviso.toDatabaseJson();
@@ -501,13 +501,13 @@ class DatabaseHelper {
         conflictAlgorithm: ConflictAlgorithm.replace,
       );
     }
-    debugPrint('DatabaseHelper: ${avisos.length} avisos guardados/actualizados en $_individualAvisosTable para cacheId: $cacheId.');
+    appLog('DatabaseHelper: ${avisos.length} avisos guardados/actualizados en $_individualAvisosTable para cacheId: $cacheId.');
   }
 
   Future<List<AvisoModel>> getAvisosData(String cacheId) async {
     // ⭐️ PROTECCIÓN ⭐️
     if (_debeDeshabilitarDb) {
-      debugPrint('DatabaseHelper: Obtención de avisos omitida (Web/Desktop).');
+      appLog('DatabaseHelper: Obtención de avisos omitida (Web/Desktop).');
       return [];
     }
     // FIN PROTECCIÓN
@@ -521,17 +521,17 @@ class DatabaseHelper {
     );
 
     if (maps.isNotEmpty) {
-      debugPrint('DatabaseHelper: ${maps.length} avisos obtenidos de $_individualAvisosTable para cacheId: $cacheId.');
+      appLog('DatabaseHelper: ${maps.length} avisos obtenidos de $_individualAvisosTable para cacheId: $cacheId.');
       return maps.map((map) => AvisoModel.fromDatabaseJson(map)).toList();
     }
-    debugPrint('DatabaseHelper: No se encontraron avisos en $_individualAvisosTable para cacheId: $cacheId.');
+    appLog('DatabaseHelper: No se encontraron avisos en $_individualAvisosTable para cacheId: $cacheId.');
     return [];
   }
 
   Future<void> updateAvisoReadStatus(String idCalendario, String cacheId, bool isRead) async {
     // ⭐️ PROTECCIÓN ⭐️
     if (_debeDeshabilitarDb) {
-      debugPrint('DatabaseHelper: Actualización de estado de lectura de aviso omitida (Web/Desktop).');
+      appLog('DatabaseHelper: Actualización de estado de lectura de aviso omitida (Web/Desktop).');
       return;
     }
     // FIN PROTECCIÓN
@@ -543,13 +543,13 @@ class DatabaseHelper {
       where: 'id_calendario = ? AND id_empresa_colaborador_cache_id = ?', // ✅ [REF] Cambiado
       whereArgs: [idCalendario, cacheId],
     );
-    debugPrint('DatabaseHelper: Estado "leido" actualizado para aviso $idCalendario en $_individualAvisosTable.');
+    appLog('DatabaseHelper: Estado "leido" actualizado para aviso $idCalendario en $_individualAvisosTable.');
   }
 
   Future<void> updateAvisoWithImageCache(AvisoModel aviso, String cacheId) async {
     // ⭐️ PROTECCIÓN ⭐️
     if (_debeDeshabilitarDb) {
-      debugPrint('DatabaseHelper: Actualización de caché de imagen de aviso omitida (Web/Desktop).');
+      appLog('DatabaseHelper: Actualización de caché de imagen de aviso omitida (Web/Desktop).');
       return;
     }
     // FIN PROTECCIÓN
@@ -565,13 +565,13 @@ class DatabaseHelper {
       whereArgs: [aviso.idCalendario, cacheId],
       conflictAlgorithm: ConflictAlgorithm.replace,
     );
-    debugPrint('DatabaseHelper: Campos de caché de imagen actualizados para aviso ${aviso.idCalendario} en $_individualAvisosTable.');
+    appLog('DatabaseHelper: Campos de caché de imagen actualizados para aviso ${aviso.idCalendario} en $_individualAvisosTable.');
   }
 
   Future<void> updateAvisoRespuesta(String idCalendario, String cacheId, String respuesta) async {
     // ⭐️ PROTECCIÓN ⭐️
     if (_debeDeshabilitarDb) {
-      debugPrint('DatabaseHelper: Actualización de respuesta de aviso omitida (Web/Desktop).');
+      appLog('DatabaseHelper: Actualización de respuesta de aviso omitida (Web/Desktop).');
       return;
     }
     // FIN PROTECCIÓN
@@ -595,7 +595,7 @@ class DatabaseHelper {
   Future<void> saveCafeteriaData(String id, double saldoActual, List<dynamic> dataJsonList) async {
     // ⭐️ PROTECCIÓN ⭐️
     if (_debeDeshabilitarDb) {
-      debugPrint('DatabaseHelper: Guardado de datos de cafetería omitido (Web/Desktop).');
+      appLog('DatabaseHelper: Guardado de datos de cafetería omitido (Web/Desktop).');
       return;
     }
     // FIN PROTECCIÓN
@@ -614,13 +614,13 @@ class DatabaseHelper {
       },
       conflictAlgorithm: ConflictAlgorithm.replace,
     );
-    debugPrint('DatabaseHelper: Datos de cafetería guardados/actualizados para ID: $id');
+    appLog('DatabaseHelper: Datos de cafetería guardados/actualizados para ID: $id');
   }
 
   Future<Map<String, dynamic>?> getCafeteriaData(String id) async {
     // ⭐️ PROTECCIÓN ⭐️
     if (_debeDeshabilitarDb) {
-      debugPrint('DatabaseHelper: Obtención de datos de cafetería omitida (Web/Desktop).');
+      appLog('DatabaseHelper: Obtención de datos de cafetería omitida (Web/Desktop).');
       return null;
     }
     // FIN PROTECCIÓN
@@ -634,14 +634,14 @@ class DatabaseHelper {
 
     if (maps.isNotEmpty) {
       final data = maps.first;
-      debugPrint('DatabaseHelper: Datos de cafetería obtenidos para ID: $id');
+      appLog('DatabaseHelper: Datos de cafetería obtenidos para ID: $id');
       return {
         'saldo_actual': data['saldo_actual'] as double?,
         'data_json': json.decode(data['data_json'] as String),
         'last_fetch_time': DateTime.fromMillisecondsSinceEpoch(data['last_fetch_time'] as int),
       };
     }
-    debugPrint('DatabaseHelper: No se encontraron datos de cafetería para ID: $id');
+    appLog('DatabaseHelper: No se encontraron datos de cafetería para ID: $id');
     return null;
   }
 
@@ -655,7 +655,7 @@ class DatabaseHelper {
   Future<void> saveColoresData(Colores colores) async {
     // ⭐️ PROTECCIÓN ⭐️
     if (_debeDeshabilitarDb) {
-      debugPrint('DatabaseHelper: Guardado de colores omitido (Web/Desktop).');
+      appLog('DatabaseHelper: Guardado de colores omitido (Web/Desktop).');
       return;
     }
     // FIN PROTECCIÓN
@@ -666,13 +666,13 @@ class DatabaseHelper {
       colores.toMap()..['id'] = 1,
       conflictAlgorithm: ConflictAlgorithm.replace,
     );
-    debugPrint('DatabaseHelper: Colores de la app guardados/actualizados.');
+    appLog('DatabaseHelper: Colores de la app guardados/actualizados.');
   }
 
   Future<Colores?> getColoresData() async {
     // ⭐️ PROTECCIÓN ⭐️
     if (_debeDeshabilitarDb) {
-      debugPrint('DatabaseHelper: Obtención de colores omitida (Web/Desktop).');
+      appLog('DatabaseHelper: Obtención de colores omitida (Web/Desktop).');
       return null;
     }
     // FIN PROTECCIÓN
@@ -681,17 +681,17 @@ class DatabaseHelper {
     final List<Map<String, dynamic>> maps = await db.query(_coloresAppTable, where: 'id = ?', whereArgs: [1]);
 
     if (maps.isNotEmpty) {
-      debugPrint('DatabaseHelper: Colores de la app obtenidos.');
+      appLog('DatabaseHelper: Colores de la app obtenidos.');
       return Colores.fromMap(maps.first);
     }
-    debugPrint('DatabaseHelper: No se encontraron colores de la app.');
+    appLog('DatabaseHelper: No se encontraron colores de la app.');
     return null;
   }
   
   Future<void> saveTokens(String id, String idToken, String fcmToken) async {
     // ⭐️ PROTECCIÓN ⭐️
     if (_debeDeshabilitarDb) {
-      debugPrint('DatabaseHelper: Guardado de tokens omitido (Web/Desktop).');
+      appLog('DatabaseHelper: Guardado de tokens omitido (Web/Desktop).');
       return;
     }
     // FIN PROTECCIÓN
@@ -702,13 +702,13 @@ class DatabaseHelper {
       {'id': id, 'id_token': idToken, 'token_celular': fcmToken},
       conflictAlgorithm: ConflictAlgorithm.replace,
     );
-    debugPrint('DatabaseHelper: Tokens guardados/actualizados en $_tokensTable para ID: $id');
+    appLog('DatabaseHelper: Tokens guardados/actualizados en $_tokensTable para ID: $id');
   }
 
   Future<Map<String, dynamic>?> getTokens(String id) async {
     // ⭐️ PROTECCIÓN ⭐️
     if (_debeDeshabilitarDb) {
-      debugPrint('DatabaseHelper: Obtención de tokens omitida (Web/Desktop).');
+      appLog('DatabaseHelper: Obtención de tokens omitida (Web/Desktop).');
       return null;
     }
     // FIN PROTECCIÓN

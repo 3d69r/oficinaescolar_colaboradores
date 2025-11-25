@@ -11,7 +11,7 @@ import 'package:oficinaescolar_colaboradores/services/api_client.dart';
 import 'package:provider/provider.dart';
 import 'providers/user_provider.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
-
+import 'package:oficinaescolar_colaboradores/utils/log_util.dart';
 
 const double _phoneBreakpoint = 600.0;
 
@@ -22,7 +22,7 @@ const double _phoneBreakpoint = 600.0;
    await Firebase.initializeApp(
      options: DefaultFirebaseOptions.currentPlatform,
    );
-   debugPrint('📥 [BACKGROUND] Mensaje FCM recibido: ${message.messageId}');
+   appLog('📥 [BACKGROUND] Mensaje FCM recibido: ${message.messageId}');
  }
 
 void main() async {
@@ -32,7 +32,7 @@ void main() async {
       await initializeDateFormatting('es', null);
   } catch (e) {
       // Manejo de error si la inicialización falla por alguna razón (poco probable)
-      debugPrint('Error al inicializar formato de fecha: $e');
+      appLog('Error al inicializar formato de fecha: $e');
       await initializeDateFormatting(); // Intenta la inicialización por defecto
   }
 
@@ -54,16 +54,16 @@ void main() async {
   if (fcmTokenFromFirebase != null) {
       // NOTA: Debes implementar este método en UserProvider: setFcmTokenForWeb(String token)
       tempUserProvider.setFcmTokenForWeb(fcmTokenFromFirebase); 
-      debugPrint('main.dart: FCM Token asignado al UserProvider en memoria.');
+      appLog('main.dart: FCM Token asignado al UserProvider en memoria.');
   }
 
   String initialRoute;
   if (tempUserProvider.idColaborador.isNotEmpty) {
     initialRoute = 'home';
-    debugPrint('main.dart: Sesión de colaborador encontrada en DB. Ruta inicial: home');
+    appLog('main.dart: Sesión de colaborador encontrada en DB. Ruta inicial: home');
   } else {
     initialRoute = '/';
-    debugPrint('main.dart: No se encontró sesión en DB. Ruta inicial: /');
+    appLog('main.dart: No se encontró sesión en DB. Ruta inicial: /');
   }
 
   runApp(
@@ -95,20 +95,20 @@ void main() async {
      provisional: false,
      announcement: false,
    );
-   debugPrint('🔔 Permisos de notificaciones: ${settings.authorizationStatus}');
+   appLog('🔔 Permisos de notificaciones: ${settings.authorizationStatus}');
    
    String? token = await messaging.getToken(); // Token obtenido
-   debugPrint('📲 Token FCM: $token');
+   appLog('📲 Token FCM: $token');
    
    FirebaseMessaging.onMessage.listen((RemoteMessage message) {
-     debugPrint('📥 [FOREGROUND] Mensaje FCM: ${message.notification?.title} - ${message.notification?.body}');
+     appLog('📥 [FOREGROUND] Mensaje FCM: ${message.notification?.title} - ${message.notification?.body}');
    });
    FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
-     debugPrint('🟢 [OPENED APP] App abierta desde notificación FCM: ${message.messageId}');
+     appLog('🟢 [OPENED APP] App abierta desde notificación FCM: ${message.messageId}');
    });
    RemoteMessage? initialMessage = await messaging.getInitialMessage();
    if (initialMessage != null) {
-     debugPrint('🚀 [INITIAL MESSAGE] App iniciada desde notificación FCM terminada: ${initialMessage.messageId}');
+     appLog('🚀 [INITIAL MESSAGE] App iniciada desde notificación FCM terminada: ${initialMessage.messageId}');
    }
    
    return token; // 👈 Devolvemos el token
