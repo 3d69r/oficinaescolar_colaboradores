@@ -39,7 +39,7 @@ class _ListaScreenState extends State<ListaScreen> {
     _cargarAlumnos(); 
   }
   
-  // ✅ MÉTODO: Cargar alumnos (YA CORREGIDO para usar el estado de la API)
+  // ✅ MÉTODO: Cargar alumnos 
   void _cargarAlumnos() {
     final userProvider = Provider.of<UserProvider>(context, listen: false);
     
@@ -73,9 +73,6 @@ class _ListaScreenState extends State<ListaScreen> {
         _attendanceState[alumno.idCursoAlumno] = AttendanceStatus.presente;
       }
     });
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Todos los alumnos marcados como Asistencia.')),
-    );
   }
 
   // ✅ MÉTODO: Marcar Falta a Todos
@@ -85,9 +82,6 @@ class _ListaScreenState extends State<ListaScreen> {
         _attendanceState[alumno.idCursoAlumno] = AttendanceStatus.ausente;
       }
     });
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Todos los alumnos marcados con Falta.')),
-    );
   }
 
   // ⭐️ Lógica de marcado individual simple ⭐️
@@ -108,48 +102,118 @@ class _ListaScreenState extends State<ListaScreen> {
     });
   }
 
-  // ✅ MÉTODO: Enviar datos de asistencia (ACTUALIZADO)
+  // ----------------------------------------------------------------------
+  // ⭐️ MÉTODOS AUXILIARES PARA MODALES ⭐️
+  // ----------------------------------------------------------------------
+
+  // ✅ MÉTODO: Muestra el modal de carga (Loading)
+  void _showLoadingDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: false, // El usuario no puede cerrarlo tocando fuera
+      builder: (BuildContext context) {
+        return const AlertDialog(
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(height: 20),
+              Text("Guardando asistencia...", style: TextStyle(fontSize: 16)),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  // ✅ MÉTODO: Muestra el modal de resultado
+  Future<void> _showResultDialog(String message, bool isSuccess) async {
+    return showDialog<void>(
+      context: context,
+      // Se puede cerrar solo si no es éxito o si la navegación ya ocurrió.
+      barrierDismissible: true, 
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Row(
+            children: [
+              Icon(
+                isSuccess ? Icons.check_circle : Icons.error,
+                color: isSuccess ? Colors.green : Colors.red,
+              ),
+              const SizedBox(width: 10),
+              Text(isSuccess ? 'Éxito' : 'Error', style: TextStyle(fontWeight: FontWeight.bold, color: isSuccess ? Colors.green : Colors.red)),
+            ],
+          ),
+          content: SingleChildScrollView(
+            child: ListBody(
+              children: <Widget>[
+                Text(message),
+              ],
+            ),
+          ),
+          actions: <Widget>[
+            TextButton(
+              child: const Text('Aceptar'),
+              onPressed: () {
+                Navigator.of(context).pop(); // Cierra el diálogo de resultado
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  // ----------------------------------------------------------------------
+  // ⭐️ MÉTODO: Enviar datos de asistencia (MODIFICADO para usar modales) ⭐️
+  // ----------------------------------------------------------------------
   void _enviarAsistencia() async { 
+    if (!mounted) return;
     final userProvider = Provider.of<UserProvider>(context, listen: false);
 
-    // Deshabilitar la interfaz temporalmente (opcional) y mostrar indicador de carga
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Enviando asistencia, por favor espere...')),
-    );
+    // 1. Mostrar modal de carga
+    _showLoadingDialog();
+    
+    // Bandera para saber si el modal de carga sigue abierto (true si showDialog fue exitoso)
+    bool loadingDialogIsVisible = true; 
 
     try {
       final Map<String, dynamic> result = await userProvider.setAsistenciaClubesOMaterias(
         idCurso: widget.idCurso,
         tipoCurso: widget.tipoCurso,
         attendanceState: _attendanceState,
-        alumnosLista: _alumnos, // <--- CLAVE: Se pasa la lista completa de alumnos
+        alumnosLista: _alumnos, 
       );
+      
+      // 2. Cerrar el modal de carga (solo si sigue montado y abierto)
+      if (mounted && loadingDialogIsVisible) {
+        Navigator.of(context).pop(); 
+        loadingDialogIsVisible = false;
+      }
 
-      // Limpiar la barra de mensajes anterior
-      ScaffoldMessenger.of(context).hideCurrentSnackBar(); 
-
-      // Mostrar el resultado de la API
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(result['message'] as String),
-          backgroundColor: result['status'] == 'success' ? Colors.green : Colors.red,
-        ),
-      );
-
-      // Si fue exitoso, puedes querer regresar a la pantalla anterior
-      if (result['status'] == 'success') {
-        // Simplemente cerramos la pantalla de lista después de un éxito
+      // 3. Evaluar el resultado (maneja 'correcto' y 'success')
+      final String status = result['status'] as String? ?? 'error';
+      final bool isSuccess = status.toLowerCase() == 'correcto' || status.toLowerCase() == 'success';
+      final String message = result['message'] as String? ?? 'Respuesta sin mensaje.';
+      
+      // 4. Mostrar modal de resultado
+      await _showResultDialog(message, isSuccess); 
+      
+      // 5. Si fue exitoso, regresar a la pantalla anterior
+      if (isSuccess && mounted) {
+        // Cerramos la pantalla actual de la lista
         Navigator.of(context).pop(); 
       }
 
     } catch (e) {
-      ScaffoldMessenger.of(context).hideCurrentSnackBar(); 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error de aplicación al enviar: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      // 6. Si hay una excepción, cerrar el modal de carga (si está abierto)
+      if (mounted && loadingDialogIsVisible) {
+        Navigator.of(context).pop(); 
+        loadingDialogIsVisible = false;
+      }
+      
+      // Mostrar el error en un modal
+      _showResultDialog('Ocurrió un error inesperado al enviar: $e', false);
     }
   }
 

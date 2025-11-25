@@ -16,11 +16,9 @@ import 'package:oficinaescolar_colaboradores/models/boleta_encabezado_model.dart
 import 'package:oficinaescolar_colaboradores/models/comentario_model.dart';
 import 'package:oficinaescolar_colaboradores/models/datos_archivo_a_subir.dart';
 import 'package:oficinaescolar_colaboradores/models/escuela_model.dart';
-import 'package:oficinaescolar_colaboradores/models/colaborador_model.dart'; // ✅ [REF] Nuevo modelo
+import 'package:oficinaescolar_colaboradores/models/colaborador_model.dart'; 
 import 'package:oficinaescolar_colaboradores/models/aviso_model.dart';
-//import 'package:oficinaescolar_colaboradores/models/cfdi_model.dart'; // Mantener el modelo si la API lo retorna, aunque no usemos el método
 import 'package:oficinaescolar_colaboradores/models/articulo_model.dart';
-//import 'package:oficinaescolar_colaboradores/models/pago_model.dart'; // Mantener el modelo si la API lo retorna
 import 'package:oficinaescolar_colaboradores/models/colores_model.dart';
 import 'package:oficinaescolar_colaboradores/providers/tipo_curso.dart';
 import 'package:oficinaescolar_colaboradores/screens/lista_screen.dart';
@@ -28,7 +26,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 class UserProvider with ChangeNotifier {
   // --- Datos de Sesión y Control (Variables Privadas) ---
-  String _idColaborador = ''; // ✅ [REF] Cambiado de _idAlumno a _idColaborador
+  String _idColaborador = ''; 
   String _idEmpresa = '';
   String _email = '';
   String _escuela = '';
@@ -47,7 +45,7 @@ class UserProvider with ChangeNotifier {
   String? _selectedCafeteriaPeriodId;
   String? _selectedCafeteriaCicloId;
 
-  ColaboradorModel? _currentColaboradorDetails; // ✅ [REF] Cambiado de AlumnoModel
+  ColaboradorModel? _currentColaboradorDetails; 
   Colores? _colores;
 
   final _defaultColores = Colores(
@@ -65,24 +63,20 @@ class UserProvider with ChangeNotifier {
 
   // --- Marcas de Tiempo de la última vez que se obtuvieron datos de la API (para lógica de caché) ---
   DateTime? _lastSchoolDataFetch;
-  DateTime? _lastColaboradorDataFetch; // ✅ [REF] Cambiado de _lastAlumnoDataFetch
+  DateTime? _lastColaboradorDataFetch; 
   DateTime? _lastAvisosDataFetch;
   DateTime? _lastArticulosCafDataFetch;
   DateTime? _lastCafeteriaMovimientosDataFetch;
-  
-  // ✅ [REF] Eliminadas marcas de tiempo para CFDI, Pagos, Cargos, Materias
 
   // --- Modelos de Datos en Caché y Parseados (Variables Privadas) ---
   EscuelaModel? _escuelaModel;
-  ColaboradorModel? _colaboradorModel; // ✅ [REF] Cambiado de AlumnoModel
+  ColaboradorModel? _colaboradorModel; 
   List<AvisoModel> _avisos = [];
   List<Articulo> _articulosCaf = [];
   List<Map<String, dynamic>> _cafeteriaMovimientos = [];
   List<BoletaEncabezadoModel> _boletaEncabezados = [];
   List<Map<String, dynamic>> _avisosCreados = [];
-  //List<Map<String, dynamic>> _avisosArchivados = [];
-  
-  // ✅ [REF] Eliminados los modelos de datos para CFDI, Pagos, Cargos, Materias
+
 
   final ValueNotifier<void> autoRefreshTrigger = ValueNotifier(null);
 
@@ -121,8 +115,6 @@ class UserProvider with ChangeNotifier {
     // ⭐️ INSTANCIAS DE HELPERS ⭐️
   final DatabaseHelper _dbHelper = DatabaseHelper.instance;
   static const String _prefsAvisosCreadosKey = 'avisos_creados_json_list'; // Clave para SharedPreferences
-  //static const String _prefsAvisosArchivadosKey = 'avisos_archivados_json_list';
-  //List<Map<String, dynamic>> get avisosArchivados => _avisosArchivados;
 
   // ⭐️ NUEVO GETTER: Avisos creados ⭐️
   List<Map<String, dynamic>> get avisosCreados => _avisosCreados;
@@ -315,7 +307,6 @@ Future<List<Map<String, dynamic>>> _getAvisosCreadosFromPrefs(String key) async 
         'escuela': prefs.getString('escuela') ?? '',
         'idCiclo': prefs.getString('idCiclo') ?? '',
         'fechaHora': prefs.getString('fechaHora') ?? '',
-        // Tokens (si se guardaron)
         'idToken': prefs.getString('idToken') ?? '', 
         'fcmToken': prefs.getString('fcmToken') ?? '',
       };
@@ -331,15 +322,12 @@ Future<List<Map<String, dynamic>>> _getAvisosCreadosFromPrefs(String key) async 
 
     // 3. ASIGNACIÓN FINAL Y LÓGICA DE TOKENS
     if (dataLoaded) {
-      // Asignar variables internas del Provider desde sessionJson
       _idColaborador = sessionJson['idColaborador'] ?? '';
       _idEmpresa = sessionJson['idEmpresa'] ?? '';
       _email = sessionJson['email'] ?? '';
       _escuela = sessionJson['escuela'] ?? '';
       _fechaHora = sessionJson['fechaHora'] ?? '';
       _idCiclo = sessionJson['idCiclo'] ?? '';
-      
-      // Si manejas más variables específicas del colaborador, inclúyelas aquí.
 
       // 🔑 Lógica de Tokens: Intentar DB, sino usar el dato del sessionJson (SharedPreferences)
       if (_idColaborador.isNotEmpty) {
@@ -392,8 +380,8 @@ Future<void> saveColaboradorSessionToPrefs({
   required String escuela,
   required String idCiclo,
   required String fechaHora,
-  String? idToken, // Opcional, si se guarda aparte
-  String? fcmToken, // Opcional, si se guarda aparte
+  String? idToken, 
+  String? fcmToken, 
 }) async {
   final prefs = await SharedPreferences.getInstance();
 
@@ -440,7 +428,6 @@ Future<void> saveColaboradorSessionToPrefs({
       escuela: escuela,
       idCiclo: idCiclo,
       fechaHora: fechaHora,
-      // Si manejas los tokens en el login, pásalos aquí:
        idToken: idToken,
       fcmToken: fcmToken,
     );
@@ -481,7 +468,6 @@ Future<void> saveColaboradorSessionToPrefs({
 }
 
   Future<void> enviarComentario(Comentario comentario) async {
-    // ... (este método no cambia, solo su uso)
     if (_escuela.isEmpty || _idColaborador.isEmpty) {
       debugPrint('UserProvider: Datos de sesión incompletos para enviar comentario.');
       throw Exception('Datos de sesión incompletos. Por favor, reinicia la app.');
@@ -519,7 +505,6 @@ Future<void> saveColaboradorSessionToPrefs({
   }
 
   String _mapTipoComentarioToString(TipoComentario tipo) {
-    // ... (este método no cambia)
     switch (tipo) {
       case TipoComentario.problema:
         return 'Reportar un problema';
@@ -537,7 +522,6 @@ Future<void> saveColaboradorSessionToPrefs({
   Future<Map<String, dynamic>> uploadCalificacionesArchivos({
     required String idAlumno,
     required String idSalon,
-    // ❌ CAMBIO DE TIPO: Usamos el nuevo modelo en una lista
     required List<DatosArchivoASubir> archivosParaSubir, 
   }) async {
     final String escuelaCode = _escuela;
@@ -581,9 +565,7 @@ Future<void> saveColaboradorSessionToPrefs({
         final String campoArchivo = archivo.nombreCampoApi;
         
         if (!kIsWeb) {
-          // ====================================================================
           // 💻 LÓGICA PARA MÓVIL/DESKTOP (USA dart:io.File y fromPath)
-          // ====================================================================
           final String? localPath = archivo.rutaLocal;
           if (localPath != null && localPath.isNotEmpty) {
             final file = File(localPath);
@@ -603,9 +585,7 @@ Future<void> saveColaboradorSessionToPrefs({
             }
           }
         } else {
-          // ====================================================================
           // 🌐 LÓGICA PARA WEB (USA Bytes y fromBytes) - ¡SOLUCIÓN!
-          // ====================================================================
           final Uint8List? bytes = archivo.bytesArchivo;
           final String? nombre = archivo.nombreArchivo;
           
@@ -898,7 +878,7 @@ Future<Map<String, dynamic>> saveAviso(Map<String, dynamic> avisoData) async {
             notifyListeners(); 
 
             final String action = isNew ? 'creado' : 'actualizado';
-            return {'success': true, 'message': 'Aviso ${action} con éxito. ID: $idAvisoServer', 'ruta_archivo': finalFilePath};
+            return {'success': true, 'message': 'Aviso $action con éxito. ID: $idAvisoServer', 'ruta_archivo': finalFilePath};
         
         } else {
             // Fallo de la API
@@ -1128,7 +1108,6 @@ Future<Map<String, dynamic>> deleteAvisoCreado(String idAviso) async {
     }
   
   Future<void> setSelectedCafeteriaPeriod(String? idPeriodo, String? idCiclo) async {
-    // ... (este método no cambia)
     if (_selectedCafeteriaPeriodId != idPeriodo || _selectedCafeteriaCicloId != idCiclo) {
       _selectedCafeteriaPeriodId = idPeriodo;
       _selectedCafeteriaCicloId = idCiclo;
@@ -1158,10 +1137,6 @@ Future<Map<String, dynamic>> deleteAvisoCreado(String idAviso) async {
     // 🔑 CRÍTICO: Eliminar los tokens
     await prefs.remove('idToken');
     await prefs.remove('fcmToken');
-    
-    // (Añade aquí cualquier otra clave que uses en saveColaboradorSessionToPrefs)
-
-    //appLog('UserProvider: SharedPreferences del Colaborador limpiado.');
   } 
 
   Future<void> clearUserData() async {
@@ -1202,7 +1177,6 @@ Future<Map<String, dynamic>> deleteAvisoCreado(String idAviso) async {
   }
 
   String generateApiFechaHora() {
-    // ... (este método no cambia)
     final now = DateTime.now();
     final formatter = DateFormat('ddMMyyyyHHmmss');
     return formatter.format(now);
@@ -1216,13 +1190,11 @@ Future<Map<String, dynamic>> deleteAvisoCreado(String idAviso) async {
   }
 
   void triggerAutoRefresh() {
-    // ... (este método no cambia)
     autoRefreshTrigger.value = null;
     debugPrint('UserProvider: Señal de auto-refresco activada.');
   }
 
   bool shouldFetchSchoolDataFromApi() {
-    // ... (este método no cambia)
     if (_lastSchoolDataFetch == null) {
       debugPrint('UserProvider: No hay marca de tiempo para datos de escuela. Se necesita API.');
       return true;
@@ -1258,7 +1230,6 @@ Future<Map<String, dynamic>> deleteAvisoCreado(String idAviso) async {
   }
 
   bool shouldFetchArticulosCafDataFromApi() {
-    // ... (este método no cambia)
     if (_lastArticulosCafDataFetch == null) {
       debugPrint('UserProvider: No hay marca de tiempo para datos de artículos de cafetería. Se necesita API.');
       return true;
@@ -1270,7 +1241,6 @@ Future<Map<String, dynamic>> deleteAvisoCreado(String idAviso) async {
   }
   
   bool shouldFetchCafeteriaMovimientosDataFromApi() {
-    // ... (este método no cambia)
     if (_lastCafeteriaMovimientosDataFetch == null) {
       debugPrint('UserProvider: No hay marca de tiempo para movimientos de cafetería. Se necesita API.');
       return true;
@@ -1284,7 +1254,6 @@ Future<Map<String, dynamic>> deleteAvisoCreado(String idAviso) async {
   // ✅ [REF] Eliminados los métodos shouldFetch para CFDI, Pagos, Cargos, Materias
 
   Future<Map<String, String>> obtenerInfoDispositivo() async {
-    // ... (este método no cambia)
     final deviceInfo = DeviceInfoPlugin();
     if (Platform.isAndroid) {
       final androidInfo = await deviceInfo.androidInfo;
@@ -1384,7 +1353,6 @@ Future<Map<String, dynamic>> deleteAvisoCreado(String idAviso) async {
   
 
   Future<void> processAndSaveSchoolColors(Map<String, dynamic> apiResponse) async {
-    // ... (este método no cambia)
     final newColores = Colores.fromMap(apiResponse);
     await DatabaseHelper.instance.saveColoresData(newColores);
     _colores = newColores;
@@ -1393,7 +1361,6 @@ Future<Map<String, dynamic>> deleteAvisoCreado(String idAviso) async {
   }
 
   Future<EscuelaModel?> fetchAndLoadSchoolData({bool forceRefresh = false}) async {
-    // ... (este método no cambia)
     final String escuelaCode = _escuela;
     final String idEmpresa = _idEmpresa;
     final String fechaHoraApiCall = _fechaHora.isNotEmpty ? _fechaHora : generateApiFechaHora();
@@ -1631,9 +1598,7 @@ Future<Map<String, dynamic>> deleteAvisoCreado(String idAviso) async {
       return imageUrl; // 🛑 Devuelve la URL de red completa
     }
 
-    // ----------------------------------------------------
     // Lógica de Caché Móvil (solo se ejecuta si NO es Web)
-    // ----------------------------------------------------
     final now = DateTime.now();
     final bool isCacheExpired = aviso.imagenCacheTimestamp != null
         ? now.difference(aviso.imagenCacheTimestamp!).inDays > 7
@@ -1743,7 +1708,6 @@ Future<Map<String, dynamic>> deleteAvisoCreado(String idAviso) async {
     return _avisos;
   }
   
-
   Future<List<Articulo>> fetchAndLoadArticulosCafData(String tipoCafeteria, {bool forceRefresh = false}) async {
     // ... (este método no cambia, solo la URL de la API)
     final String escuelaCode = _escuela;
@@ -1832,8 +1796,6 @@ Future<Map<String, dynamic>> deleteAvisoCreado(String idAviso) async {
     return _articulosCaf;
   }
 
-  // ✅ [REF] Eliminados los métodos para Pagos Realizados y Cargos Pendientes
-  
   void setUltimoSaldoConocido(double saldo) {
     _ultimoSaldoConocido = saldo;
     notifyListeners();
@@ -2190,23 +2152,33 @@ Future<Map<String, dynamic>> deleteAvisoCreado(String idAviso) async {
       // ✅ CLAVE: Enviamos el Map<String, String>. http.post lo codifica automáticamente como Form-encode.
       final response = await http.post(url, body: body);
 
-      if (response.statusCode == 200) {
-        final responseData = json.decode(response.body);
-        
-        if (responseData['status'] == 'success') {
-          debugPrint('Asistencia enviada exitosamente.');
-          return {'status': 'success', 'message': responseData['message'] ?? 'Asistencia guardada con éxito.'};
-        } else {
-          String errorMessage = responseData['message'] ?? 'Ocurrió un error al guardar la asistencia.';
-          debugPrint('Error de API: $errorMessage');
-          debugPrint('Respuesta de error completa del servidor: ${response.body}');
-          return {'status': 'error', 'message': errorMessage};
-        }
-      } else {
-        debugPrint('Error de servidor HTTP: ${response.statusCode}');
-        debugPrint('Cuerpo de la respuesta del servidor: ${response.body}');
-        return {'status': 'error', 'message': 'Error de conexión con el servidor (${response.statusCode}).'};
-      }
+     if (response.statusCode == 200) {
+    final responseData = json.decode(response.body);
+    
+    // 🚨 MODIFICACIÓN CLAVE AQUÍ 🚨
+    // La API devuelve 'correcto' o 'success'. Ambas deben ser tratadas como éxito.
+    final String serverStatus = responseData['status'] as String? ?? 'error'; 
+    final bool isSuccess = serverStatus.toLowerCase() == 'success' || serverStatus.toLowerCase() == 'correcto';
+
+    if (isSuccess) {
+      debugPrint('Asistencia enviada exitosamente.');
+      
+      // Devolvemos el status tal cual viene del servidor ('correcto')
+      return {'status': serverStatus, 'message': responseData['message'] ?? 'Asistencia guardada con éxito.'};
+    } else {
+      String errorMessage = responseData['message'] ?? 'Ocurrió un error al guardar la asistencia.';
+      
+      // El log de error aquí es correcto, ya que el status no es éxito (por ejemplo, 'fallido')
+      debugPrint('Error de API: $errorMessage');
+      debugPrint('Respuesta de error completa del servidor: ${response.body}');
+      
+      return {'status': 'error', 'message': errorMessage};
+    }
+  } else {
+    debugPrint('Error de servidor HTTP: ${response.statusCode}');
+    debugPrint('Cuerpo de la respuesta del servidor: ${response.body}');
+    return {'status': 'error', 'message': 'Error de conexión con el servidor (${response.statusCode}).'};
+  }
     } on SocketException {
       debugPrint('Excepción al enviar asistencia: SocketException');
       return {'status': 'error', 'message': 'No se pudo conectar al servidor. Revisa tu conexión a internet.'};
@@ -2238,9 +2210,6 @@ Future<Map<String, dynamic>> deleteAvisoCreado(String idAviso) async {
     }
 
     final String idColaborador = _idColaborador;
-
-    // ✅ MODIFICACIÓN: Lógica para SIMPLIFICAR EL JSON a enviar
-    // ------------------------------------
 
     // 1. Recolectar TODAS las claves de calificación/observación de la boleta:
     Set<String> clavesDeCalificacion = {};
@@ -2277,8 +2246,6 @@ Future<Map<String, dynamic>> deleteAvisoCreado(String idAviso) async {
         
         return alumnoData;
     }).toList();
-    
-    // ------------------------------------
 
     // El parámetro 'calificacion' de la API debe ser un JSON String de esta lista.
     final String calificacionesDataJsonString = json.encode(listaCalificacionesAEnviar);
