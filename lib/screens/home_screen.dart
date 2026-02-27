@@ -404,8 +404,16 @@ if (mounted) {
     _userProvider = Provider.of<UserProvider>(context);
 
     if (_userProvider.colaboradorModel == null || _userProvider.escuelaModel == null) {
-      debugPrint('HomeScreen: build - Datos de colaborador o escuela nulos. Mostrando CircularProgressIndicator.');
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      /*debugPrint('HomeScreen: build - Datos de colaborador o escuela nulos. Mostrando CircularProgressIndicator.');
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));*/
+      // Redirige al login si la sesión está vacía
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          Navigator.pushReplacementNamed(context, '/');
+        }
+      });
+      // Retorna un widget vacío mientras navega
+      return const SizedBox.shrink();
     }
     
     final menuData = _buildDynamicMenu(context);

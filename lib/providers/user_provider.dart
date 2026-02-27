@@ -40,6 +40,7 @@ class UserProvider with ChangeNotifier {
   String? _tokenCelular;
   String? _idMateriaAlumno;
   String? _idAlumno;
+  bool sesionInvalida = false;
 
   double _ultimoSaldoConocido = 0.0;
   double get ultimoSaldoConocido => _ultimoSaldoConocido;
@@ -1690,7 +1691,13 @@ Future<Map<String, dynamic>> deleteAvisoCreado(String idAviso) async {
             _lastAvisosDataFetch = DateTime.now();
             appLog('UserProvider: fetchAndLoadAvisosData - Datos de avisos obtenidos y guardados desde la API.');
             fetchedAvisos = finalAvisosToSave;
-          } else {
+          } else if (rawData is Map<String, dynamic> && rawData['status'] == 'error' && (rawData['message']?.toString().toLowerCase().contains('token inactivo') == true || rawData['message']?.toString().toLowerCase().contains('token invalido') == true)) {
+            appLog('UserProvider: Token inactivo o inválido detectado en la respuesta de avisos. Forzando cierre de sesión.');
+            await clearUserData();
+            sesionInvalida = true;
+            notifyListeners();
+            return [];
+          }else {
             appLog('UserProvider: fetchAndLoadAvisosData - La API de avisos devolvió un formato inesperado. Manteniendo caché si existe.');
           }
         } else {

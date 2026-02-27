@@ -219,6 +219,14 @@ class _AvisosViewState extends State<AvisosView>
       // El provider se encarga de la lógica de caché y de fusionar el estado 'leido'.
       await _userProvider.fetchAndLoadAvisosData(forceRefresh: forceReload);
 
+      if (_userProvider.sesionInvalida) {
+        _userProvider.sesionInvalida = false; // resetea la bandera
+      if (mounted) {
+        Navigator.pushReplacementNamed(context, '/');
+      }
+      return;
+      }
+
       // Si el widget se desmonta mientras la operación asíncrona está en curso, salir.
       if (!mounted) {
         debugPrint(
