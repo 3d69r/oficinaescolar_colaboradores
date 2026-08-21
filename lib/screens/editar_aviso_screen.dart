@@ -2,16 +2,21 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:oficinaescolar_colaboradores/providers/user_provider.dart';
 import 'package:html_editor_enhanced/html_editor.dart';
-import 'package:file_picker/file_picker.dart'; // ⭐️ IMPORTAR FILE_PICKER ⭐️
+import 'package:file_picker/file_picker.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:oficinaescolar_colaboradores/models/colaborador_model.dart';
+import 'package:oficinaescolar_colaboradores/utils/snackbar_util.dart';
+import 'dart:io';
 
 // ----------------------------------------------------------------------
 // ESTA VISTA SOLO SE ENCARGA DE EDITAR Y ELIMINAR AVISOS EXISTENTES
 // ----------------------------------------------------------------------
 
 class EditarAvisoScreen extends StatefulWidget {
-  final Map<String, dynamic> avisoParaEditar; 
+  final Map<String, dynamic> avisoParaEditar;
 
-  const EditarAvisoScreen({Key? key, required this.avisoParaEditar}) : super(key: key);
+  const EditarAvisoScreen({Key? key, required this.avisoParaEditar})
+      : super(key: key);
 
   @override
   _EditarAvisoScreenState createState() => _EditarAvisoScreenState();
@@ -26,62 +31,67 @@ class _EditarAvisoScreenState extends State<EditarAvisoScreen> {
   final _opcion1Controller = TextEditingController();
   final _opcion2Controller = TextEditingController();
   final _opcion3Controller = TextEditingController();
-  
+  final ImagePicker _imagePicker = ImagePicker();
+
   // Estado
   List<String> _destinatariosPrincipales = ['Todos'];
-  String _destinatarioSeleccionado = 'Todos'; 
+  String _destinatarioSeleccionado = 'Todos';
   Map<String, List<String>> _opcionesEspecificas = {};
   String? _seleccionEspecifica;
   String _respuestaSeleccionada = 'Ninguna';
-  
-  // Fechas 
+
+  // Fechas
   DateTime _fechaInicio = DateTime.now();
   DateTime _fechaFin = DateTime.now();
-  
-  String _initialHtmlContent = ''; 
 
-  // ⭐️ NUEVOS ESTADOS PARA CONTROL DE ARCHIVO/COMENTARIO ⭐️
-  bool _mostrarEditor = false; 
-  String? _rutaArchivoAdjunto; 
+  String _initialHtmlContent = '';
+
+  // ⭐️ ESTADOS PARA CONTROL DE ARCHIVO/COMENTARIO ⭐️
+  bool _mostrarEditor = false;
+  String? _rutaArchivoAdjunto;
   // ----------------------------------------------------
-
-  // Definición de botones para el ToolbarWidget
-  final List<Toolbar> _toolbarButtons = const [
-      FontButtons(strikethrough: false, subscript: false, superscript: false),
-      FontSettingButtons(fontSize: true, fontName: false),
-      StyleButtons(), 
-      ColorButtons(), 
-      ParagraphButtons(textDirection: false, lineHeight: false, caseConverter: false),
-      ListButtons(listStyles: true),
-      InsertButtons(link: true, picture: true, audio: false, video: false, table: false, hr: false),
-  ];
 
   @override
   void initState() {
     super.initState();
-    
+
     final userProvider = Provider.of<UserProvider>(context, listen: false);
     final colaborador = userProvider.colaboradorModel;
     final aviso = widget.avisoParaEditar;
 
     // 1. Configurar listas de destinatarios (se mantiene igual)
     if (colaborador != null) {
-      final List<String> listaNiveles = colaborador.avisoNivelesEducativos.map((n) => n.nivelEducativo).toList();
-      final List<String> listaSalones = colaborador.avisoSalones.map((s) => s.salon).toList();
-      final List<String> listaAlumnos = colaborador.avisoAlumnos.map((a) => '${a.primerNombre} ${a.apellidoPat} (${a.idAlumno})').toList();
-      final List<String> listaColaboradores = colaborador.avisoColaboradores.map((c) => c.nombreCompleto).toList(); 
-      
+      final List<String> listaNiveles = colaborador.avisoNivelesEducativos
+          .map((n) => n.nivelEducativo)
+          .toList();
+      final String idColaboradorActual = userProvider.idColaborador;
+      final List<AvisoSalaModel> salonesAsignados = colaborador.avisoSalones
+          .where((s) =>
+              s.idMaestroTitular == idColaboradorActual ||
+              s.idMaestroSuplente == idColaboradorActual)
+          .toList();
+      final List<AvisoSalaModel> salonesParaMostrar =
+          salonesAsignados.isNotEmpty ? salonesAsignados : colaborador.avisoSalones;
+      final List<String> listaSalones =
+          salonesParaMostrar.map((s) => s.salon).toList();
+      final List<String> listaAlumnos = colaborador.avisoAlumnos
+          .map((a) => '${a.primerNombre} ${a.apellidoPat} (${a.idAlumno})')
+          .toList();
+      final List<String> listaColaboradores = colaborador.avisoColaboradores
+          .map((c) => c.nombreCompleto)
+          .toList();
+
       _opcionesEspecificas = {
         'Nivel Educativo': listaNiveles,
         'Salón': listaSalones,
         'Alumno Específico': listaAlumnos,
         'Colaborador Específico': listaColaboradores,
       };
-      
+
       _destinatariosPrincipales = [
-        'Todos',                   
-        'Todos los Alumnos',       
-        'Todos los Colaboradores', 
+        'Todos',
+        'Todos los Alumnos',
+        'Todos los Colaboradores',
         if (listaNiveles.isNotEmpty) 'Nivel Educativo',
         if (listaSalones.isNotEmpty) 'Salón',
         if (listaAlumnos.isNotEmpty) 'Alumno Específico',
@@ -91,77 +101,79 @@ class _EditarAvisoScreenState extends State<EditarAvisoScreen> {
 
     // 2. Llenar los campos para EDICIÓN (Carga de datos de la API)
     _tituloController.text = aviso['titulo'] as String? ?? '';
-    _initialHtmlContent = aviso['comentario'] as String? ?? ''; 
-    
+    _initialHtmlContent = aviso['comentario'] as String? ?? '';
+
     // ⭐️ LÓGICA CLAVE DE COMENTARIO/ARCHIVO ⭐️
     final String? archivoAdjuntoApi = aviso['archivo'] as String?;
-    
+
     if (archivoAdjuntoApi != null && archivoAdjuntoApi.isNotEmpty) {
-        // Se subió un archivo, lo mostramos.
-        _rutaArchivoAdjunto = archivoAdjuntoApi;
-        _mostrarEditor = false;
+      _rutaArchivoAdjunto = archivoAdjuntoApi;
+      _mostrarEditor = false;
     } else if (_initialHtmlContent.isNotEmpty) {
-        // Hay comentario, mostramos el editor.
-        _mostrarEditor = true;
-        _rutaArchivoAdjunto = null;
+      _mostrarEditor = true;
+      _rutaArchivoAdjunto = null;
     } else {
-        // No hay ni archivo ni comentario, por defecto no mostramos nada.
-        _mostrarEditor = false;
-        _rutaArchivoAdjunto = null;
+      _mostrarEditor = false;
+      _rutaArchivoAdjunto = null;
     }
 
-    // El resto de la inicialización se mantiene (con las correcciones anteriores)
-    
-    String destinatarioTipoApi = aviso['seccion'] as String? ?? 'Todos'; 
+    String destinatarioTipoApi = aviso['seccion'] as String? ?? 'Todos';
     if (destinatarioTipoApi == 'ColaboradorEspecifico') {
-        destinatarioTipoApi = 'Colaborador Específico';
-    } else if (destinatarioTipoApi == 'AlumnoEspecifico') { 
-        destinatarioTipoApi = 'Alumno Específico';
+      destinatarioTipoApi = 'Colaborador Específico';
+    } else if (destinatarioTipoApi == 'AlumnoEspecifico') {
+      destinatarioTipoApi = 'Alumno Específico';
     }
 
     if (_destinatariosPrincipales.contains(destinatarioTipoApi)) {
-        _destinatarioSeleccionado = destinatarioTipoApi;
+      _destinatarioSeleccionado = destinatarioTipoApi;
     } else {
-        _destinatarioSeleccionado = 'Todos';
+      _destinatarioSeleccionado = 'Todos';
     }
-    
-    final String apiRespuesta = aviso['tipo_respuesta'] as String? ?? 'Ninguna'; 
+
+    final String apiRespuesta =
+        aviso['tipo_respuesta'] as String? ?? 'Ninguna';
     if (apiRespuesta == 'Seleccion') {
-        _respuestaSeleccionada = 'Seleccion multiple';
-    } else if (apiRespuesta == 'SioNo') { 
-        _respuestaSeleccionada = 'Sí o No'; 
+      _respuestaSeleccionada = 'Seleccion multiple';
+    } else if (apiRespuesta == 'SioNo') {
+      _respuestaSeleccionada = 'Sí o No';
     } else {
-        _respuestaSeleccionada = apiRespuesta;
+      _respuestaSeleccionada = apiRespuesta;
     }
 
     try {
-        final String? fechaInicioStr = aviso['fecha_inicio'] as String?;
-        final String? fechaFinStr = aviso['fecha_fin'] as String?;
-        
-        if (fechaInicioStr != null && fechaInicioStr.isNotEmpty) {
-              _fechaInicio = DateTime.parse(fechaInicioStr.substring(0, 10));
-        }
-        if (fechaFinStr != null && fechaFinStr.isNotEmpty) {
-              _fechaFin = DateTime.parse(fechaFinStr.substring(0, 10));
-        }
-    } catch (_) {}
-    
-    _seleccionEspecifica = aviso['valor_especifico'] as String?;
-    
-    final String? opcion1 = aviso['opcion_1'] as String?; 
-    final String? opcion2 = aviso['opcion_2'] as String?; 
-    final String? opcion3 = aviso['opcion_3'] as String?; 
+      final String? fechaInicioStr = aviso['fecha_inicio'] as String?;
+      final String? fechaFinStr = aviso['fecha_fin'] as String?;
 
-    if (opcion1 != null && opcion1.isNotEmpty) _opcion1Controller.text = opcion1;
-    if (opcion2 != null && opcion2.isNotEmpty) _opcion2Controller.text = opcion2;
-    if (opcion3 != null && opcion3.isNotEmpty) _opcion3Controller.text = opcion3;
-    
+      if (fechaInicioStr != null && fechaInicioStr.isNotEmpty) {
+        _fechaInicio = DateTime.parse(fechaInicioStr.substring(0, 10));
+      }
+      if (fechaFinStr != null && fechaFinStr.isNotEmpty) {
+        _fechaFin = DateTime.parse(fechaFinStr.substring(0, 10));
+      }
+    } catch (_) {}
+
+    _seleccionEspecifica = aviso['valor_especifico'] as String?;
+
+    final String? opcion1 = aviso['opcion_1'] as String?;
+    final String? opcion2 = aviso['opcion_2'] as String?;
+    final String? opcion3 = aviso['opcion_3'] as String?;
+
+    if (opcion1 != null && opcion1.isNotEmpty) {
+      _opcion1Controller.text = opcion1;
+    }
+    if (opcion2 != null && opcion2.isNotEmpty) {
+      _opcion2Controller.text = opcion2;
+    }
+    if (opcion3 != null && opcion3.isNotEmpty) {
+      _opcion3Controller.text = opcion3;
+    }
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) {
-             setState(() {
-                _resetSeleccionEspecifica(); 
-             });
-        }
+      if (mounted) {
+        setState(() {
+          _resetSeleccionEspecifica();
+        });
+      }
     });
   }
 
@@ -177,7 +189,7 @@ class _EditarAvisoScreenState extends State<EditarAvisoScreen> {
   // ⭐️ LÓGICA DE ARCHIVO Y EDITOR ⭐️
   Future<void> _seleccionarArchivo() async {
     const int maxFileSize = 1048576; // 1 MB
-    
+
     try {
       final FilePickerResult? result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
@@ -188,36 +200,127 @@ class _EditarAvisoScreenState extends State<EditarAvisoScreen> {
         final PlatformFile pickedFile = result.files.single;
 
         if (pickedFile.size > maxFileSize) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('¡El archivo es demasiado grande! Máximo 1 MB.'),
-              backgroundColor: Colors.red,
-            ),
-          );
-          return; 
+          if (mounted) {
+            showModernSnackBar(context, 'El archivo es demasiado grande. Máximo 1 MB.', SnackType.error);
+          }
+          return;
         }
-        
+
         setState(() {
           _rutaArchivoAdjunto = pickedFile.path;
-          _mostrarEditor = false; // Deshabilita el editor si hay archivo
-          _cuerpoEditorController.clear(); // Limpia el editor
-          _initialHtmlContent = ''; // Limpia el contenido inicial si se cambia de editor a archivo
+          _mostrarEditor = false;
+          _cuerpoEditorController.clear();
+          _initialHtmlContent = '';
         });
-        
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Archivo seleccionado: ${pickedFile.name}')),
-        );
-        
+
+        if (mounted) {
+          showModernSnackBar(context, 'Archivo seleccionado: ${pickedFile.name}', SnackType.success);
+        }
       }
     } catch (e) {
       // Manejo de error
     }
   }
 
+  void _mostrarMenuAdjuntar(Color colorPrimario) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return Container(
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 30),
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade300,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+              const SizedBox(height: 18),
+              const Text(
+                'Adjuntar archivo',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+              ),
+              const SizedBox(height: 14),
+              ListTile(
+                onTap: () {
+                  Navigator.pop(context);
+                  _seleccionarImagen(ImageSource.camera);
+                },
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                leading: Icon(Icons.photo_camera_rounded, color: colorPrimario),
+                title: const Text('Tomar foto'),
+              ),
+              ListTile(
+                onTap: () {
+                  Navigator.pop(context);
+                  _seleccionarImagen(ImageSource.gallery);
+                },
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                leading: Icon(Icons.photo_library_rounded, color: colorPrimario),
+                title: const Text('Elegir de galería'),
+              ),
+              ListTile(
+                onTap: () {
+                  Navigator.pop(context);
+                  _seleccionarArchivo();
+                },
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                leading: Icon(Icons.picture_as_pdf_rounded, color: colorPrimario),
+                title: const Text('Elegir documento (PDF)'),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _seleccionarImagen(ImageSource source) async {
+    const int maxFileSize = 1048576;
+    try {
+      final XFile? picked = await _imagePicker.pickImage(source: source, imageQuality: 85);
+      if (picked == null) return;
+
+      final file = File(picked.path);
+      final int size = await file.length();
+
+      if (size > maxFileSize) {
+        if (mounted) {
+          showModernSnackBar(context, 'La imagen es demasiado grande. Máximo 1 MB.', SnackType.error);
+        }
+        return;
+      }
+
+      setState(() {
+        _rutaArchivoAdjunto = picked.path;
+        _mostrarEditor = false;
+        _cuerpoEditorController.clear();
+        _initialHtmlContent = '';
+      });
+
+      if (mounted) {
+        showModernSnackBar(context, 'Imagen adjuntada correctamente', SnackType.success);
+      }
+    } catch (e) {
+      if (mounted) {
+        showModernSnackBar(context, 'No se pudo tomar/seleccionar la foto', SnackType.error);
+      }
+    }
+  }
+
   void _mostrarEditorComentario() {
     setState(() {
       _mostrarEditor = true;
-      _rutaArchivoAdjunto = null; // Elimina el archivo si se elige escribir
+      _rutaArchivoAdjunto = null;
     });
   }
 
@@ -226,47 +329,51 @@ class _EditarAvisoScreenState extends State<EditarAvisoScreen> {
     final String key = _destinatarioSeleccionado;
 
     if (key == 'Todos' || !_opcionesEspecificas.containsKey(key)) {
-        if (mounted) {
-            setState(() {
-                _seleccionEspecifica = null;
-            });
-        }
-        return;
+      if (mounted) {
+        setState(() {
+          _seleccionEspecifica = null;
+        });
+      }
+      return;
     }
-    
+
     final List<String> opciones = _opcionesEspecificas[key]!;
 
     if (opciones.isNotEmpty) {
-        if (_seleccionEspecifica == null || !opciones.contains(_seleccionEspecifica!)) {
-             if (mounted) {
-                 setState(() {
-                    _seleccionEspecifica = opciones.first;
-                 });
-             }
-        }
-    } else {
+      if (_seleccionEspecifica == null ||
+          !opciones.contains(_seleccionEspecifica!)) {
         if (mounted) {
-            setState(() {
-                _seleccionEspecifica = null;
-            });
+          setState(() {
+            _seleccionEspecifica = opciones.first;
+          });
         }
+      }
+    } else {
+      if (mounted) {
+        setState(() {
+          _seleccionEspecifica = null;
+        });
+      }
     }
   }
 
   Future<void> _selectDate(BuildContext context, bool isStartDate) async {
-    // Lógica de selección de fecha (se mantiene igual)
     final DateTime? picked = await showDatePicker(
       context: context,
       initialDate: isStartDate ? _fechaInicio : _fechaFin,
       firstDate: DateTime(2023),
       lastDate: DateTime(2030),
       builder: (BuildContext context, Widget? child) {
-        final Color dynamicPrimaryColor = Provider.of<UserProvider>(context, listen: false).colores.headerColor;
+        final Color dynamicPrimaryColor =
+            Provider.of<UserProvider>(context, listen: false)
+                .colores
+                .headerColor;
         return Theme(
           data: ThemeData.light().copyWith(
             primaryColor: dynamicPrimaryColor,
             colorScheme: ColorScheme.light(primary: dynamicPrimaryColor),
-            buttonTheme: const ButtonThemeData(textTheme: ButtonTextTheme.primary),
+            buttonTheme:
+                const ButtonThemeData(textTheme: ButtonTextTheme.primary),
           ),
           child: child!,
         );
@@ -284,114 +391,106 @@ class _EditarAvisoScreenState extends State<EditarAvisoScreen> {
   }
 
   // Lógica de guardar Aviso (Editar) (se ajusta la carga de 'cuerpo' y 'archivo')
-  void _guardarAviso() async { 
+  void _guardarAviso() async {
     if (_formKey.currentState!.validate()) {
-      
       final userProvider = Provider.of<UserProvider>(context, listen: false);
-      
+
       String cuerpoHtml = '';
-      
+
       // ⚠️ VALIDACIÓN CLAVE: Debe haber un cuerpo de mensaje O un archivo adjunto
       if (_rutaArchivoAdjunto == null && !_mostrarEditor) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Debe escribir un comentario o adjuntar un archivo (PDF/Imagen).')),
-          );
-          return;
+        showModernSnackBar(context, 'Escribe un comentario o adjunta un archivo (PDF/Imagen).', SnackType.warning);
+        return;
       }
-      
-      if (_mostrarEditor) {
-          cuerpoHtml = await _cuerpoEditorController.getText();
 
-          if (cuerpoHtml.trim().isEmpty || cuerpoHtml.trim() == '<p><br></p>') {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('El campo de comentario no puede estar vacío.')),
-              );
-              return;
-          }
+      if (_mostrarEditor) {
+        cuerpoHtml = await _cuerpoEditorController.getText();
+
+        if (cuerpoHtml.trim().isEmpty || cuerpoHtml.trim() == '<p><br></p>') {
+          showModernSnackBar(context, 'El campo de comentario no puede estar vacío.', SnackType.warning);
+          return;
+        }
       }
-      
+
       // La lógica de respuesta múltiple (mantenida)
       String opcionesMultiples = '';
-      String tipoRespuestaAPI = _respuestaSeleccionada; 
-      
+      String tipoRespuestaAPI = _respuestaSeleccionada;
+
       if (_respuestaSeleccionada == 'Sí o No') {
-          tipoRespuestaAPI = 'SioNo'; 
+        tipoRespuestaAPI = 'SioNo';
       } else if (_respuestaSeleccionada == 'Seleccion multiple') {
-          tipoRespuestaAPI = 'Seleccion'; 
-          
-          final List<String> opciones = [];
-          if (_opcion1Controller.text.isNotEmpty) opciones.add(_opcion1Controller.text.trim());
-          if (_opcion2Controller.text.isNotEmpty) opciones.add(_opcion2Controller.text.trim());
-          if (_opcion3Controller.text.isNotEmpty) opciones.add(_opcion3Controller.text.trim());
-          opcionesMultiples = opciones.join(',');
-          
-          if (opciones.length < 2) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Debe ingresar al menos dos opciones para la Selección Múltiple.')),
-              );
-              return; 
-          }
+        tipoRespuestaAPI = 'Seleccion';
+
+        final List<String> opciones = [];
+        if (_opcion1Controller.text.isNotEmpty) {
+          opciones.add(_opcion1Controller.text.trim());
+        }
+        if (_opcion2Controller.text.isNotEmpty) {
+          opciones.add(_opcion2Controller.text.trim());
+        }
+        if (_opcion3Controller.text.isNotEmpty) {
+          opciones.add(_opcion3Controller.text.trim());
+        }
+        opcionesMultiples = opciones.join(',');
+
+        if (opciones.length < 2) {
+          showModernSnackBar(context, 'Ingresa al menos dos opciones para la Selección Múltiple.', SnackType.warning);
+          return;
+        }
       }
-      
+
       // Lógica de destinatario específico (mantenida)
-      final bool esDestinatarioEspecifico = _opcionesEspecificas.containsKey(_destinatarioSeleccionado);
-      final bool hayOpcionesDisponibles = _opcionesEspecificas[_destinatarioSeleccionado]?.isNotEmpty ?? false;
+      final bool esDestinatarioEspecifico =
+          _opcionesEspecificas.containsKey(_destinatarioSeleccionado);
+      final bool hayOpcionesDisponibles =
+          _opcionesEspecificas[_destinatarioSeleccionado]?.isNotEmpty ??
+              false;
       final String? destinatarioValor;
-      
-      if (esDestinatarioEspecifico && hayOpcionesDisponibles && _seleccionEspecifica != null) {
-          destinatarioValor = _seleccionEspecifica;
+
+      if (esDestinatarioEspecifico &&
+          hayOpcionesDisponibles &&
+          _seleccionEspecifica != null) {
+        destinatarioValor = _seleccionEspecifica;
       } else {
-          destinatarioValor = null;
+        destinatarioValor = null;
       }
-      
-      final String idAviso = widget.avisoParaEditar['id_calendario'] as String? ?? '0';
+
+      final String idAviso =
+          widget.avisoParaEditar['id_calendario'] as String? ?? '0';
 
       final avisoDataParaProvider = {
         'titulo': _tituloController.text,
         'cuerpo': _rutaArchivoAdjunto != null ? '' : cuerpoHtml, // Enviar cuerpo vacío si hay archivo
         'destinatario_tipo': _destinatarioSeleccionado,
         'destinatario_valor': destinatarioValor,
-        'requiere_respuesta': tipoRespuestaAPI, 
+        'requiere_respuesta': tipoRespuestaAPI,
         'fecha_inicio': _fechaInicio.toIso8601String().substring(0, 10),
         'fecha_fin': _fechaFin.toIso8601String().substring(0, 10),
-        'id_calendario': idAviso, 
+        'id_calendario': idAviso,
         'opciones_multiples': opcionesMultiples,
         'archivo': _rutaArchivoAdjunto, // ⭐️ Ruta del archivo ⭐️
       };
 
-      print('--- EDICIÓN DE AVISO (ID: ${idAviso}) ---');
+      print('--- EDICIÓN DE AVISO (ID: $idAviso) ---');
       print('Datos enviados al Provider: $avisoDataParaProvider');
       print('-------------------------------------------');
-      
-      // (Llamada a la API y manejo de respuesta...)
-      final snackBar = SnackBar(
-        content: Row(
-          children: const [
-            CircularProgressIndicator(color: Colors.white),
-            SizedBox(width: 20),
-            Text('Actualizando aviso...'),
-          ],
-        ),
-        duration: const Duration(minutes: 5),
-      );
+
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        ScaffoldMessenger.of(context).showSnackBar(snackBar);
+        showModernSnackBar(context, 'Actualizando aviso...', SnackType.loading);
       });
 
       final result = await userProvider.saveAviso(avisoDataParaProvider);
 
-      if (!mounted) return; 
-      ScaffoldMessenger.of(context).hideCurrentSnackBar(); 
+      if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(result['message']),
-          backgroundColor: result['success'] ? Colors.green : Colors.red,
-        ),
+      showModernSnackBar(
+        context,
+        result['message'],
+        result['success'] ? SnackType.success : SnackType.error,
       );
 
       if (result['success']) {
-        Navigator.pop(context); 
+        Navigator.pop(context);
       }
     }
   }
@@ -409,16 +508,122 @@ class _EditarAvisoScreenState extends State<EditarAvisoScreen> {
   Widget _buildCustomToolbar(BuildContext context, Color dynamicPrimaryColor) {
     return Container(
       decoration: BoxDecoration(
-        color: dynamicPrimaryColor.withOpacity(0.1), 
-        borderRadius: BorderRadius.circular(5.0),
-        border: Border.all(color: dynamicPrimaryColor, width: 0.5),
+        color: dynamicPrimaryColor.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(12.0),
+        border: Border.all(color: dynamicPrimaryColor.withOpacity(0.25)),
       ),
-      padding: const EdgeInsets.symmetric(horizontal: 5.0, vertical: 8.0),
+      padding: const EdgeInsets.symmetric(horizontal: 6.0, vertical: 8.0),
       child: ToolbarWidget(
         controller: _cuerpoEditorController,
         callbacks: Callbacks(),
         htmlToolbarOptions: HtmlToolbarOptions(
           defaultToolbarButtons: _toolbarButtons,
+        ),
+      ),
+    );
+  }
+
+  // Definición de botones para el ToolbarWidget (se mantiene igual)
+  final List<Toolbar> _toolbarButtons = const [
+    FontButtons(strikethrough: false, subscript: false, superscript: false),
+    FontSettingButtons(fontSize: true, fontName: false),
+    StyleButtons(),
+    ColorButtons(),
+    ParagraphButtons(textDirection: false, lineHeight: false, caseConverter: false),
+    ListButtons(listStyles: true),
+    InsertButtons(link: true, picture: true, audio: false, video: false, table: false, hr: false),
+  ];
+
+  // ⭐️ Card de sección reutilizable, en línea con CrearAvisoScreen ⭐️
+  Widget _buildSectionCard({
+    required String title,
+    required IconData icon,
+    required Color accentColor,
+    required List<Widget> children,
+  }) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+              color: Colors.black.withOpacity(0.04),
+              blurRadius: 12,
+              offset: const Offset(0, 4)),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(7),
+                decoration: BoxDecoration(
+                  color: accentColor.withOpacity(0.10),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(icon, size: 17, color: accentColor),
+              ),
+              const SizedBox(width: 10),
+              Text(
+                title,
+                style: const TextStyle(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 15,
+                    color: Color(0xFF1E1E2C)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          ...children,
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSegmentButton({
+    required String label,
+    required IconData icon,
+    required bool selected,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(11),
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        decoration: BoxDecoration(
+          color: selected ? color : Colors.transparent,
+          borderRadius: BorderRadius.circular(11),
+          boxShadow: selected
+              ? [
+                  BoxShadow(
+                      color: color.withOpacity(0.35),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2)),
+                ]
+              : [],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon,
+                size: 19, color: selected ? Colors.white : Colors.grey.shade500),
+            const SizedBox(height: 4),
+            Text(
+              label,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: selected ? Colors.white : Colors.grey.shade500),
+            ),
+          ],
         ),
       ),
     );
@@ -431,19 +636,30 @@ class _EditarAvisoScreenState extends State<EditarAvisoScreen> {
     final Color dynamicPrimaryColor = colores.footerColor;
     final Color dynamicHeaderColor = colores.headerColor;
 
-    final bool mostrarComboEspecifico = _opcionesEspecificas.containsKey(_destinatarioSeleccionado) && (_opcionesEspecificas[_destinatarioSeleccionado]?.isNotEmpty ?? false);
-    final bool mostrarOpcionesMultiples = _respuestaSeleccionada == 'Seleccion multiple';
+    final bool mostrarComboEspecifico =
+        _opcionesEspecificas.containsKey(_destinatarioSeleccionado) &&
+            (_opcionesEspecificas[_destinatarioSeleccionado]?.isNotEmpty ??
+                false);
+    final bool mostrarOpcionesMultiples =
+        _respuestaSeleccionada == 'Seleccion multiple';
 
-    return SafeArea( 
+    return SafeArea(
       child: Scaffold(
+        backgroundColor: const Color(0xFFF4F5FA),
         appBar: AppBar(
-          title: const Text('Editar Aviso'), // Título estático
+          title: const Text('Editar Aviso'),
+          titleTextStyle: const TextStyle(
+              fontWeight: FontWeight.w800, fontSize: 18, color: Colors.white),
           backgroundColor: dynamicHeaderColor,
           centerTitle: true,
           foregroundColor: Colors.white,
+          elevation: 0,
+          shape: const RoundedRectangleBorder(
+            borderRadius: BorderRadius.vertical(bottom: Radius.circular(22)),
+          ),
           actions: [
             IconButton(
-              icon: const Icon(Icons.delete),
+              icon: const Icon(Icons.delete_outline_rounded),
               onPressed: _eliminarAviso,
               tooltip: 'Eliminar aviso',
               color: Colors.white,
@@ -451,208 +667,306 @@ class _EditarAvisoScreenState extends State<EditarAvisoScreen> {
           ],
         ),
         body: SingleChildScrollView(
-          padding: const EdgeInsets.all(16.0),
+          padding: const EdgeInsets.fromLTRB(16, 18, 16, 16),
           child: Form(
             key: _formKey,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
-                // ... (Dropdowns y Fechas - Se mantienen igual) ...
-                _buildFiltroDropdown(
-                  label: 'Mostrar en Calendario de',
-                  value: _destinatarioSeleccionado,
-                  items: _destinatariosPrincipales, 
-                  onChanged: (String? newValue) {
-                    setState(() {
-                      _destinatarioSeleccionado = newValue!;
-                      _resetSeleccionEspecifica(); 
-                    });
-                  },
-                  dynamicPrimaryColor: dynamicPrimaryColor,
-                ),
-                
-                if (mostrarComboEspecifico) ...[
-                  const SizedBox(height: 20),
-                  _buildFiltroDropdown(
-                    label: 'Seleccionar $_destinatarioSeleccionado',
-                    value: _seleccionEspecifica,
-                    items: _opcionesEspecificas[_destinatarioSeleccionado]!, 
-                    onChanged: (String? newValue) {
-                      setState(() {
-                        _seleccionEspecifica = newValue!;
-                      });
-                    },
-                    dynamicPrimaryColor: dynamicPrimaryColor,
-                  ),
-                ],
-                
-                const SizedBox(height: 20),
-                Row(
+                // ------- SECCIÓN: DESTINATARIOS -------
+                _buildSectionCard(
+                  title: 'Destinatarios',
+                  icon: Icons.groups_rounded,
+                  accentColor: dynamicPrimaryColor,
                   children: [
-                    Expanded(
-                      child: _buildDateInput(
-                        label: 'Visible desde',
-                        date: _fechaInicio,
-                        onTap: () => _selectDate(context, true),
+                    _buildFiltroDropdown(
+                      label: 'Mostrar en Calendario de',
+                      value: _destinatarioSeleccionado,
+                      items: _destinatariosPrincipales,
+                      onChanged: (String? newValue) {
+                        setState(() {
+                          _destinatarioSeleccionado = newValue!;
+                          _resetSeleccionEspecifica();
+                        });
+                      },
+                      dynamicPrimaryColor: dynamicPrimaryColor,
+                    ),
+                    if (mostrarComboEspecifico) ...[
+                      const SizedBox(height: 16),
+                      _buildFiltroDropdown(
+                        label: 'Seleccionar $_destinatarioSeleccionado',
+                        value: _seleccionEspecifica,
+                        items: _opcionesEspecificas[_destinatarioSeleccionado]!,
+                        onChanged: (String? newValue) {
+                          setState(() {
+                            _seleccionEspecifica = newValue!;
+                          });
+                        },
                         dynamicPrimaryColor: dynamicPrimaryColor,
                       ),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: _buildDateInput(
-                        label: 'Visible hasta',
-                        date: _fechaFin,
-                        onTap: () => _selectDate(context, false),
-                        dynamicPrimaryColor: dynamicPrimaryColor,
-                      ),
-                    ),
+                    ],
                   ],
                 ),
-                const SizedBox(height: 20),
-                _buildFiltroDropdown(
-                  label: 'Requiere respuesta',
-                  value: _respuestaSeleccionada,
-                  items: const ['Ninguna', 'Sí o No', 'Seleccion multiple'],
-                  onChanged: (String? newValue) {
-                    setState(() {
-                      _respuestaSeleccionada = newValue!;
-                    });
-                  },
-                  dynamicPrimaryColor: dynamicPrimaryColor,
-                ),
-                const SizedBox(height: 20),
-                
-                if (mostrarOpcionesMultiples) ...[
-                  const Text('Opciones de Respuesta Múltiple:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                  _buildOpcionTextField(controller: _opcion1Controller, label: 'Opción 1', dynamicPrimaryColor: dynamicPrimaryColor),
-                  _buildOpcionTextField(controller: _opcion2Controller, label: 'Opción 2', dynamicPrimaryColor: dynamicPrimaryColor),
-                  _buildOpcionTextField(controller: _opcion3Controller, label: 'Opción 3', dynamicPrimaryColor: dynamicPrimaryColor),
-                  const SizedBox(height: 20),
-                ],
-                
-                // Título (se mantiene igual)
-                TextFormField(
-                  controller: _tituloController,
-                  decoration: InputDecoration(
-                    labelText: 'Título', 
-                    border: const OutlineInputBorder(),
-                    focusedBorder: OutlineInputBorder(
-                      borderSide: BorderSide(color: dynamicPrimaryColor, width: 2.0),
-                    ),
-                    labelStyle: TextStyle(color: dynamicPrimaryColor),
-                  ),
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Por favor, ingrese un título';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 20),
-                
-                // ⭐️ ÁREA DE SELECCIÓN: COMENTARIO vs ARCHIVO ⭐️
-                const Text('Contenido:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                const SizedBox(height: 10),
 
-                // 1. Botones de Acción
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                // ------- SECCIÓN: VIGENCIA -------
+                _buildSectionCard(
+                  title: 'Vigencia',
+                  icon: Icons.date_range_rounded,
+                  accentColor: dynamicPrimaryColor,
                   children: [
-                    Expanded(
-                      child: ElevatedButton.icon(
-                        onPressed: _seleccionarArchivo,
-                        icon: const Icon(Icons.attach_file),
-                        label: const Text('Adjuntar Archivo'),
-                        style: ElevatedButton.styleFrom(
-                          // Resaltar si hay un archivo adjunto
-                          backgroundColor: _rutaArchivoAdjunto != null && _rutaArchivoAdjunto!.isNotEmpty ? Colors.green : dynamicPrimaryColor,
-                          foregroundColor: Colors.white,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: ElevatedButton.icon(
-                        onPressed: _mostrarEditorComentario,
-                        icon: const Icon(Icons.edit),
-                        label: const Text('Escribir Comentario'),
-                        style: ElevatedButton.styleFrom(
-                          // Resaltar si el editor está visible
-                          backgroundColor: _mostrarEditor ? Colors.green : dynamicPrimaryColor,
-                          foregroundColor: Colors.white,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 15),
-
-                // 2. Estado de Archivo Adjunto (Muestra solo el nombre del archivo si existe)
-                if (_rutaArchivoAdjunto != null && _rutaArchivoAdjunto!.isNotEmpty) 
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Colors.lightBlue.shade100,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Row(
+                    Row(
                       children: [
-                        const Icon(Icons.description, color: Colors.blue),
-                        const SizedBox(width: 10),
-                        // Muestra solo el nombre del archivo si es una ruta completa
-                        Expanded(child: Text('Archivo adjunto: ${_rutaArchivoAdjunto!.split('/').last}', overflow: TextOverflow.ellipsis)),
-                        IconButton(
-                          icon: const Icon(Icons.close, color: Colors.red),
-                          onPressed: () => setState(() => _rutaArchivoAdjunto = null),
+                        Expanded(
+                          child: _buildDateInput(
+                            label: 'Visible desde',
+                            date: _fechaInicio,
+                            onTap: () => _selectDate(context, true),
+                            dynamicPrimaryColor: dynamicPrimaryColor,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: _buildDateInput(
+                            label: 'Visible hasta',
+                            date: _fechaFin,
+                            onTap: () => _selectDate(context, false),
+                            dynamicPrimaryColor: dynamicPrimaryColor,
+                          ),
                         ),
                       ],
                     ),
-                  ),
+                  ],
+                ),
 
-                // 3. Editor de Comentario (se muestra condicionalmente)
-                if (_mostrarEditor) ...[
-                  if (_rutaArchivoAdjunto != null && _rutaArchivoAdjunto!.isNotEmpty) 
-                    const Padding(
-                      padding: EdgeInsets.only(bottom: 10),
-                      child: Text('⚠️ Nota: Al guardar, se enviará el comentario y se ignorará el archivo. Para enviar el archivo, desactiva el editor.', style: TextStyle(color: Colors.orange)),
+                // ------- SECCIÓN: RESPUESTA -------
+                _buildSectionCard(
+                  title: 'Respuesta',
+                  icon: Icons.question_answer_rounded,
+                  accentColor: dynamicPrimaryColor,
+                  children: [
+                    _buildFiltroDropdown(
+                      label: 'Requiere respuesta',
+                      value: _respuestaSeleccionada,
+                      items: const ['Ninguna', 'Sí o No', 'Seleccion multiple'],
+                      onChanged: (String? newValue) {
+                        setState(() {
+                          _respuestaSeleccionada = newValue!;
+                        });
+                      },
+                      dynamicPrimaryColor: dynamicPrimaryColor,
                     ),
-                    
-                  _buildCustomToolbar(context, dynamicPrimaryColor),
-                  const SizedBox(height: 10),
-                  
-                  HtmlEditor(
-                    controller: _cuerpoEditorController,
-                    htmlEditorOptions: HtmlEditorOptions(
-                      hint: "Escriba aquí el cuerpo del aviso...",
-                      // Usar el contenido inicial si está disponible
-                      initialText: _initialHtmlContent.isNotEmpty ? _initialHtmlContent : null, 
-                      darkMode: Theme.of(context).brightness == Brightness.dark,
-                      adjustHeightForKeyboard: true,
+                    if (mostrarOpcionesMultiples) ...[
+                      const SizedBox(height: 16),
+                      _buildOpcionTextField(
+                          controller: _opcion1Controller,
+                          label: 'Opción 1',
+                          dynamicPrimaryColor: dynamicPrimaryColor),
+                      _buildOpcionTextField(
+                          controller: _opcion2Controller,
+                          label: 'Opción 2',
+                          dynamicPrimaryColor: dynamicPrimaryColor),
+                      _buildOpcionTextField(
+                          controller: _opcion3Controller,
+                          label: 'Opción 3',
+                          dynamicPrimaryColor: dynamicPrimaryColor),
+                    ],
+                  ],
+                ),
+
+                // ------- SECCIÓN: CONTENIDO -------
+                _buildSectionCard(
+                  title: 'Contenido',
+                  icon: Icons.article_rounded,
+                  accentColor: dynamicPrimaryColor,
+                  children: [
+                    TextFormField(
+                      controller: _tituloController,
+                      textCapitalization: TextCapitalization.sentences,
+                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+                      decoration: InputDecoration(
+                        labelText: 'Título',
+                        filled: true,
+                        fillColor: const Color(0xFFF7F8FA),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide.none,
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide:
+                              BorderSide(color: dynamicPrimaryColor, width: 2.0),
+                        ),
+                        labelStyle: TextStyle(color: dynamicPrimaryColor),
+                      ),
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'Por favor, ingrese un título';
+                        }
+                        return null;
+                      },
                     ),
-                    htmlToolbarOptions: const HtmlToolbarOptions(
-                      toolbarPosition: ToolbarPosition.custom, 
-                      toolbarType: ToolbarType.nativeGrid,
-                    ),
-                    otherOptions: OtherOptions(
-                      height: 400, 
+                    const SizedBox(height: 18),
+
+                    // ⭐️ Selector segmentado: Archivo vs Comentario ⭐️
+                    Container(
+                      padding: const EdgeInsets.all(4),
                       decoration: BoxDecoration(
-                        border: Border.all(color: Colors.grey.shade400),
-                        borderRadius: BorderRadius.circular(5.0),
+                        color: const Color(0xFFF0F1F6),
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: _buildSegmentButton(
+                              label: 'Adjuntar archivo',
+                              icon: Icons.attach_file_rounded,
+                              selected: !_mostrarEditor,
+                              color: dynamicPrimaryColor,
+                              onTap: () => _mostrarMenuAdjuntar(dynamicPrimaryColor),
+                            ),
+                          ),
+                          Expanded(
+                            child: _buildSegmentButton(
+                              label: 'Escribir comentario',
+                              icon: Icons.edit_note_rounded,
+                              selected: _mostrarEditor,
+                              color: dynamicPrimaryColor,
+                              onTap: _mostrarEditorComentario,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+
+                    // Estado de archivo adjunto
+                    if (_rutaArchivoAdjunto != null &&
+                        _rutaArchivoAdjunto!.isNotEmpty)
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: Colors.blue.shade50,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.blue.shade100),
+                        ),
+                        child: Row(
+                          children: [
+                            if (!_rutaArchivoAdjunto!.toLowerCase().endsWith('.pdf'))
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(8),
+                                child: Image.file(
+                                  File(_rutaArchivoAdjunto!),
+                                  width: 44,
+                                  height: 44,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (context, error, stackTrace) => Icon(
+                                    Icons.broken_image_rounded,
+                                    color: Colors.blue.shade300,
+                                  ),
+                                ),
+                              )
+                            else
+                              Container(
+                                width: 44,
+                                height: 44,
+                                alignment: Alignment.center,
+                                decoration: BoxDecoration(
+                                  color: Colors.red.shade50,
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Icon(Icons.picture_as_pdf_rounded, color: Colors.red.shade400),
+                              ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                                child: Text(
+                                    'Archivo adjunto: ${_rutaArchivoAdjunto!.split('/').last}',
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w600,
+                                        color: Colors.blue.shade700))),
+                            IconButton(
+                              icon: Icon(Icons.close_rounded,
+                                  color: Colors.red.shade400, size: 20),
+                              onPressed: () =>
+                                  setState(() => _rutaArchivoAdjunto = null),
+                            ),
+                          ],
+                        ),
+                      ),
+
+                    // Editor de comentario
+                    if (_mostrarEditor) ...[
+                      if (_rutaArchivoAdjunto != null &&
+                          _rutaArchivoAdjunto!.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 10),
+                          child: Row(
+                            children: [
+                              Icon(Icons.info_outline_rounded,
+                                  size: 16, color: Colors.orange.shade700),
+                              const SizedBox(width: 6),
+                              const Expanded(
+                                child: Text(
+                                  'Al guardar, se enviará el comentario y se ignorará el archivo.',
+                                  style:
+                                      TextStyle(color: Colors.orange, fontSize: 12.5),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      _buildCustomToolbar(context, dynamicPrimaryColor),
+                      const SizedBox(height: 10),
+                      HtmlEditor(
+                        controller: _cuerpoEditorController,
+                        htmlEditorOptions: HtmlEditorOptions(
+                          hint: "Escriba aquí el cuerpo del aviso...",
+                          initialText: _initialHtmlContent.isNotEmpty
+                              ? _initialHtmlContent
+                              : null,
+                          darkMode:
+                              Theme.of(context).brightness == Brightness.dark,
+                          adjustHeightForKeyboard: true,
+                        ),
+                        htmlToolbarOptions: const HtmlToolbarOptions(
+                          toolbarPosition: ToolbarPosition.custom,
+                          toolbarType: ToolbarType.nativeGrid,
+                        ),
+                        otherOptions: OtherOptions(
+                          height: 380,
+                          decoration: BoxDecoration(
+                            border: Border.all(color: Colors.grey.shade300),
+                            borderRadius: BorderRadius.circular(12.0),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+
+                const SizedBox(height: 8),
+                // Botón de guardar (alineado a la derecha)
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: SizedBox(
+                    height: 54,
+                    child: ElevatedButton.icon(
+                      onPressed: _guardarAviso,
+                      icon: const Icon(Icons.check_circle_outline_rounded),
+                      label: const Text('Guardar Cambios',
+                          style:
+                              TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: dynamicPrimaryColor,
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        padding: const EdgeInsets.symmetric(horizontal: 28),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16)),
                       ),
                     ),
                   ),
-                ],
-                
-                const SizedBox(height: 30),
-                // Botón de guardar
-                ElevatedButton(
-                  onPressed: _guardarAviso,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: dynamicPrimaryColor,
-                    foregroundColor: Colors.white,
-                    minimumSize: const Size.fromHeight(50),
-                  ),
-                  child: const Text('Guardar Cambios'),
                 ),
               ],
             ),
@@ -662,10 +976,10 @@ class _EditarAvisoScreenState extends State<EditarAvisoScreen> {
     );
   }
 
-  // ... (Funciones auxiliares buildFiltroDropdown, buildDateInput, buildOpcionTextField se mantienen igual) ...
+  // Widget para Dropdown
   Widget _buildFiltroDropdown({
     required String label,
-    required String? value, 
+    required String? value,
     required List<String> items,
     required Function(String?) onChanged,
     required Color dynamicPrimaryColor,
@@ -673,13 +987,25 @@ class _EditarAvisoScreenState extends State<EditarAvisoScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+        Text(label,
+            style: TextStyle(
+                fontWeight: FontWeight.w700,
+                fontSize: 13.5,
+                color: Colors.grey.shade600)),
         const SizedBox(height: 8),
         DropdownButtonFormField<String>(
-          value: value, 
+          value: value,
           decoration: InputDecoration(
-            border: const OutlineInputBorder(),
+            filled: true,
+            fillColor: const Color(0xFFF7F8FA),
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide.none,
+            ),
             focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
               borderSide: BorderSide(color: dynamicPrimaryColor, width: 2.0),
             ),
           ),
@@ -687,21 +1013,22 @@ class _EditarAvisoScreenState extends State<EditarAvisoScreen> {
           items: items.map<DropdownMenuItem<String>>((String itemValue) {
             return DropdownMenuItem<String>(
               value: itemValue,
-              child: Text(itemValue),
+              child: Text(itemValue, style: const TextStyle(fontSize: 14)),
             );
           }).toList(),
-          onChanged: items.isEmpty ? null : onChanged, 
+          onChanged: items.isEmpty ? null : onChanged,
           validator: (val) {
-             if (items.isNotEmpty && val == null) {
-                 return 'Debe seleccionar una opción.';
-             }
-             return null;
-          }
+            if (items.isNotEmpty && val == null) {
+              return 'Debe seleccionar una opción.';
+            }
+            return null;
+          },
         ),
       ],
     );
   }
 
+  // Widget para entrada de fecha
   Widget _buildDateInput({
     required String label,
     required DateTime date,
@@ -711,21 +1038,32 @@ class _EditarAvisoScreenState extends State<EditarAvisoScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+        Text(label,
+            style: TextStyle(
+                fontWeight: FontWeight.w700,
+                fontSize: 13.5,
+                color: Colors.grey.shade600)),
         const SizedBox(height: 8),
         InkWell(
+          borderRadius: BorderRadius.circular(12),
           onTap: onTap,
-          child: InputDecorator(
-            decoration: InputDecoration(
-              border: const OutlineInputBorder(),
-              focusedBorder: OutlineInputBorder(
-                borderSide: BorderSide(color: dynamicPrimaryColor, width: 2.0),
-              ),
-              suffixIcon: Icon(Icons.calendar_today, color: dynamicPrimaryColor),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF7F8FA),
+              borderRadius: BorderRadius.circular(12),
             ),
-            child: Text(
-              '${date.day}/${date.month}/${date.year}',
-              style: const TextStyle(fontSize: 16),
+            child: Row(
+              children: [
+                Icon(Icons.calendar_today_rounded,
+                    color: dynamicPrimaryColor, size: 16),
+                const SizedBox(width: 8),
+                Text(
+                  '${date.day}/${date.month}/${date.year}',
+                  style:
+                      const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                ),
+              ],
             ),
           ),
         ),
@@ -733,6 +1071,7 @@ class _EditarAvisoScreenState extends State<EditarAvisoScreen> {
     );
   }
 
+  // Widget para opciones múltiples
   Widget _buildOpcionTextField({
     required TextEditingController controller,
     required String label,
@@ -743,10 +1082,16 @@ class _EditarAvisoScreenState extends State<EditarAvisoScreen> {
       child: TextFormField(
         controller: controller,
         decoration: InputDecoration(
-          labelText: label, 
+          labelText: label,
           hintText: 'Ej. "Opción A"',
-          border: const OutlineInputBorder(),
+          filled: true,
+          fillColor: const Color(0xFFF7F8FA),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide.none,
+          ),
           focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
             borderSide: BorderSide(color: dynamicPrimaryColor, width: 2.0),
           ),
           labelStyle: TextStyle(color: dynamicPrimaryColor),

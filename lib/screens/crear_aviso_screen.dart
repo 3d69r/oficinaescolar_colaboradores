@@ -1,8 +1,13 @@
 import 'package:file_picker/file_picker.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:oficinaescolar_colaboradores/providers/user_provider.dart';
 import 'package:html_editor_enhanced/html_editor.dart';
+import 'package:oficinaescolar_colaboradores/models/colaborador_model.dart';
+import 'package:oficinaescolar_colaboradores/utils/snackbar_util.dart';
+import 'dart:io';
+import 'package:flutter_html/flutter_html.dart';
 
 class CrearAvisoScreen extends StatefulWidget {
   final Map<String, dynamic>? avisoParaEditar;
@@ -13,7 +18,8 @@ class CrearAvisoScreen extends StatefulWidget {
   _CrearAvisoScreenState createState() => _CrearAvisoScreenState();
 }
 
-class _CrearAvisoScreenState extends State<CrearAvisoScreen> with WidgetsBindingObserver {
+class _CrearAvisoScreenState extends State<CrearAvisoScreen>
+    with WidgetsBindingObserver {
   final _formKey = GlobalKey<FormState>();
 
   // Controladores y variables de estado para los campos
@@ -22,16 +28,17 @@ class _CrearAvisoScreenState extends State<CrearAvisoScreen> with WidgetsBinding
   final _opcion1Controller = TextEditingController();
   final _opcion2Controller = TextEditingController();
   final _opcion3Controller = TextEditingController();
-  
+  final ImagePicker _imagePicker = ImagePicker();
+
   // DINÁMICOS: Se llenan en initState con datos del Provider
   List<String> _destinatariosPrincipales = ['Todos'];
-  String _destinatarioSeleccionado = 'Todos';  
+  String _destinatarioSeleccionado = 'Todos';
   Map<String, List<String>> _opcionesEspecificas = {};
   String? _seleccionEspecifica;
   String _respuestaSeleccionada = 'Ninguna';
   DateTime _fechaInicio = DateTime.now();
   DateTime _fechaFin = DateTime.now().add(const Duration(days: 7));
-  String _initialHtmlContent = '';  
+  String _initialHtmlContent = '';
 
   // ⭐️ ESTADOS PARA CONTROL DE ARCHIVO/COMENTARIO ⭐️
   bool _mostrarEditor = false;
@@ -42,115 +49,155 @@ class _CrearAvisoScreenState extends State<CrearAvisoScreen> with WidgetsBinding
     final String key = _destinatarioSeleccionado;
 
     if (key == 'Todos' || !_opcionesEspecificas.containsKey(key)) {
-        setState(() {
-            _seleccionEspecifica = null;
-        });
-        return;
+      setState(() {
+        _seleccionEspecifica = null;
+      });
+      return;
     }
-    
+
     final List<String> opciones = _opcionesEspecificas[key]!;
 
     if (opciones.isNotEmpty) {
-        if (_seleccionEspecifica == null || !opciones.contains(_seleccionEspecifica)) {
-              setState(() {
-                _seleccionEspecifica = opciones.first;
-              });
-        }
-    } else {
+      if (_seleccionEspecifica == null ||
+          !opciones.contains(_seleccionEspecifica)) {
         setState(() {
-            _seleccionEspecifica = null;
+          _seleccionEspecifica = opciones.first;
         });
+      }
+    } else {
+      setState(() {
+        _seleccionEspecifica = null;
+      });
     }
   }
 
   @override
   void initState() {
     super.initState();
-    
-    WidgetsBinding.instance.addObserver(this); 
 
-    // ⭐️ AÑADIDO: Eliminar el foco en el primer frame ⭐️
+    WidgetsBinding.instance.addObserver(this);
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         FocusScope.of(context).unfocus();
       }
     });
-    
+
     final userProvider = Provider.of<UserProvider>(context, listen: false);
     final colaborador = userProvider.colaboradorModel;
 
     if (colaborador != null) {
-      final List<String> listaNiveles = colaborador.avisoNivelesEducativos.map((n) => n.nivelEducativo).toList();
-      final List<String> listaSalones = colaborador.avisoSalones.map((s) => s.salon).toList();
-      final List<String> listaAlumnos = colaborador.avisoAlumnos.map((a) => '${a.primerNombre} ${a.apellidoPat} (${a.idAlumno})').toList();
-      final List<String> listaColaboradores = colaborador.avisoColaboradores.map((c) => c.nombreCompleto).toList();  
-      
+      final List<String> listaNiveles = colaborador.avisoNivelesEducativos
+          .map((n) => n.nivelEducativo)
+          .toList();
+final String idColaboradorActual = userProvider.idColaborador;
+final List<AvisoSalaModel> salonesAsignados = colaborador.avisoSalones
+    .where((s) =>
+        s.idMaestroTitular == idColaboradorActual ||
+        s.idMaestroSuplente == idColaboradorActual)
+    .toList();
+final List<AvisoSalaModel> salonesParaMostrar =
+    salonesAsignados.isNotEmpty ? salonesAsignados : colaborador.avisoSalones;
+final List<String> listaSalones =
+    salonesParaMostrar.map((s) => s.salon).toList();
+      final List<String> listaAlumnos = colaborador.avisoAlumnos
+          .map((a) => '${a.primerNombre} ${a.apellidoPat} (${a.idAlumno})')
+          .toList();
+      final List<String> listaColaboradores = colaborador.avisoColaboradores
+          .map((c) => c.nombreCompleto)
+          .toList();
+
       _opcionesEspecificas = {
         'Nivel Educativo': listaNiveles,
         'Salón': listaSalones,
         'Alumno Específico': listaAlumnos,
         'Colaborador Específico': listaColaboradores,
       };
-      
-      _destinatariosPrincipales = [
-        'Todos',                  
-        'Todos los Alumnos',      
-        'Todos los Colaboradores',
-        if (listaNiveles.isNotEmpty) 'Nivel Educativo',
-        if (listaSalones.isNotEmpty) 'Salón',
-        if (listaAlumnos.isNotEmpty) 'Alumno Específico',
-        if (listaColaboradores.isNotEmpty) 'Colaborador Específico',
-      ];
+
+      // ⭐️ NUEVO: id_maestro_titular o id_maestro_suplente distinto de "0"
+      // en al menos un salón => el colaborador tiene salón(es) asignado(s).
+      final bool tieneSalonAsignado = salonesAsignados.isNotEmpty;
+
+      if (tieneSalonAsignado) {
+        _destinatariosPrincipales = [
+          if (listaSalones.isNotEmpty) 'Salón',
+          if (listaAlumnos.isNotEmpty) 'Alumno Específico',
+        ];
+      } else {
+        _destinatariosPrincipales = [
+          'Todos',
+          'Todos los Alumnos',
+          'Todos los Colaboradores',
+          if (listaNiveles.isNotEmpty) 'Nivel Educativo',
+          if (listaSalones.isNotEmpty) 'Salón',
+          if (listaAlumnos.isNotEmpty) 'Alumno Específico',
+          if (listaColaboradores.isNotEmpty) 'Colaborador Específico',
+        ];
+      }
+
+      // 'Todos' es el valor por defecto de _destinatarioSeleccionado,
+      // pero puede ya no existir en la lista filtrada. Lo corregimos aquí.
+      if (widget.avisoParaEditar == null && _destinatariosPrincipales.isNotEmpty) {
+        _destinatarioSeleccionado = _destinatariosPrincipales.first;
+      }
     }
 
     if (widget.avisoParaEditar != null) {
-      _tituloController.text = widget.avisoParaEditar!['titulo'] as String? ?? '';
-      _initialHtmlContent = widget.avisoParaEditar!['comentario'] as String? ?? '';  
-      
+      _tituloController.text =
+          widget.avisoParaEditar!['titulo'] as String? ?? '';
+      _initialHtmlContent =
+          widget.avisoParaEditar!['comentario'] as String? ?? '';
+
       if (_initialHtmlContent.isNotEmpty) {
-          _mostrarEditor = true;
+        _mostrarEditor = true;
       }
-      
-      _destinatarioSeleccionado = widget.avisoParaEditar!['destinatario_tipo'] as String? ?? 'Todos';  
-      
-      final String apiRespuesta = widget.avisoParaEditar!['requiere_respuesta'] as String? ?? 'Ninguna';  
-      _respuestaSeleccionada = apiRespuesta == 'Seleccion' ? 'Seleccion multiple' : apiRespuesta;
+
+      _destinatarioSeleccionado =
+          widget.avisoParaEditar!['destinatario_tipo'] as String? ?? 'Todos';
+
+      final String apiRespuesta =
+          widget.avisoParaEditar!['requiere_respuesta'] as String? ??
+              'Ninguna';
+      _respuestaSeleccionada =
+          apiRespuesta == 'Seleccion' ? 'Seleccion multiple' : apiRespuesta;
 
       try {
-          final String? fechaInicioStr = widget.avisoParaEditar!['fecha_inicio'] as String?;
-          final String? fechaFinStr = widget.avisoParaEditar!['fecha_fin'] as String?;
-          
-          if (fechaInicioStr != null && fechaInicioStr.isNotEmpty) {
-              _fechaInicio = DateTime.parse(fechaInicioStr);
-          }
-          if (fechaFinStr != null && fechaFinStr.isNotEmpty) {
-              _fechaFin = DateTime.parse(fechaFinStr);
-          }
+        final String? fechaInicioStr =
+            widget.avisoParaEditar!['fecha_inicio'] as String?;
+        final String? fechaFinStr =
+            widget.avisoParaEditar!['fecha_fin'] as String?;
+
+        if (fechaInicioStr != null && fechaInicioStr.isNotEmpty) {
+          _fechaInicio = DateTime.parse(fechaInicioStr);
+        }
+        if (fechaFinStr != null && fechaFinStr.isNotEmpty) {
+          _fechaFin = DateTime.parse(fechaFinStr);
+        }
       } catch (_) {}
-      
-      _seleccionEspecifica = widget.avisoParaEditar!['destinatario_valor'] as String?;
-      
-      final String? opciones = widget.avisoParaEditar!['opciones_multiples'] as String?;  
+
+      _seleccionEspecifica =
+          widget.avisoParaEditar!['destinatario_valor'] as String?;
+
+      final String? opciones =
+          widget.avisoParaEditar!['opciones_multiples'] as String?;
       if (opciones != null && opciones.isNotEmpty) {
-          final List<String> parts = opciones.split(',');
-          if (parts.isNotEmpty) _opcion1Controller.text = parts[0].trim();
-          if (parts.length > 1) _opcion2Controller.text = parts[1].trim();
-          if (parts.length > 2) _opcion3Controller.text = parts[2].trim();
+        final List<String> parts = opciones.split(',');
+        if (parts.isNotEmpty) _opcion1Controller.text = parts[0].trim();
+        if (parts.length > 1) _opcion2Controller.text = parts[1].trim();
+        if (parts.length > 2) _opcion3Controller.text = parts[2].trim();
       }
-    }  
-    
-    _resetSeleccionEspecifica();  
+    }
+
+    _resetSeleccionEspecifica();
   }
-  
+
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     super.didChangeAppLifecycleState(state);
-    
+
     if (state == AppLifecycleState.resumed) {
       if (mounted) {
-        setState(() {}); 
-        
-        // ⭐️ AÑADIDO: Eliminar el foco al reanudar ⭐️
+        setState(() {});
         FocusScope.of(context).unfocus();
       }
     }
@@ -159,7 +206,7 @@ class _CrearAvisoScreenState extends State<CrearAvisoScreen> with WidgetsBinding
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    
+
     _tituloController.dispose();
     _opcion1Controller.dispose();
     _opcion2Controller.dispose();
@@ -174,12 +221,16 @@ class _CrearAvisoScreenState extends State<CrearAvisoScreen> with WidgetsBinding
       firstDate: DateTime(2023),
       lastDate: DateTime(2030),
       builder: (BuildContext context, Widget? child) {
-        final Color dynamicPrimaryColor = Provider.of<UserProvider>(context, listen: false).colores.headerColor;
+        final Color dynamicPrimaryColor =
+            Provider.of<UserProvider>(context, listen: false)
+                .colores
+                .headerColor;
         return Theme(
           data: ThemeData.light().copyWith(
             primaryColor: dynamicPrimaryColor,
             colorScheme: ColorScheme.light(primary: dynamicPrimaryColor),
-            buttonTheme: const ButtonThemeData(textTheme: ButtonTextTheme.primary),
+            buttonTheme:
+                const ButtonThemeData(textTheme: ButtonTextTheme.primary),
           ),
           child: child!,
         );
@@ -195,10 +246,10 @@ class _CrearAvisoScreenState extends State<CrearAvisoScreen> with WidgetsBinding
       });
     }
   }
-  
+
   Future<void> _seleccionarArchivo() async {
-    const int maxFileSize = 1048576;  
-    
+    const int maxFileSize = 1048576;
+
     try {
       final FilePickerResult? result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
@@ -209,38 +260,124 @@ class _CrearAvisoScreenState extends State<CrearAvisoScreen> with WidgetsBinding
         final PlatformFile pickedFile = result.files.single;
 
         if (pickedFile.size > maxFileSize) {
-          if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('¡El archivo es demasiado grande! Máximo 1 MB.'),
-                  backgroundColor: Colors.red,
-                ),
-              );
-          }
-          return;  
-        }
-        
         if (mounted) {
-            setState(() {
-              _rutaArchivoAdjunto = pickedFile.path;
-              _mostrarEditor = false;
-            });
-            
-            _cuerpoEditorController.clear();
-            
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Archivo seleccionado: ${pickedFile.name}')),
-            );
+            showModernSnackBar(context, 'El archivo es demasiado grande. Máximo 1 MB.', SnackType.error);
+          }
+          return;
         }
-        
+
+        if (mounted) {
+          setState(() {
+            _rutaArchivoAdjunto = pickedFile.path;
+            _mostrarEditor = false;
+          });
+
+          _cuerpoEditorController.clear();
+
+          showModernSnackBar(context, 'Archivo seleccionado: ${pickedFile.name}', SnackType.success);
+        }
       } else {
         // El usuario canceló la selección.
       }
     } catch (e) {
       if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error al seleccionar archivo: $e')),
-          );
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error al seleccionar archivo: $e')),
+        );
+      }
+    }
+  }
+
+  void _mostrarMenuAdjuntar(Color colorPrimario) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return Container(
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 30),
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade300,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+              const SizedBox(height: 18),
+              const Text(
+                'Adjuntar archivo',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+              ),
+              const SizedBox(height: 14),
+              ListTile(
+                onTap: () {
+                  Navigator.pop(context);
+                  _seleccionarImagen(ImageSource.camera);
+                },
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                leading: Icon(Icons.photo_camera_rounded, color: colorPrimario),
+                title: const Text('Tomar foto'),
+              ),
+              ListTile(
+                onTap: () {
+                  Navigator.pop(context);
+                  _seleccionarImagen(ImageSource.gallery);
+                },
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                leading: Icon(Icons.photo_library_rounded, color: colorPrimario),
+                title: const Text('Elegir de galería'),
+              ),
+              ListTile(
+                onTap: () {
+                  Navigator.pop(context);
+                  _seleccionarArchivo();
+                },
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                leading: Icon(Icons.picture_as_pdf_rounded, color: colorPrimario),
+                title: const Text('Elegir documento (PDF)'),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _seleccionarImagen(ImageSource source) async {
+    const int maxFileSize = 1048576;
+    try {
+      final XFile? picked = await _imagePicker.pickImage(source: source, imageQuality: 85);
+      if (picked == null) return;
+
+      final file = File(picked.path);
+      final int size = await file.length();
+
+      if (size > maxFileSize) {
+        if (mounted) {
+          showModernSnackBar(context, 'La imagen es demasiado grande. Máximo 1 MB.', SnackType.error);
+        }
+        return;
+      }
+
+      setState(() {
+        _rutaArchivoAdjunto = picked.path;
+        _mostrarEditor = false;
+      });
+      _cuerpoEditorController.clear();
+
+      if (mounted) {
+        showModernSnackBar(context, 'Imagen adjuntada correctamente', SnackType.success);
+      }
+    } catch (e) {
+      if (mounted) {
+        showModernSnackBar(context, 'No se pudo tomar/seleccionar la foto', SnackType.error);
       }
     }
   }
@@ -251,117 +388,239 @@ class _CrearAvisoScreenState extends State<CrearAvisoScreen> with WidgetsBinding
       _rutaArchivoAdjunto = null;
     });
   }
-  
-  void _guardarAviso() async {  
-    if (_formKey.currentState!.validate()) {
-      
+
+  void _prepararYMostrarPreview() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    String cuerpoHtml = '';
+
+    if (_rutaArchivoAdjunto == null && !_mostrarEditor) {
+      showModernSnackBar(context, 'Escribe un comentario o adjunta un archivo (PDF/Imagen).', SnackType.warning);
+      return;
+    }
+
+    if (_mostrarEditor) {
+      cuerpoHtml = await _cuerpoEditorController.getText();
+      if (cuerpoHtml.trim().isEmpty || cuerpoHtml.trim() == '<p><br></p>') {
+        showModernSnackBar(context, 'El campo de comentario no puede estar vacío.', SnackType.warning);
+        return;
+      }
+    }
+
+    String opcionesMultiples = '';
+    String tipoRespuestaAPI = _respuestaSeleccionada;
+
+    if (_respuestaSeleccionada == 'Sí o No') {
+      tipoRespuestaAPI = 'SioNo';
+    } else if (_respuestaSeleccionada == 'Seleccion multiple') {
+      tipoRespuestaAPI = 'Seleccion';
+      final List<String> opciones = [];
+      if (_opcion1Controller.text.isNotEmpty) opciones.add(_opcion1Controller.text.trim());
+      if (_opcion2Controller.text.isNotEmpty) opciones.add(_opcion2Controller.text.trim());
+      if (_opcion3Controller.text.isNotEmpty) opciones.add(_opcion3Controller.text.trim());
+      opcionesMultiples = opciones.join(',');
+
+      if (opciones.length < 2) {
+        showModernSnackBar(context, 'Ingresa al menos dos opciones para la Selección Múltiple.', SnackType.warning);
+        return;
+      }
+    }
+
+    final bool esDestinatarioEspecifico =
+        _opcionesEspecificas.containsKey(_destinatarioSeleccionado);
+    final bool hayOpcionesDisponibles =
+        _opcionesEspecificas[_destinatarioSeleccionado]?.isNotEmpty ?? false;
+    final String? destinatarioValor =
+        (esDestinatarioEspecifico && hayOpcionesDisponibles && _seleccionEspecifica != null)
+            ? _seleccionEspecifica
+            : null;
+
+    final String idAviso = widget.avisoParaEditar?['id_calendario'] as String? ?? '0';
+
+    final avisoDataParaProvider = {
+      'titulo': _tituloController.text,
+      'cuerpo': cuerpoHtml,
+      'destinatario_tipo': _destinatarioSeleccionado,
+      'destinatario_valor': destinatarioValor,
+      'requiere_respuesta': tipoRespuestaAPI,
+      'fecha_inicio': _fechaInicio.toIso8601String().substring(0, 10),
+      'fecha_fin': _fechaFin.toIso8601String().substring(0, 10),
+      'id_calendario': idAviso,
+      'opciones_multiples': opcionesMultiples,
+      'archivo': _rutaArchivoAdjunto,
+    };
+
+    if (!mounted) return;
+    _mostrarPreviewAviso(avisoDataParaProvider);
+  }
+
+  void _publicarAviso(Map<String, dynamic> avisoDataParaProvider) async {
       final userProvider = Provider.of<UserProvider>(context, listen: false);
-      
-      String cuerpoHtml = '';
-      
-      if (_rutaArchivoAdjunto == null && !_mostrarEditor) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Debe escribir un comentario o adjuntar un archivo (PDF/Imagen).')),
-          );
-          return;
-      }
-      
-      if (_mostrarEditor) {
-          cuerpoHtml = await _cuerpoEditorController.getText();
+      final String idAviso = avisoDataParaProvider['id_calendario'] as String? ?? '0';
 
-          if (cuerpoHtml.trim().isEmpty || cuerpoHtml.trim() == '<p><br></p>') {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('El campo de comentario no puede estar vacío.')),
-              );
-              return;
-          }
-      }
-      
-      String opcionesMultiples = '';
-      String tipoRespuestaAPI = _respuestaSeleccionada;  
-      
-      if (_respuestaSeleccionada == 'Sí o No') {
-          tipoRespuestaAPI = 'SioNo';  
-      } else if (_respuestaSeleccionada == 'Seleccion multiple') {
-          tipoRespuestaAPI = 'Seleccion';  
-          
-          final List<String> opciones = [];
-          if (_opcion1Controller.text.isNotEmpty) opciones.add(_opcion1Controller.text.trim());
-          if (_opcion2Controller.text.isNotEmpty) opciones.add(_opcion2Controller.text.trim());
-          if (_opcion3Controller.text.isNotEmpty) opciones.add(_opcion3Controller.text.trim());
-          opcionesMultiples = opciones.join(',');
-          
-          if (opciones.length < 2) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Debe ingresar al menos dos opciones para la Selección Múltiple.')),
-              );
-              return;  
-          }
-      }
-      
-      final bool esDestinatarioEspecifico = _opcionesEspecificas.containsKey(_destinatarioSeleccionado);
-      final bool hayOpcionesDisponibles = _opcionesEspecificas[_destinatarioSeleccionado]?.isNotEmpty ?? false;
-      
-      final String? destinatarioValor;
-      
-      if (esDestinatarioEspecifico && hayOpcionesDisponibles && _seleccionEspecifica != null) {
-          destinatarioValor = _seleccionEspecifica;
-      } else {
-          destinatarioValor = null;
-      }
-      
-      final String idAviso = widget.avisoParaEditar?['id_calendario'] as String? ?? '0';
-
-      final avisoDataParaProvider = {
-        'titulo': _tituloController.text,
-        'cuerpo': cuerpoHtml,
-        'destinatario_tipo': _destinatarioSeleccionado,
-        'destinatario_valor': destinatarioValor,
-        'requiere_respuesta': tipoRespuestaAPI,  
-        'fecha_inicio': _fechaInicio.toIso8601String().substring(0, 10),
-        'fecha_fin': _fechaFin.toIso8601String().substring(0, 10),
-        'id_calendario': idAviso,  
-        'opciones_multiples': opcionesMultiples,
-        'archivo': _rutaArchivoAdjunto,
-      };
-
-      print('--- CREACIÓN/EDICIÓN DE AVISO (ID: ${idAviso}) ---');
+      print('--- CREACIÓN/EDICIÓN DE AVISO (ID: $idAviso) ---');
       print('Datos enviados al Provider: $avisoDataParaProvider');
       print('-------------------------------------------');
-      
-      final snackBar = SnackBar(
-        content: Row(
-          children: const [
-            CircularProgressIndicator(color: Colors.white),
-            SizedBox(width: 20),
-            Text('Guardando aviso...'),
-          ],
-        ),
-        duration: const Duration(minutes: 5),
-      );
+
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        ScaffoldMessenger.of(context).showSnackBar(snackBar);
+        showModernSnackBar(context, 'Guardando aviso...', SnackType.loading);
       });
 
       final result = await userProvider.saveAviso(avisoDataParaProvider);
 
-      if (!mounted) return;  
+      if (!mounted) return;
 
-      ScaffoldMessenger.of(context).hideCurrentSnackBar();  
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(result['message']),
-          backgroundColor: result['success'] ? Colors.green : Colors.red,
-        ),
+      showModernSnackBar(
+        context,
+        result['message'],
+        result['success'] ? SnackType.success : SnackType.error,
       );
 
       if (result['success']) {
-        Navigator.pop(context);  
+        Navigator.pop(context); // cierra CrearAvisoScreen
       }
     }
-  }
 
+    void _mostrarPreviewAviso(Map<String, dynamic> avisoData) {
+    final userProvider = Provider.of<UserProvider>(context, listen: false);
+    final colores = userProvider.colores;
+    final String? archivo = avisoData['archivo'] as String?;
+    final String cuerpo = avisoData['cuerpo'] as String? ?? '';
+
+    showDialog(
+      context: context,
+      builder: (dialogContext) {
+        final screenWidth = MediaQuery.of(dialogContext).size.width;
+        final screenHeight = MediaQuery.of(dialogContext).size.height;
+
+        return Dialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+          insetPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+          backgroundColor: Colors.white,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              minWidth: screenWidth * 0.90,
+              maxWidth: screenWidth * 0.90,
+              minHeight: screenHeight * 0.85,
+              maxHeight: screenHeight * 0.90,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.max,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(vertical: 15, horizontal: 20),
+                  decoration: BoxDecoration(
+                    color: colores.headerColor,
+                    borderRadius: const BorderRadius.only(
+                      topLeft: Radius.circular(15),
+                      topRight: Radius.circular(15),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.visibility_outlined, color: Colors.white, size: 20),
+                      const SizedBox(width: 10),
+                      const Expanded(
+                        child: Text(
+                          'Vista previa del aviso',
+                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Expanded(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.all(20),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          avisoData['titulo'] as String? ?? '',
+                          style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Del ${avisoData['fecha_inicio']} al ${avisoData['fecha_fin']}',
+                          style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Destinatario: ${_destinatarioSeleccionado}'
+                          '${_seleccionEspecifica != null ? " · $_seleccionEspecifica" : ""}',
+                          style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
+                        ),
+                        const Divider(height: 24),
+                        if (archivo != null && archivo.isNotEmpty) ...[
+                          Container(
+                            padding: const EdgeInsets.all(5),
+                            decoration: BoxDecoration(
+                              border: Border.all(color: Colors.grey.shade300),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: (archivo.toLowerCase().endsWith('.pdf'))
+                                ? ListTile(
+                                    leading: const Icon(Icons.picture_as_pdf, color: Colors.red),
+                                    title: Text(archivo.split('/').last),
+                                  )
+                                : Image.file(File(archivo), fit: BoxFit.contain, height: 220),
+                          ),
+                        ] else
+                          Html(data: cuerpo),
+                        if (_respuestaSeleccionada != 'Ninguna') ...[
+                          const SizedBox(height: 16),
+                          Text(
+                            'Este aviso pedirá respuesta: $_respuestaSeleccionada',
+                            style: TextStyle(fontSize: 13, fontStyle: FontStyle.italic, color: colores.botonesColor),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: () => Navigator.of(dialogContext).pop(),
+                          icon: const Icon(Icons.edit_outlined),
+                          label: const Text('Seguir editando'),
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          onPressed: () {
+                            Navigator.of(dialogContext).pop();
+                            _publicarAviso(avisoData);
+                          },
+                          icon: const Icon(Icons.publish_rounded),
+                          label: const Text('Publicar'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: colores.botonesColor,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
   void _eliminarAviso() {
     print('Aviso eliminado');
     Navigator.pop(context, true);
@@ -370,42 +629,92 @@ class _CrearAvisoScreenState extends State<CrearAvisoScreen> with WidgetsBinding
   Widget _buildCustomToolbar(BuildContext context, Color dynamicPrimaryColor) {
     return Container(
       decoration: BoxDecoration(
-        color: dynamicPrimaryColor.withOpacity(0.1),  
-        borderRadius: BorderRadius.circular(5.0),
-        border: Border.all(color: dynamicPrimaryColor, width: 0.5),
+        color: dynamicPrimaryColor.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(12.0),
+        border: Border.all(color: dynamicPrimaryColor.withOpacity(0.25)),
       ),
-      padding: const EdgeInsets.symmetric(horizontal: 5.0, vertical: 8.0),
+      padding: const EdgeInsets.symmetric(horizontal: 6.0, vertical: 8.0),
       child: ToolbarWidget(
         controller: _cuerpoEditorController,
         callbacks: Callbacks(),
         htmlToolbarOptions: const HtmlToolbarOptions(
           defaultToolbarButtons: [
             FontButtons(
-              strikethrough: false,  
-              subscript: false,     
-              superscript: false,   
+              strikethrough: false,
+              subscript: false,
+              superscript: false,
             ),
             FontSettingButtons(
-              fontSize: true,    
-              fontName: false,   
+              fontSize: true,
+              fontName: false,
             ),
-            StyleButtons(),  
-            ColorButtons(),  
+            StyleButtons(),
+            ColorButtons(),
             ParagraphButtons(
-              textDirection: false,  
-              lineHeight: false,  
+              textDirection: false,
+              lineHeight: false,
               caseConverter: false,
             ),
             InsertButtons(
-              link: true,        
-              picture: false,  
-              audio: false,  
-              video: false,  
-              table: false,  
+              link: true,
+              picture: false,
+              audio: false,
+              video: false,
+              table: false,
               hr: false,
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  // ⭐️ Card de sección reutilizable para el nuevo diseño ⭐️
+  Widget _buildSectionCard({
+    required String title,
+    required IconData icon,
+    required Color accentColor,
+    required List<Widget> children,
+  }) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+              color: Colors.black.withOpacity(0.04),
+              blurRadius: 12,
+              offset: const Offset(0, 4)),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(7),
+                decoration: BoxDecoration(
+                  color: accentColor.withOpacity(0.10),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(icon, size: 17, color: accentColor),
+              ),
+              const SizedBox(width: 10),
+              Text(
+                title,
+                style: const TextStyle(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 15,
+                    color: Color(0xFF1E1E2C)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          ...children,
+        ],
       ),
     );
   }
@@ -417,230 +726,341 @@ class _CrearAvisoScreenState extends State<CrearAvisoScreen> with WidgetsBinding
     final Color dynamicPrimaryColor = colores.footerColor;
     final Color dynamicHeaderColor = colores.headerColor;
 
-    final bool mostrarComboEspecifico = _opcionesEspecificas.containsKey(_destinatarioSeleccionado) && (_opcionesEspecificas[_destinatarioSeleccionado]?.isNotEmpty ?? false);
-    final bool mostrarOpcionesMultiples = _respuestaSeleccionada == 'Seleccion multiple';
+    final bool mostrarComboEspecifico =
+        _opcionesEspecificas.containsKey(_destinatarioSeleccionado) &&
+            (_opcionesEspecificas[_destinatarioSeleccionado]?.isNotEmpty ??
+                false);
+    final bool mostrarOpcionesMultiples =
+        _respuestaSeleccionada == 'Seleccion multiple';
 
-    // ⭐️ MODIFICACIÓN CLAVE 1: Envolver en GestureDetector para cerrar el teclado al tocar fuera ⭐️
     return GestureDetector(
       onTap: () {
         FocusScope.of(context).unfocus();
       },
-      child: SafeArea(  
+      child: SafeArea(
         child: Scaffold(
+          backgroundColor: const Color(0xFFF4F5FA),
           appBar: AppBar(
-            title: Text(widget.avisoParaEditar == null ? 'Crear Aviso' : 'Editar Aviso'),
+            title: Text(widget.avisoParaEditar == null
+                ? 'Crear Aviso'
+                : 'Editar Aviso'),
+            titleTextStyle: const TextStyle(
+                fontWeight: FontWeight.w800, fontSize: 18, color: Colors.white),
             backgroundColor: dynamicHeaderColor,
             centerTitle: true,
             foregroundColor: Colors.white,
+            elevation: 0,
+            shape: const RoundedRectangleBorder(
+              borderRadius: BorderRadius.vertical(bottom: Radius.circular(22)),
+            ),
             actions: widget.avisoParaEditar != null
                 ? [
-              IconButton(
-                icon: const Icon(Icons.delete),
-                onPressed: _eliminarAviso,
-                tooltip: 'Eliminar aviso',
-                color: Colors.white,
-              ),
-            ]
+                    IconButton(
+                      icon: const Icon(Icons.delete_outline_rounded),
+                      onPressed: _eliminarAviso,
+                      tooltip: 'Eliminar aviso',
+                      color: Colors.white,
+                    ),
+                  ]
                 : null,
           ),
           body: SingleChildScrollView(
-            padding: const EdgeInsets.all(16.0),
+            padding: const EdgeInsets.fromLTRB(16, 18, 16, 16),
             child: Form(
               key: _formKey,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
-                  _buildFiltroDropdown(
-                    label: 'Mostrar en Calendario de',
-                    value: _destinatarioSeleccionado,
-                    items: _destinatariosPrincipales,  
-                    onChanged: (String? newValue) {
-                      setState(() {
-                        _destinatarioSeleccionado = newValue!;
-                        _resetSeleccionEspecifica();  
-                      });
-                    },
-                    dynamicPrimaryColor: dynamicPrimaryColor,
-                  ),
-                  
-                  if (mostrarComboEspecifico) ...[
-                    const SizedBox(height: 20),
-                    _buildFiltroDropdown(
-                      label: 'Seleccionar $_destinatarioSeleccionado',
-                      value: _seleccionEspecifica,
-                      items: _opcionesEspecificas[_destinatarioSeleccionado]!,  
-                      onChanged: (String? newValue) {
-                        setState(() {
-                          _seleccionEspecifica = newValue!;
-                        });
-                      },
-                      dynamicPrimaryColor: dynamicPrimaryColor,
-                    ),
-                  ],
-                  
-                  const SizedBox(height: 20),
-                  Row(
+                  // ------- SECCIÓN: DESTINATARIOS -------
+                  _buildSectionCard(
+                    title: 'Destinatarios',
+                    icon: Icons.groups_rounded,
+                    accentColor: dynamicPrimaryColor,
                     children: [
-                      Expanded(
-                        child: _buildDateInput(
-                          label: 'Visible desde',
-                          date: _fechaInicio,
-                          onTap: () => _selectDate(context, true),
+                      _buildFiltroDropdown(
+                        label: 'Mostrar en Calendario de',
+                        value: _destinatarioSeleccionado,
+                        items: _destinatariosPrincipales,
+                        onChanged: (String? newValue) {
+                          setState(() {
+                            _destinatarioSeleccionado = newValue!;
+                            _resetSeleccionEspecifica();
+                          });
+                        },
+                        dynamicPrimaryColor: dynamicPrimaryColor,
+                      ),
+                      if (mostrarComboEspecifico) ...[
+                        const SizedBox(height: 16),
+                        _buildFiltroDropdown(
+                          label: 'Seleccionar $_destinatarioSeleccionado',
+                          value: _seleccionEspecifica,
+                          items: _opcionesEspecificas[_destinatarioSeleccionado]!,
+                          onChanged: (String? newValue) {
+                            setState(() {
+                              _seleccionEspecifica = newValue!;
+                            });
+                          },
                           dynamicPrimaryColor: dynamicPrimaryColor,
                         ),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: _buildDateInput(
-                          label: 'Visible hasta',
-                          date: _fechaFin,
-                          onTap: () => _selectDate(context, false),
-                          dynamicPrimaryColor: dynamicPrimaryColor,
-                        ),
-                      ),
+                      ],
                     ],
                   ),
-                  const SizedBox(height: 20),
-                  _buildFiltroDropdown(
-                    label: 'Requiere respuesta',
-                    value: _respuestaSeleccionada,
-                    items: const ['Ninguna', 'Sí o No', 'Seleccion multiple'],
-                    onChanged: (String? newValue) {
-                      setState(() {
-                        _respuestaSeleccionada = newValue!;
-                      });
-                    },
-                    dynamicPrimaryColor: dynamicPrimaryColor,
-                  ),
-                  const SizedBox(height: 20),
-                  
-                  if (mostrarOpcionesMultiples) ...[
-                    const Text('Opciones de Respuesta Múltiple:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                    _buildOpcionTextField(controller: _opcion1Controller, label: 'Opción 1', dynamicPrimaryColor: dynamicPrimaryColor),
-                    _buildOpcionTextField(controller: _opcion2Controller, label: 'Opción 2', dynamicPrimaryColor: dynamicPrimaryColor),
-                    _buildOpcionTextField(controller: _opcion3Controller, label: 'Opción 3', dynamicPrimaryColor: dynamicPrimaryColor),
-                    const SizedBox(height: 20),
-                  ],
-                  
-                  // Título
-                  TextFormField(
-                    controller: _tituloController,
-                    decoration: InputDecoration(
-                      labelText: 'Título',  
-                      border: const OutlineInputBorder(),
-                      focusedBorder: OutlineInputBorder(
-                        borderSide: BorderSide(color: dynamicPrimaryColor, width: 2.0),
-                      ),
-                      labelStyle: TextStyle(color: dynamicPrimaryColor),
-                    ),
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Por favor, ingrese un título';
-                      }
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: 20),
-                  
-                  // ⭐️ ÁREA DE SELECCIÓN: COMENTARIO vs ARCHIVO ⭐️
-                  const Text('Contenido:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                  const SizedBox(height: 10),
 
-                  // 1. Botones de Acción
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceAround,
+                  // ------- SECCIÓN: VIGENCIA -------
+                  _buildSectionCard(
+                    title: 'Vigencia',
+                    icon: Icons.date_range_rounded,
+                    accentColor: dynamicPrimaryColor,
                     children: [
-                      Expanded(
-                        child: ElevatedButton.icon(
-                          onPressed: _seleccionarArchivo,
-                          icon: const Icon(Icons.attach_file),
-                          label: const Text('Adjuntar Archivo'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: _rutaArchivoAdjunto != null ? Colors.green : dynamicPrimaryColor,
-                            foregroundColor: Colors.white,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: ElevatedButton.icon(
-                          onPressed: _mostrarEditorComentario,
-                          icon: const Icon(Icons.edit),
-                          label: const Text('Escribir Comentario'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: _mostrarEditor ? Colors.green : dynamicPrimaryColor,
-                            foregroundColor: Colors.white,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 15),
-
-                  // 2. Estado de Archivo Adjunto
-                  if (_rutaArchivoAdjunto != null)  
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: Colors.lightBlue.shade100,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Row(
+                      Row(
                         children: [
-                          const Icon(Icons.description, color: Colors.blue),
-                          const SizedBox(width: 10),
-                          Expanded(child: Text('Archivo adjunto: ${_rutaArchivoAdjunto!.split('/').last}', overflow: TextOverflow.ellipsis)),
-                          IconButton(
-                            icon: const Icon(Icons.close, color: Colors.red),
-                            onPressed: () => setState(() => _rutaArchivoAdjunto = null),
+                          Expanded(
+                            child: _buildDateInput(
+                              label: 'Visible desde',
+                              date: _fechaInicio,
+                              onTap: () => _selectDate(context, true),
+                              dynamicPrimaryColor: dynamicPrimaryColor,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: _buildDateInput(
+                              label: 'Visible hasta',
+                              date: _fechaFin,
+                              onTap: () => _selectDate(context, false),
+                              dynamicPrimaryColor: dynamicPrimaryColor,
+                            ),
                           ),
                         ],
                       ),
-                    ),
+                    ],
+                  ),
 
-                  // 3. Editor de Comentario (se muestra condicionalmente)
-                  if (_mostrarEditor) ...[
-                    if (_rutaArchivoAdjunto != null)  
-                      const Padding(
-                        padding: EdgeInsets.only(bottom: 10),
-                        child: Text('⚠️ El archivo adjunto se eliminará al guardar si escribes un comentario.', style: TextStyle(color: Colors.orange)),
+                  // ------- SECCIÓN: RESPUESTA -------
+                  _buildSectionCard(
+                    title: 'Respuesta',
+                    icon: Icons.question_answer_rounded,
+                    accentColor: dynamicPrimaryColor,
+                    children: [
+                      _buildFiltroDropdown(
+                        label: 'Requiere respuesta',
+                        value: _respuestaSeleccionada,
+                        items: const ['Ninguna', 'Sí o No', 'Seleccion multiple'],
+                        onChanged: (String? newValue) {
+                          setState(() {
+                            _respuestaSeleccionada = newValue!;
+                          });
+                        },
+                        dynamicPrimaryColor: dynamicPrimaryColor,
                       ),
-                      
-                    _buildCustomToolbar(context, dynamicPrimaryColor),
-                    const SizedBox(height: 10),
-                    
-                    HtmlEditor(
-                      controller: _cuerpoEditorController,
-                      htmlEditorOptions: HtmlEditorOptions(
-                        hint: "Escriba aquí el cuerpo del aviso...",
-                        initialText: _initialHtmlContent,  
-                        darkMode: Theme.of(context).brightness == Brightness.dark,
-                        adjustHeightForKeyboard: true,
+                      if (mostrarOpcionesMultiples) ...[
+                        const SizedBox(height: 16),
+                        _buildOpcionTextField(
+                            controller: _opcion1Controller,
+                            label: 'Opción 1',
+                            dynamicPrimaryColor: dynamicPrimaryColor),
+                        _buildOpcionTextField(
+                            controller: _opcion2Controller,
+                            label: 'Opción 2',
+                            dynamicPrimaryColor: dynamicPrimaryColor),
+                        _buildOpcionTextField(
+                            controller: _opcion3Controller,
+                            label: 'Opción 3',
+                            dynamicPrimaryColor: dynamicPrimaryColor),
+                      ],
+                    ],
+                  ),
+
+                  // ------- SECCIÓN: CONTENIDO -------
+                  _buildSectionCard(
+                    title: 'Contenido',
+                    icon: Icons.article_rounded,
+                    accentColor: dynamicPrimaryColor,
+                    children: [
+                      TextFormField(
+                        controller: _tituloController,
+                        textCapitalization: TextCapitalization.sentences,
+                        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+                        decoration: InputDecoration(
+                          labelText: 'Título',
+                          filled: true,
+                          fillColor: const Color(0xFFF7F8FA),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide.none,
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide:
+                                BorderSide(color: dynamicPrimaryColor, width: 2.0),
+                          ),
+                          labelStyle: TextStyle(color: dynamicPrimaryColor),
+                        ),
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Por favor, ingrese un título';
+                          }
+                          return null;
+                        },
                       ),
-                      htmlToolbarOptions: const HtmlToolbarOptions(
-                        toolbarPosition: ToolbarPosition.custom,  
-                        toolbarType: ToolbarType.nativeGrid,
-                      ),
-                      otherOptions: OtherOptions(
-                        height: 400,  
+                      const SizedBox(height: 18),
+
+                      // ⭐️ Selector segmentado: Archivo vs Comentario ⭐️
+                      Container(
+                        padding: const EdgeInsets.all(4),
                         decoration: BoxDecoration(
-                          border: Border.all(color: Colors.grey.shade400),
-                          borderRadius: BorderRadius.circular(5.0),
+                          color: const Color(0xFFF0F1F6),
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: _buildSegmentButton(
+                                label: 'Adjuntar archivo',
+                                icon: Icons.attach_file_rounded,
+                                selected: !_mostrarEditor,
+                                color: dynamicPrimaryColor,
+                                onTap: () => _mostrarMenuAdjuntar(dynamicPrimaryColor),
+                              ),
+                            ),
+                            Expanded(
+                              child: _buildSegmentButton(
+                                label: 'Escribir comentario',
+                                icon: Icons.edit_note_rounded,
+                                selected: _mostrarEditor,
+                                color: dynamicPrimaryColor,
+                                onTap: _mostrarEditorComentario,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+
+                      // Estado de archivo adjunto
+                      if (_rutaArchivoAdjunto != null)
+                        Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: Colors.blue.shade50,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: Colors.blue.shade100),
+                          ),
+                          child: Row(
+                            children: [
+                              if (!_rutaArchivoAdjunto!.toLowerCase().endsWith('.pdf'))
+                                ClipRRect(
+                                  borderRadius: BorderRadius.circular(8),
+                                  child: Image.file(
+                                    File(_rutaArchivoAdjunto!),
+                                    width: 44,
+                                    height: 44,
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (context, error, stackTrace) => Icon(
+                                      Icons.broken_image_rounded,
+                                      color: Colors.blue.shade300,
+                                    ),
+                                  ),
+                                )
+                              else
+                                Container(
+                                  width: 44,
+                                  height: 44,
+                                  alignment: Alignment.center,
+                                  decoration: BoxDecoration(
+                                    color: Colors.red.shade50,
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Icon(Icons.picture_as_pdf_rounded, color: Colors.red.shade400),
+                                ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                  child: Text(
+                                      'Archivo adjunto: ${_rutaArchivoAdjunto!.split('/').last}',
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w600,
+                                          color: Colors.blue.shade700))),
+                              IconButton(
+                                icon: Icon(Icons.close_rounded,
+                                    color: Colors.red.shade400, size: 20),
+                                onPressed: () =>
+                                    setState(() => _rutaArchivoAdjunto = null),
+                              ),
+                            ],
+                          ),
+                        ),
+
+                      // Editor de comentario
+                      if (_mostrarEditor) ...[
+                        if (_rutaArchivoAdjunto != null)
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 10),
+                            child: Row(
+                              children: [
+                                Icon(Icons.info_outline_rounded,
+                                    size: 16, color: Colors.orange.shade700),
+                                const SizedBox(width: 6),
+                                const Expanded(
+                                  child: Text(
+                                    'El archivo adjunto se eliminará al guardar si escribes un comentario.',
+                                    style: TextStyle(
+                                        color: Colors.orange, fontSize: 12.5),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        _buildCustomToolbar(context, dynamicPrimaryColor),
+                        const SizedBox(height: 10),
+                        HtmlEditor(
+                          controller: _cuerpoEditorController,
+                          htmlEditorOptions: HtmlEditorOptions(
+                            hint: "Escriba aquí el cuerpo del aviso...",
+                            initialText: _initialHtmlContent,
+                            darkMode: Theme.of(context).brightness ==
+                                Brightness.dark,
+                            adjustHeightForKeyboard: true,
+                          ),
+                          htmlToolbarOptions: const HtmlToolbarOptions(
+                            toolbarPosition: ToolbarPosition.custom,
+                            toolbarType: ToolbarType.nativeGrid,
+                          ),
+                          otherOptions: OtherOptions(
+                            height: 380,
+                            decoration: BoxDecoration(
+                              border: Border.all(color: Colors.grey.shade300),
+                              borderRadius: BorderRadius.circular(12.0),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+
+                  const SizedBox(height: 8),
+                  // Botón de guardar (alineado a la derecha)
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: SizedBox(
+                      height: 54,
+                      child: ElevatedButton.icon(
+                        onPressed: _prepararYMostrarPreview,
+                        icon: const Icon(Icons.check_circle_outline_rounded),
+                        label: const Text('Guardar Aviso',
+                            style: TextStyle(
+                                fontSize: 16, fontWeight: FontWeight.w700)),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: dynamicPrimaryColor,
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          padding: const EdgeInsets.symmetric(horizontal: 28),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16)),
                         ),
                       ),
                     ),
-                  ],
-                  
-                  const SizedBox(height: 30),
-                  // Botón de guardar
-                  ElevatedButton(
-                    onPressed: _guardarAviso,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: dynamicPrimaryColor,
-                      foregroundColor: Colors.white,
-                      minimumSize: const Size.fromHeight(50),
-                    ),
-                    child: const Text('Guardar Aviso'),
                   ),
                 ],
               ),
@@ -651,10 +1071,54 @@ class _CrearAvisoScreenState extends State<CrearAvisoScreen> with WidgetsBinding
     );
   }
 
-  // Widget para Dropdown (Mantenido)
+  Widget _buildSegmentButton({
+    required String label,
+    required IconData icon,
+    required bool selected,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(11),
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        decoration: BoxDecoration(
+          color: selected ? color : Colors.transparent,
+          borderRadius: BorderRadius.circular(11),
+          boxShadow: selected
+              ? [
+                  BoxShadow(
+                      color: color.withOpacity(0.35),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2)),
+                ]
+              : [],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 19, color: selected ? Colors.white : Colors.grey.shade500),
+            const SizedBox(height: 4),
+            Text(
+              label,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: selected ? Colors.white : Colors.grey.shade500),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Widget para Dropdown
   Widget _buildFiltroDropdown({
     required String label,
-    required String? value,  
+    required String? value,
     required List<String> items,
     required Function(String?) onChanged,
     required Color dynamicPrimaryColor,
@@ -662,13 +1126,25 @@ class _CrearAvisoScreenState extends State<CrearAvisoScreen> with WidgetsBinding
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+        Text(label,
+            style: TextStyle(
+                fontWeight: FontWeight.w700,
+                fontSize: 13.5,
+                color: Colors.grey.shade600)),
         const SizedBox(height: 8),
         DropdownButtonFormField<String>(
-          value: value,  
+          value: value,
           decoration: InputDecoration(
-            border: const OutlineInputBorder(),
+            filled: true,
+            fillColor: const Color(0xFFF7F8FA),
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide.none,
+            ),
             focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
               borderSide: BorderSide(color: dynamicPrimaryColor, width: 2.0),
             ),
           ),
@@ -676,22 +1152,22 @@ class _CrearAvisoScreenState extends State<CrearAvisoScreen> with WidgetsBinding
           items: items.map<DropdownMenuItem<String>>((String itemValue) {
             return DropdownMenuItem<String>(
               value: itemValue,
-              child: Text(itemValue),
+              child: Text(itemValue, style: const TextStyle(fontSize: 14)),
             );
           }).toList(),
-          onChanged: items.isEmpty || value == null ? null : onChanged,  
+          onChanged: items.isEmpty || value == null ? null : onChanged,
           validator: (val) {
-              if (items.isNotEmpty && val == null) {
-                return 'Debe seleccionar una opción.';
-              }
-              return null;
-          }
+            if (items.isNotEmpty && val == null) {
+              return 'Debe seleccionar una opción.';
+            }
+            return null;
+          },
         ),
       ],
     );
   }
 
-  // Widget para entrada de fecha (Mantenido)
+  // Widget para entrada de fecha
   Widget _buildDateInput({
     required String label,
     required DateTime date,
@@ -701,21 +1177,32 @@ class _CrearAvisoScreenState extends State<CrearAvisoScreen> with WidgetsBinding
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+        Text(label,
+            style: TextStyle(
+                fontWeight: FontWeight.w700,
+                fontSize: 13.5,
+                color: Colors.grey.shade600)),
         const SizedBox(height: 8),
         InkWell(
+          borderRadius: BorderRadius.circular(12),
           onTap: onTap,
-          child: InputDecorator(
-            decoration: InputDecoration(
-              border: const OutlineInputBorder(),
-              focusedBorder: OutlineInputBorder(
-                borderSide: BorderSide(color: dynamicPrimaryColor, width: 2.0),
-              ),
-              suffixIcon: Icon(Icons.calendar_today, color: dynamicPrimaryColor),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF7F8FA),
+              borderRadius: BorderRadius.circular(12),
             ),
-            child: Text(
-              '${date.day}/${date.month}/${date.year}',
-              style: const TextStyle(fontSize: 16),
+            child: Row(
+              children: [
+                Icon(Icons.calendar_today_rounded,
+                    color: dynamicPrimaryColor, size: 16),
+                const SizedBox(width: 8),
+                Text(
+                  '${date.day}/${date.month}/${date.year}',
+                  style: const TextStyle(
+                      fontSize: 14, fontWeight: FontWeight.w600),
+                ),
+              ],
             ),
           ),
         ),
@@ -723,7 +1210,7 @@ class _CrearAvisoScreenState extends State<CrearAvisoScreen> with WidgetsBinding
     );
   }
 
-  // Widget para opciones múltiples (Mantenido)
+  // Widget para opciones múltiples
   Widget _buildOpcionTextField({
     required TextEditingController controller,
     required String label,
@@ -734,10 +1221,16 @@ class _CrearAvisoScreenState extends State<CrearAvisoScreen> with WidgetsBinding
       child: TextFormField(
         controller: controller,
         decoration: InputDecoration(
-          labelText: label,  
+          labelText: label,
           hintText: 'Ej. "Opción A"',
-          border: const OutlineInputBorder(),
+          filled: true,
+          fillColor: const Color(0xFFF7F8FA),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide.none,
+          ),
           focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
             borderSide: BorderSide(color: dynamicPrimaryColor, width: 2.0),
           ),
           labelStyle: TextStyle(color: dynamicPrimaryColor),

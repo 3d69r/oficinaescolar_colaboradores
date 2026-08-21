@@ -276,6 +276,8 @@ class AvisoSalaModel {
   final String autRvoe;
   final String idSalonOtroSistema;
   final bool activo;
+  final String idMaestroTitular;
+  final String idMaestroSuplente;
 
   AvisoSalaModel({
     required this.idSalon,
@@ -287,6 +289,8 @@ class AvisoSalaModel {
     required this.autRvoe,
     required this.idSalonOtroSistema,
     required this.activo,
+    required this.idMaestroTitular,
+    required this.idMaestroSuplente,
   });
 
   factory AvisoSalaModel.fromJson(Map<String, dynamic> json) {
@@ -302,6 +306,8 @@ class AvisoSalaModel {
       autRvoe: json['aut_rvoe'] as String? ?? '',
       idSalonOtroSistema: json['id_salon_otro_sistema'] as String? ?? '',
       activo: activoStr == '1',
+      idMaestroTitular: json['id_maestro_titular']?.toString() ?? '0',
+      idMaestroSuplente: json['id_maestro_suplente']?.toString() ?? '0',
     );
   }
 }

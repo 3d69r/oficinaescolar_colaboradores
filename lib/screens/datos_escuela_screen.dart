@@ -5,51 +5,124 @@ import 'package:oficinaescolar_colaboradores/models/escuela_model.dart';
 import 'package:oficinaescolar_colaboradores/config/api_constants.dart';
 import 'package:provider/provider.dart';
 
+
 class DatosEscuelaScreen extends StatelessWidget {
   final EscuelaModel escuela;
 
   const DatosEscuelaScreen({super.key, required this.escuela});
 
-  // Función privada para crear una Card de director si el nombre no está vacío
-  Widget _buildDirectorCard(BuildContext context, String title, String directorName) {
-    if (directorName.isEmpty) {
-      return const SizedBox.shrink();
-    }
+  // ---------- Helpers de UI ----------
 
-    final userProvider = Provider.of<UserProvider>(context, listen: false);
-    final colores = userProvider.colores;
-
-    return Column(
-      children: [
-        Card(
-          elevation: 3,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          child: ListTile(
-            leading: Icon(Icons.person, color: colores.headerColor),
-            title: Text(title),
-            subtitle: Text(directorName),
+  Widget _sectionTitle(String text, Color color) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12, top: 8),
+      child: Row(
+        children: [
+          Container(
+            width: 4,
+            height: 18,
+            decoration: BoxDecoration(
+              color: color,
+              borderRadius: BorderRadius.circular(4),
+            ),
           ),
-        ),
-        const SizedBox(height: 10),
-      ],
+          const SizedBox(width: 8),
+          Text(
+            text,
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w700,
+              color: Colors.grey[800],
+              letterSpacing: 0.2,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
-  // Nuevo método para construir una tarjeta de domicilio
-  Widget _buildDomicilioCard(BuildContext context, Domicilio domicilio, Color headerColor) {
-    // Solo muestra la tarjeta si el campo 'adicional' no está vacío
-    if (domicilio.adicional.isEmpty) {
-      return const SizedBox.shrink();
-    }
-
-    return Card(
-      elevation: 3,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: ListTile(
-        leading: Icon(Icons.location_on, color: headerColor),
-        title: Text(domicilio.nombreCat),
-        subtitle: Text(domicilio.adicional),
+  // Tarjeta genérica moderna: ícono en "badge" + título + subtítulo
+  Widget _infoTile({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required Color accent,
+  }) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
       ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(
+              color: accent.withOpacity(0.12),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(icon, color: accent, size: 22),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.grey[500],
+                    letterSpacing: 0.2,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  subtitle,
+                  style: const TextStyle(
+                    fontSize: 14.5,
+                    fontWeight: FontWeight.w500,
+                    color: Colors.black87,
+                    height: 1.3,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDirectorCard(String title, String directorName, Color accent) {
+    if (directorName.isEmpty) return const SizedBox.shrink();
+    return _infoTile(
+      icon: Icons.school_rounded,
+      title: title,
+      subtitle: directorName,
+      accent: accent,
+    );
+  }
+
+  Widget _buildDomicilioCard(Domicilio domicilio, Color accent) {
+    if (domicilio.adicional.isEmpty) return const SizedBox.shrink();
+    return _infoTile(
+      icon: Icons.location_on_rounded,
+      title: domicilio.nombreCat,
+      subtitle: domicilio.adicional,
+      accent: accent,
     );
   }
 
@@ -61,121 +134,170 @@ class DatosEscuelaScreen extends StatelessWidget {
     final String schoolLogoUrl = escuela.rutaLogo.isNotEmpty
         ? '${ApiConstants.assetsBaseUrl}${escuela.rutaLogo}'
         : '';
-        
-    // ✅ Agregamos una validación para determinar si la imagen es PNG.
     final bool isPng = schoolLogoUrl.toLowerCase().endsWith('.png');
 
-    return SafeArea(
-      child: Scaffold(
-        appBar: AppBar(
-          title: const Text(
-            'Datos de la Escuela',
-            style: TextStyle(color: Colors.white),
-          ),
-          backgroundColor: colores.headerColor,
-          iconTheme: const IconThemeData(color: Colors.white),
-          centerTitle: true,
-        ),
-        body: SingleChildScrollView(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            children: [
-              Container(
-                width: 100,
-                height: 100,
-                // ✅ Cambiamos el color de fondo del cuadrado basándonos en la validación.
+    final direccionCompleta =
+        '${escuela.calle} ${escuela.numeroExterior} '
+        '${escuela.numeroInterior.isNotEmpty ? 'Int. ${escuela.numeroInterior}' : ''}, '
+        '${escuela.colonia}, C.P. ${escuela.codigoPostal}, '
+        '${escuela.municipio}, ${escuela.estado}';
+
+    final directores = <List<String>>[
+      ['Director General', escuela.empDirector],
+      ['Director de Preescolar', escuela.empDirectorPreesco],
+      ['Director de Primaria', escuela.empDirectorPrim],
+      ['Director de Secundaria', escuela.empDirectorSec],
+      ['Director de Preparatoria', escuela.empDirectorPrepa],
+    ].where((d) => d[1].isNotEmpty).toList();
+
+    return Scaffold(
+      backgroundColor: const Color(0xFFF5F6FA),
+      body: CustomScrollView(
+        slivers: [
+          // ---------- Header moderno con degradado ----------
+          SliverAppBar(
+            expandedHeight: 240,
+            pinned: true,
+            backgroundColor: colores.headerColor,
+            iconTheme: const IconThemeData(color: Colors.white),
+            flexibleSpace: FlexibleSpaceBar(
+              background: Container(
                 decoration: BoxDecoration(
-                  color: isPng ? colores.headerColor : Colors.grey[200],
-                  borderRadius: BorderRadius.circular(8.0),
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      colores.headerColor,
+                      colores.headerColor.withOpacity(0.75),
+                    ],
+                  ),
                 ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(0.0),
-                  child: schoolLogoUrl.isNotEmpty
-                      ? CachedNetworkImage(
-                          imageUrl: schoolLogoUrl,
-                          fit: BoxFit.contain,
-                          // ❌ Eliminamos la propiedad de color para mostrar la imagen tal cual es.
-                          // color: isPng ? Colors.white : null,
-                          errorWidget: (context, url, error) {
-                            debugPrint('Error al cargar imagen del logo: $error');
-                            return Icon(Icons.wifi_off, size: 50, color: colores.headerColor);
-                          },
-                        )
-                      : Icon(Icons.wifi_off, size: 50, color: colores.headerColor),
-                ),
-              ),
-              const SizedBox(height: 20),
-              Text(
-                escuela.nombreComercial,
-                style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 30),
-              
-              // Sección de Directores
-              _buildDirectorCard(context, 'Director General', escuela.empDirector),
-              _buildDirectorCard(context, 'Director de Preescolar', escuela.empDirectorPreesco),
-              _buildDirectorCard(context, 'Director de Primaria', escuela.empDirectorPrim),
-              _buildDirectorCard(context, 'Director de Secundaria', escuela.empDirectorSec),
-              _buildDirectorCard(context, 'Director de Preparatoria', escuela.empDirectorPrepa),
-              
-              // Resto de las tarjetas de información general
-              Card(
-                elevation: 3,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                child: ListTile(
-                  leading: Icon(Icons.business, color: colores.headerColor),
-                  title: const Text('Institucion Educativa'),
-                  subtitle: Text(escuela.nombreComercial),
-                ),
-              ),
-              const SizedBox(height: 10),
-              Card(
-                elevation: 3,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                child: ListTile(
-                  leading: Icon(Icons.calendar_today, color: colores.headerColor),
-                  title: const Text('Ciclo Escolar'),
-                  subtitle: Text(escuela.cicloEscolar.periodo),
-                ),
-              ),
-              const SizedBox(height: 10),
-              // Tarjeta de la dirección principal
-              Card(
-                elevation: 3,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                child: ListTile(
-                  leading: Icon(Icons.location_on, color: colores.headerColor),
-                  title: const Text('Dirección'),
-                  subtitle: Text(
-                    '${escuela.calle} ${escuela.numeroExterior} '
-                    '${escuela.numeroInterior.isNotEmpty ? 'Int. ${escuela.numeroInterior}' : ''}, '
-                    '${escuela.colonia}, C.P. ${escuela.codigoPostal}, '
-                    '${escuela.municipio}, ${escuela.estado}',
+                child: SafeArea(
+                  child: Padding(
+                    padding: const EdgeInsets.only(top: 30, bottom: 20),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Container(
+                          width: 92,
+                          height: 92,
+                          padding: const EdgeInsets.all(4),
+                          decoration: BoxDecoration(
+                            color: isPng ? colores.headerColor : Colors.white,
+                            borderRadius: BorderRadius.circular(20),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.15),
+                                blurRadius: 12,
+                                offset: const Offset(0, 4),
+                              ),
+                            ],
+                          ),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(16),
+                            child: schoolLogoUrl.isNotEmpty
+                                ? CachedNetworkImage(
+                                    imageUrl: schoolLogoUrl,
+                                    fit: BoxFit.contain,
+                                    errorWidget: (context, url, error) {
+                                      debugPrint(
+                                          'Error al cargar imagen del logo: $error');
+                                      return const Icon(Icons.wifi_off,
+                                          size: 40, color: Colors.white);
+                                    },
+                                  )
+                                : const Icon(Icons.wifi_off,
+                                    size: 40, color: Colors.white),
+                          ),
+                        ),
+                        const SizedBox(height: 14),
+                        Padding(
+                          padding:
+                              const EdgeInsets.symmetric(horizontal: 32),
+                          child: Text(
+                            escuela.nombreComercial,
+                            textAlign: TextAlign.center,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.18),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Text(
+                            escuela.cicloEscolar.periodo,
+                            style: const TextStyle(
+                              fontSize: 12.5,
+                              color: Colors.white,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
-              
-              // Sección de Domicilios adicionales
-              if (escuela.dirDomicilios != null && escuela.dirDomicilios!.isNotEmpty) ...[
-                const SizedBox(height: 20),
-                const Text(
-                  'Domicilio(s)',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 10),
-                ...escuela.dirDomicilios!.map((domicilio) {
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 10.0),
-                    child: _buildDomicilioCard(context, domicilio, colores.headerColor),
-                  );
-                }).toList(),
-              ],
-            ],
+            ),
           ),
-        ),
+
+          // ---------- Contenido ----------
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 20, 16, 24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Institución + Dirección principal
+                  _sectionTitle('Información general', colores.headerColor),
+                  _infoTile(
+                    icon: Icons.business_rounded,
+                    title: 'Institución Educativa',
+                    subtitle: escuela.nombreComercial,
+                    accent: colores.headerColor,
+                  ),
+                  _infoTile(
+                    icon: Icons.location_on_rounded,
+                    title: 'Dirección',
+                    subtitle: direccionCompleta,
+                    accent: colores.headerColor,
+                  ),
+
+                  // Directores
+                  if (directores.isNotEmpty) ...[
+                    _sectionTitle('Directivos', colores.headerColor),
+                    ...directores.map(
+                      (d) => _buildDirectorCard(d[0], d[1], colores.headerColor),
+                    ),
+                  ],
+
+                  // Domicilios adicionales
+                  if (escuela.dirDomicilios != null &&
+                      escuela.dirDomicilios!.isNotEmpty) ...[
+                    _sectionTitle('Domicilio(s) adicionales',
+                        colores.headerColor),
+                    ...escuela.dirDomicilios!.map(
+                      (domicilio) =>
+                          _buildDomicilioCard(domicilio, colores.headerColor),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
 }
+//MENSAJE BANDERA ESTE CODIGO ES FUNCIONAL

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:oficinaescolar_colaboradores/firebase_options.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -8,22 +9,49 @@ import 'package:oficinaescolar_colaboradores/screens/code_escuela_screen.dart';
 import 'package:oficinaescolar_colaboradores/screens/home_screen.dart';
 import 'package:oficinaescolar_colaboradores/screens/login_screen.dart';
 import 'package:oficinaescolar_colaboradores/services/api_client.dart';
+import 'package:oficinaescolar_colaboradores/services/aviso_navigation_signal.dart';
 import 'package:provider/provider.dart';
 import 'providers/user_provider.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:oficinaescolar_colaboradores/utils/log_util.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 const double _phoneBreakpoint = 600.0;
 
-// ✅ TODO: Descomentar y habilitar cuando Firebase se configure para la app de colaboradores.
- @pragma('vm:entry-point')
- Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-   // La inicialización de Firebase es necesaria para handlers en segundo plano
-   await Firebase.initializeApp(
-     options: DefaultFirebaseOptions.currentPlatform,
-   );
-   appLog('📥 [BACKGROUND] Mensaje FCM recibido: ${message.messageId}');
- }
+final StreamController<Map<String, dynamic>> _dataPushController =
+    StreamController<Map<String, dynamic>>.broadcast();
+
+/// Tipos de push que la app sabe manejar. Agregar aquí un tipo nuevo
+/// es todo lo que se necesita en este archivo.
+const Set<String> _knownPushTypes = {'aviso_nuevo'};
+
+String? _sectionForTipo(String tipo) {
+  switch (tipo) {
+    case 'aviso_nuevo':
+      return 'avisos';
+    default:
+      return null;
+  }
+}
+
+@pragma('vm:entry-point')
+Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  // La inicialización de Firebase es necesaria para handlers en segundo plano
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
+  appLog('📥 [BACKGROUND] Mensaje FCM recibido: ${message.messageId}');
+  appLog('📥 [BACKGROUND] data completo: ${message.data}');
+
+  // El isolate de background no tiene acceso al Provider ni al stream de la
+  // app en primer plano, así que solo dejamos una bandera en disco.
+  // main() la lee al arrancar (cuando el usuario toca la notificación).
+  final String tipo = message.data['tipo']?.toString() ?? '';
+  if (_knownPushTypes.contains(tipo)) {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('pending_push_tipo', tipo);
+  }
+}
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -31,30 +59,47 @@ void main() async {
   try {
       await initializeDateFormatting('es', null);
   } catch (e) {
-      // Manejo de error si la inicialización falla por alguna razón (poco probable)
       appLog('Error al inicializar formato de fecha: $e');
-      await initializeDateFormatting(); // Intenta la inicialización por defecto
+      await initializeDateFormatting();
   }
 
-  // ✅ Inicialización de Firebase.
-   await Firebase.initializeApp(
-     options: DefaultFirebaseOptions.currentPlatform,
-   );
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
 
-  // ✅ Habilitación de handlers de FCM.
-   FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+  FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
    
-   // 🚀 CAMBIO 1: Capturamos el token devuelto.
-   final String? fcmTokenFromFirebase = await _initPushNotifications(); 
+  final String? fcmTokenFromFirebase = await _initPushNotifications(); 
 
   final UserProvider tempUserProvider = UserProvider();
+  // Conecta el stream de pushes (foreground / abierto desde background)
+  // directamente al manejador del provider.
+  _dataPushController.stream.listen(tempUserProvider.handleDataPush);
   await tempUserProvider.loadUserDataFromDb();
   
-  // 🚀 CAMBIO 2: Asignamos el token FCM al Provider en memoria antes de runApp().
   if (fcmTokenFromFirebase != null) {
-      // NOTA: Debes implementar este método en UserProvider: setFcmTokenForWeb(String token)
       tempUserProvider.setFcmTokenForWeb(fcmTokenFromFirebase); 
       appLog('main.dart: FCM Token asignado al UserProvider en memoria.');
+  }
+
+  // 🚀 ¿La app se abrió (cold start) tocando una notificación?
+  final RemoteMessage? initialMessage =
+      await FirebaseMessaging.instance.getInitialMessage();
+  final String initialTipo = initialMessage?.data['tipo']?.toString() ?? '';
+  if (initialMessage != null && _knownPushTypes.contains(initialTipo)) {
+    appLog('main.dart: App abierta desde notificación (terminada). tipo=$initialTipo');
+    _dataPushController.add(initialMessage.data);
+    pendingOpenSection.value = _sectionForTipo(initialTipo);
+  }
+
+  // 🚀 ¿Llegó un push mientras la app estaba en background (no terminada)?
+  final prefs = await SharedPreferences.getInstance();
+  final String? pendingTipo = prefs.getString('pending_push_tipo');
+  if (pendingTipo != null && _knownPushTypes.contains(pendingTipo)) {
+    await prefs.remove('pending_push_tipo');
+    appLog('main.dart: Bandera de refresco pendiente detectada. tipo=$pendingTipo');
+    pendingOpenSection.value = _sectionForTipo(pendingTipo);
+    tempUserProvider.handleDataPush({'tipo': pendingTipo});
   }
 
   String initialRoute;
@@ -73,7 +118,7 @@ void main() async {
           value: tempUserProvider,
         ),
         ProxyProvider<UserProvider, ApiClient>(
-          update: (_, userProvider, __) => ApiClient(userProvider), // Corregido: '__' para el tercer argumento
+          update: (_, userProvider, __) => ApiClient(userProvider),
         ),
       ],
       child: MyApp(
@@ -83,8 +128,7 @@ void main() async {
   );
 }
 
-// ✅ CAMBIO 3: La función ahora devuelve el token.
- Future<String?> _initPushNotifications() async {
+Future<String?> _initPushNotifications() async {
    FirebaseMessaging messaging = FirebaseMessaging.instance;
    NotificationSettings settings = await messaging.requestPermission(
      alert: true,
@@ -97,21 +141,36 @@ void main() async {
    );
    appLog('🔔 Permisos de notificaciones: ${settings.authorizationStatus}');
    
-   String? token = await messaging.getToken(); // Token obtenido
+   String? token = await messaging.getToken();
    appLog('📲 Token FCM: $token');
    
+   // Foreground: la app está abierta y visible.
    FirebaseMessaging.onMessage.listen((RemoteMessage message) {
      appLog('📥 [FOREGROUND] Mensaje FCM: ${message.notification?.title} - ${message.notification?.body}');
+     appLog('📥 [FOREGROUND] data completo: ${message.data}');
+     final String tipo = message.data['tipo']?.toString() ?? '';
+     if (_knownPushTypes.contains(tipo)) {
+       _dataPushController.add(message.data);
+     }
    });
+
+   // Background (no terminada) y el usuario toca la notificación.
    FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
      appLog('🟢 [OPENED APP] App abierta desde notificación FCM: ${message.messageId}');
+     appLog('🟢 [OPENED APP] data completo: ${message.data}');
+     final String tipo = message.data['tipo']?.toString() ?? '';
+     if (_knownPushTypes.contains(tipo)) {
+       _dataPushController.add(message.data);
+       pendingOpenSection.value = _sectionForTipo(tipo);
+     }
    });
+
    RemoteMessage? initialMessage = await messaging.getInitialMessage();
    if (initialMessage != null) {
      appLog('🚀 [INITIAL MESSAGE] App iniciada desde notificación FCM terminada: ${initialMessage.messageId}');
    }
    
-   return token; // 👈 Devolvemos el token
+   return token;
  }
 
 class MyApp extends StatelessWidget {
@@ -128,24 +187,16 @@ class MyApp extends StatelessWidget {
         debugShowCheckedModeBanner: false,
         title: 'OFICINA COLABORADORES',
         initialRoute: initialRoute,
-        // ⭐️ INICIO DE LA CONFIGURACIÓN DE LOCALIZACIÓN (ESPAÑOL) ⭐️
         localizationsDelegates: const [
-          // Delegado de Material para textos de UI (botones, meses, días)
           GlobalMaterialLocalizations.delegate,
-          // Delegado para widgets
           GlobalWidgetsLocalizations.delegate,
-          // Delegado para widgets de iOS/Cupertino
           GlobalCupertinoLocalizations.delegate,
         ],
-        // Definimos los idiomas que la app debe cargar
         supportedLocales: const [
-          Locale('en', 'US'), // Inglés (generalmente se incluye por defecto)
-          Locale('es', 'ES'), // Español de España/general
+          Locale('en', 'US'),
+          Locale('es', 'ES'),
         ],
-        // Definimos la localización por defecto si el sistema del usuario no es 'es'.
-        // Ya tienes initializeDateFormatting('es', null) en main(), pero esto es más robusto.
         locale: const Locale('es', 'ES'), 
-        // ⭐️ FIN DE LA CONFIGURACIÓN DE LOCALIZACIÓN ⭐️
         routes: {
           '/': (_) => const CodeEscuelaScreen(),
           'login': (context) => const LoginScreen(),

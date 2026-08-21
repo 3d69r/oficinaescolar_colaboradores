@@ -41,6 +41,7 @@ class UserProvider with ChangeNotifier {
   String? _idMateriaAlumno;
   String? _idAlumno;
   bool sesionInvalida = false;
+  final Map<String, Timer?> _pushDebounceTimers = {};
 
   double _ultimoSaldoConocido = 0.0;
   double get ultimoSaldoConocido => _ultimoSaldoConocido;
@@ -144,6 +145,14 @@ class UserProvider with ChangeNotifier {
     loadUserDataFromDb();
     loadAppColorsFromDb();
     loadAvisosCreados();
+  }
+
+  @override
+  void dispose() {
+    for (final t in _pushDebounceTimers.values) {
+      t?.cancel();
+    }
+    super.dispose();
   }
 
   /// ⭐️ [FINAL] Carga la lista de avisos creados usando lógica dual (DB > SharedPreferences o Solo SP en Web).
@@ -1197,6 +1206,35 @@ Future<Map<String, dynamic>> deleteAvisoCreado(String idAviso) async {
     appLog('UserProvider: Señal de auto-refresco activada.');
   }
 
+  Future<void> Function()? _refreshActionForTipo(String tipo) {
+  switch (tipo) {
+    case 'aviso_nuevo':
+      return () => fetchAndLoadAvisosData(forceRefresh: true);
+    default:
+      return null;
+  }
+}
+
+void handleDataPush(Map<String, dynamic> data) {
+  final String tipo = data['tipo']?.toString() ?? '';
+
+  final String idEmpresaPush = data['id_empresa']?.toString() ?? '';
+  if (idEmpresaPush.isNotEmpty && idEmpresaPush != _idEmpresa) {
+    appLog('UserProvider: Push ignorado. Pertenece a otra empresa.');
+    return;
+  }
+
+  final action = _refreshActionForTipo(tipo);
+  if (action == null) {
+    appLog('UserProvider: Push con tipo "$tipo" sin acción registrada. Ignorado.');
+    return;
+  }
+
+  appLog('UserProvider: Señal de push "$tipo". Programando refresco único...');
+  _pushDebounceTimers[tipo]?.cancel();
+  _pushDebounceTimers[tipo] = Timer(const Duration(seconds: 2), action);
+}
+
   bool shouldFetchSchoolDataFromApi() {
     if (_lastSchoolDataFetch == null) {
       appLog('UserProvider: No hay marca de tiempo para datos de escuela. Se necesita API.');
@@ -1532,6 +1570,7 @@ Future<Map<String, dynamic>> deleteAvisoCreado(String idAviso) async {
             
             // Si la API tiene éxito, actualizamos colaboradorJsonData
             colaboradorJsonData = rawData; 
+            appLog('DEBUG SALONES: aviso_salones crudo de la API: ${json.encode(rawData['aviso_salones'])}');
             
             // Guardamos el JSON COMPLETO en la caché.
             await DatabaseHelper.instance.saveColaboradorData(idColaborador, rawData);

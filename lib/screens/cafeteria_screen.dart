@@ -6,6 +6,8 @@ import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 
 // Importa tus constantes de API y tu provider
+import 'package:oficinaescolar_colaboradores/models/colores_model.dart';
+import 'package:dropdown_button2/dropdown_button2.dart';
 import 'package:oficinaescolar_colaboradores/providers/user_provider.dart';
 import 'package:oficinaescolar_colaboradores/config/api_constants.dart';
 
@@ -30,6 +32,8 @@ class CafeteriaView extends StatefulWidget {
 
 class _CafeteriaViewState extends State<CafeteriaView>
     with AutomaticKeepAliveClientMixin {
+  final ValueNotifier<String?> _periodoValueNotifier = ValueNotifier(null);
+
   bool _isLoading = false;
   String? _errorMessage;
 
@@ -38,6 +42,10 @@ class _CafeteriaViewState extends State<CafeteriaView>
   Timer? _autoRefreshTimer;
 
   DateTime? _lastManualRefreshTime;
+
+  // [NUEVO] Referencia al UserProvider y a los colores dinámicos
+  late UserProvider userProvider;
+  late Colores colores;
 
   // Formateador de moneda (ajusta según tu región si es necesario)
   final NumberFormat _currencyFormatter = NumberFormat.currency(
@@ -91,6 +99,8 @@ class _CafeteriaViewState extends State<CafeteriaView>
       'CafeteriaView: dispose - Cancelando temporizador de auto-refresco.',
     );
     _autoRefreshTimer?.cancel();
+
+    _periodoValueNotifier.dispose();
 
     super.dispose();
   }
@@ -261,6 +271,22 @@ class _CafeteriaViewState extends State<CafeteriaView>
     }
   }
 
+  Widget _buildCircleAction({required IconData icon, required VoidCallback onTap}) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(24),
+      child: Container(
+        width: 44,
+        height: 44,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.2),
+          shape: BoxShape.circle,
+        ),
+        child: Icon(icon, color: Colors.white, size: 22),
+      ),
+    );
+  }
 
   Widget _buildBankAccountCard(CuentaBancaria cuenta) {
     return Card(
@@ -683,6 +709,13 @@ class _CafeteriaViewState extends State<CafeteriaView>
     final userProvider = Provider.of<UserProvider>(context, listen: false);
     final colores = userProvider.colores;
 
+    // Mantener el ValueNotifier sincronizado con el provider
+    if (_periodoValueNotifier.value != _userProvider.selectedCafeteriaPeriodId) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _periodoValueNotifier.value = _userProvider.selectedCafeteriaPeriodId;
+      });
+    }
+
     return SafeArea(
       child: Scaffold(
         appBar: AppBar(
@@ -751,38 +784,91 @@ class _CafeteriaViewState extends State<CafeteriaView>
                         if (periodos.isNotEmpty)
                           Padding(
                             padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                            child: DropdownButtonFormField<String>(
-                              decoration: const InputDecoration(
-                                labelText: 'Filtrar por Periodo',
-                                border: OutlineInputBorder(),
-                              ),
-                             value: _userProvider.selectedCafeteriaPeriodId,
-                              items: periodos.map((periodo) {
-                                return DropdownMenuItem<String>(
-                                  value: periodo.idPeriodo.toString(),
-                                  child: Text(periodo.periodo.toString()),
-                                );
-                              }).toList(),
-                              onChanged: (value) async {
-                                final selectedPeriodObject = periodos.firstWhere(
-                                  (p) => p.idPeriodo.toString() == value,
-                                  orElse: () => PeriodoCafeteria(
-                                    idPeriodo: 'NULL',
-                                    periodo: 'Ninguno',
-                                    fechaInicio: '',
-                                    fechaTermino: '',
-                                    activo: '',
-                                    tipoPeriodo: '',
-                                    idEmpresa: '',
-                                    idCiclo: 'NULL',
-                                  ),
-                                );
+                            child: DropdownButtonHideUnderline(
+                              child: DropdownButton2<String>(
+                                isExpanded: true,
+                                valueListenable: _periodoValueNotifier,
 
-                                await _userProvider.setSelectedCafeteriaPeriod(
-                                  value,
-                                  selectedPeriodObject.idCiclo,
-                                );
-                              },
+                                items: periodos.map((periodo) {
+                                  return DropdownItem<String>(
+                                    value: periodo.idPeriodo.toString(),
+                                    child: Row(
+                                      children: [
+                                        const Icon(
+                                          Icons.calendar_month_rounded,
+                                          size: 18,
+                                          color: Colors.grey,
+                                        ),
+                                        const SizedBox(width: 10),
+                                        Expanded(
+                                          child: Text(
+                                            periodo.periodo,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: const TextStyle(
+                                              fontSize: 14,
+                                              fontWeight: FontWeight.w500,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                }).toList(),
+
+                                onChanged: (value) async {
+                                  final selectedPeriodObject = periodos.firstWhere(
+                                    (p) => p.idPeriodo.toString() == value,
+                                    orElse: () => PeriodoCafeteria(
+                                      idPeriodo: 'NULL',
+                                      periodo: 'Ninguno',
+                                      fechaInicio: '',
+                                      fechaTermino: '',
+                                      activo: '',
+                                      tipoPeriodo: '',
+                                      idEmpresa: '',
+                                      idCiclo: 'NULL',
+                                    ),
+                                  );
+
+                                  _periodoValueNotifier.value = value;
+                                  await _userProvider.setSelectedCafeteriaPeriod(
+                                    value,
+                                    selectedPeriodObject.idCiclo,
+                                  );
+                                },
+
+                                buttonStyleData: ButtonStyleData(
+                                  height: 58,
+                                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(16),
+                                    border: Border.all(color: Colors.grey.shade300),
+                                    color: Colors.white,
+                                  ),
+                                ),
+
+                                iconStyleData: IconStyleData(
+                                  icon: Icon(
+                                    Icons.keyboard_arrow_down_rounded,
+                                    color: colores.headerColor,
+                                    size: 28,
+                                  ),
+                                ),
+
+                                dropdownStyleData: DropdownStyleData(
+                                  maxHeight: 260,
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    borderRadius: BorderRadius.circular(16),
+                                  ),
+                                  elevation: 4,
+                                  offset: const Offset(0, 6),
+                                ),
+
+                                menuItemStyleData: const MenuItemStyleData(
+                                  padding: EdgeInsets.symmetric(horizontal: 16),
+                                ),
+                              ),
                             ),
                           )
                         else
@@ -796,88 +882,78 @@ class _CafeteriaViewState extends State<CafeteriaView>
                           ),
                         const SizedBox(height: 15),
                         Padding(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 16.0,
-                            vertical: 8.0,
-                          ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    _currencyFormatter.format(totalBalance),
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 20,
-                                      color: Colors.black,
-                                    ),
-                                  ),
-                                  const Text(
-                                    'Saldo Actual',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 16,
-                                      color: Colors.black,
-                                    ),
-                                  ),
-                                ],
+                          padding: const EdgeInsets.fromLTRB(16.0, 12.0, 16.0, 4.0),
+                          child: Container(
+                            padding: const EdgeInsets.all(18.0),
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                                colors: [colores.headerColor, colores.headerColor.withOpacity(0.75)],
                               ),
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.end,
-                                children: [
-                                  ElevatedButton(
-                                    onPressed: _showArticulosModal,
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: colores.botonesColor,
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 10,
-                                        vertical: 12,
-                                      ),
-                                      textStyle: const TextStyle(fontSize: 14),
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(8.0),
-                                      ),
-                                    ),
-                                    child: const Icon(
-                                      Icons.fastfood,
-                                      color: Colors.white,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  ElevatedButton(
-                                    onPressed: _showBankAccountModal,
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: colores.botonesColor,
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 10,
-                                        vertical: 12,
-                                      ),
-                                      textStyle: const TextStyle(fontSize: 14),
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(8.0),
+                              borderRadius: BorderRadius.circular(16),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: colores.headerColor.withOpacity(0.3),
+                                  blurRadius: 10,
+                                  offset: const Offset(0, 4),
+                                ),
+                              ],
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text(
+                                      'SALDO ACTUAL',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.w600,
+                                        fontSize: 12,
+                                        letterSpacing: 0.6,
+                                        color: Colors.white70,
                                       ),
                                     ),
-                                    child: const Icon(
-                                      Icons.account_balance,
-                                      color: Colors.white,
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      _currencyFormatter.format(totalBalance),
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 26,
+                                        color: Colors.white,
+                                      ),
                                     ),
-                                  ),
-                                ],
-                              ),
-                            ],
+                                  ],
+                                ),
+                                Row(
+                                  children: [
+                                    _buildCircleAction(
+                                      icon: Icons.fastfood,
+                                      onTap: _showArticulosModal,
+                                    ),
+                                    const SizedBox(width: 10),
+                                    _buildCircleAction(
+                                      icon: Icons.account_balance,
+                                      onTap: _showBankAccountModal,
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
                           ),
                         ),
-                        const Divider(
-                            height: 24, thickness: 1, color: Colors.grey),
+                        const SizedBox(height: 16),
                         if (movimientos.isEmpty && !_isLoading)
-                          const Expanded(
-                            child: Center(
-                              child: Padding(
-                                padding: EdgeInsets.all(20.0),
-                                child: Text(
-                                  'No se encontraron movimientos para el alumno seleccionado y filtros actuales.',
+                          Expanded(
+                            child: SingleChildScrollView(
+                              physics: const AlwaysScrollableScrollPhysics(),
+                              child: const Center(
+                                child: Padding(
+                                  padding: EdgeInsets.all(20.0),
+                                  child: Text(
+                                    'No se encontraron movimientos para el alumno seleccionado y filtros actuales.',
+                                  ),
                                 ),
                               ),
                             ),
@@ -925,72 +1001,59 @@ class _CafeteriaViewState extends State<CafeteriaView>
                                   amountFontWeight = FontWeight.normal;
                                 }
 
-                                return Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                    vertical: 8.0,
+                                return Card(
+                                  elevation: 1,
+                                  margin: const EdgeInsets.only(bottom: 10),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                    side: BorderSide(color: Colors.grey.shade200),
                                   ),
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Row(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          Expanded(
-                                            child: Text(
-                                              mov['descripcion'].toString(),
-                                              style: const TextStyle(
-                                                fontSize: 16,
-                                                fontWeight: FontWeight.bold,
-                                                color: Colors.black87,
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(14.0),
+                                    child: Row(
+                                      crossAxisAlignment: CrossAxisAlignment.center,
+                                      children: [
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                mov['descripcion'].toString(),
+                                                style: const TextStyle(
+                                                  fontSize: 14,
+                                                  fontWeight: FontWeight.bold,
+                                                  color: Colors.black87,
+                                                ),
+                                                overflow: TextOverflow.ellipsis,
                                               ),
-                                              overflow: TextOverflow.ellipsis,
-                                            ),
+                                              const SizedBox(height: 2),
+                                              Text(
+                                                mov['fecha'].toString(),
+                                                style: const TextStyle(fontSize: 12, color: Colors.grey),
+                                              ),
+                                            ],
                                           ),
-                                          Text(
-                                            _currencyFormatter.format(
-                                              displayAmount,
-                                            ),
-                                            style: TextStyle(
-                                              fontSize: 18,
-                                              fontWeight: amountFontWeight,
-                                              color: amountColor,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                      const SizedBox(height: 4),
-                                      Padding(
-                                        padding: const EdgeInsets.only(
-                                          left: 0.0,
                                         ),
-                                        child: Row(
-                                          mainAxisAlignment:
-                                              MainAxisAlignment.spaceBetween,
+                                        Column(
+                                          crossAxisAlignment: CrossAxisAlignment.end,
                                           children: [
                                             Text(
-                                              mov['fecha'].toString(),
-                                              style: const TextStyle(
-                                                fontSize: 14,
-                                                color: Colors.black,
+                                              _currencyFormatter.format(displayAmount),
+                                              style: TextStyle(
+                                                fontSize: 16,
+                                                fontWeight: amountFontWeight,
+                                                color: amountColor,
                                               ),
                                             ),
+                                            const SizedBox(height: 2),
                                             Text(
                                               'Saldo: ${_currencyFormatter.format(saldoActual)}',
-                                              style: TextStyle(
-                                                fontSize: 14,
-                                                color: Colors.grey[600],
-                                              ),
+                                              style: TextStyle(fontSize: 11, color: Colors.grey[600]),
                                             ),
                                           ],
                                         ),
-                                      ),
-                                      const Divider(
-                                        height: 16,
-                                        thickness: 1,
-                                        color: Colors.grey,
-                                      ),
-                                    ],
+                                      ],
+                                    ),
                                   ),
                                 );
                               },

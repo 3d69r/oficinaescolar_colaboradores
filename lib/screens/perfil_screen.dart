@@ -24,6 +24,8 @@ class _PerfilScreenState extends State<PerfilScreen>
   late Animation<double> _animacionGiro; // Renombrado
   bool _esFrente = true; // Renombrado
 
+  DateTime? _lastManualRefreshTime;
+
   @override
   void initState() {
     super.initState();
@@ -52,6 +54,64 @@ class _PerfilScreenState extends State<PerfilScreen>
     setState(() {
       _esFrente = !_esFrente;
     });
+  }
+
+    void _showSnackBar(
+    String message, {
+    Color backgroundColor = Colors.red,
+    Duration duration = const Duration(seconds: 4),
+  }) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: backgroundColor,
+        behavior: SnackBarBehavior.floating,
+        duration: duration,
+      ),
+    );
+  }
+
+  Future<void> _handleRefresh() async {
+    final now = DateTime.now();
+    if (_lastManualRefreshTime != null &&
+        now.difference(_lastManualRefreshTime!).inSeconds < 60) {
+      debugPrint('PerfilScreen: Intento de recarga manual demasiado pronto.');
+      _showSnackBar('Datos actualizados.', backgroundColor: Colors.green);
+      return;
+    }
+
+    debugPrint('PerfilScreen: RefreshIndicator activado. Iniciando recarga forzada.');
+
+    _showSnackBar(
+      'Recargando perfil...',
+      duration: const Duration(seconds: 1),
+      backgroundColor: Colors.grey,
+    );
+
+    _lastManualRefreshTime = now;
+
+    final userProvider = Provider.of<UserProvider>(context, listen: false);
+
+    try {
+      await userProvider.fetchAndLoadColaboradorData(forceRefresh: true);
+      await userProvider.fetchAndLoadSchoolData(forceRefresh: true);
+
+      if (!mounted) return;
+
+      _showSnackBar(
+        'Datos actualizados.',
+        backgroundColor: Colors.green,
+        duration: const Duration(seconds: 2),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      debugPrint('PerfilScreen: Excepción al recargar perfil: $e');
+      _showSnackBar(
+        'Error al actualizar el perfil: ${e.toString().replaceFirst('Exception: ', '')}',
+      );
+    }
   }
 
   // --- FUNCIÓN PARA ABRIR EL ENLACE DEL QR ---
@@ -121,6 +181,59 @@ class _PerfilScreenState extends State<PerfilScreen>
     }).toList();
   }
 
+    Widget _buildFlipToggle(Color accent) {
+    Widget option(String label, bool selected, VoidCallback onTap) {
+      return Expanded(
+        child: GestureDetector(
+          onTap: onTap,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 250),
+            padding: const EdgeInsets.symmetric(vertical: 10),
+            decoration: BoxDecoration(
+              color: selected ? accent : Colors.transparent,
+              borderRadius: BorderRadius.circular(30),
+            ),
+            child: Text(
+              label,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 13.5,
+                fontWeight: FontWeight.w700,
+                color: selected ? Colors.white : Colors.grey[600],
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Container(
+      width: 220,
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(30),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.06),
+            blurRadius: 8,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          option('Frente', _esFrente, () {
+            if (!_esFrente) _girarCredencial();
+          }),
+          option('Reverso', !_esFrente, () {
+            if (_esFrente) _girarCredencial();
+          }),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return SafeArea(
@@ -132,103 +245,108 @@ class _PerfilScreenState extends State<PerfilScreen>
 
           if (colaborador == null || escuela == null) {
             return Scaffold(
+              backgroundColor: const Color(0xFFF5F6FA),
               appBar: AppBar(
                 title: const Text('Mi Perfil', style: TextStyle(color: Colors.white)),
                 backgroundColor: colores.headerColor,
                 centerTitle: true,
                 iconTheme: const IconThemeData(color: Colors.white),
               ),
-              body: const Center(child: CircularProgressIndicator()),
+              body: Center(
+                child: CircularProgressIndicator(color: colores.headerColor),
+              ),
             );
           }
-          
-          final bool esGandhi = escuela.nombreComercial.toLowerCase().contains('gandhi'); // Condición
+
+          final bool esGandhi = escuela.nombreComercial.toLowerCase().contains('gandhi');
 
           return Scaffold(
+            backgroundColor: const Color(0xFFF5F6FA),
             appBar: AppBar(
               title: const Text('Mi Perfil', style: TextStyle(color: Colors.white)),
               backgroundColor: colores.headerColor,
               centerTitle: true,
               iconTheme: const IconThemeData(color: Colors.white),
+              elevation: 0,
             ),
-            body: SingleChildScrollView(
-              padding: const EdgeInsets.all(20.0),
-              child: Center( 
-                child: Column(
-                  children: [
-                    // --- SWITCH PARA GIRAR LA CREDENCIAL ---
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(_esFrente ? 'Frente' : 'Reverso'),
-                        Switch(
-                          value: !_esFrente, 
-                          onChanged: (value) {
-                            _girarCredencial();
-                          },
-                          activeTrackColor: colores.headerColor,
-                        ),
-                        Text(_esFrente ? 'Reverso' : 'Frente'),
-                      ],
-                    ),
-                    const SizedBox(height: 20),
-                    // Contenedor de la Credencial
-                    ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 300, maxHeight: 500), 
-                      child: GestureDetector(
-                        onTap: _girarCredencial, 
-                        child: AnimatedBuilder(
-                          animation: _animacionGiro, 
-                          builder: (context, child) {
-                            final isUnderHalf = _animacionGiro.value < 0.5;
-                            final rotationY = _animacionGiro.value * (isUnderHalf ? 3.14159 : -3.14159);
-                            
-                            Widget currentWidget = isUnderHalf
-                                ? _obtenerCredencialFrontal(colaborador, escuela, colores, esGandhi) // Cambio aquí
-                                : Transform(
-                                    alignment: Alignment.center,
-                                    transform: Matrix4.identity()..rotateY(3.14159),
-                                    child: _obtenerCredencialReversa(colaborador, escuela, colores, esGandhi), // Cambio aquí
-                                  );
-
-                            return Transform(
-                              alignment: Alignment.center,
-                              transform: Matrix4.identity()..rotateY(rotationY),
-                              child: currentWidget,
-                            );
-                          },
-                        ),
+            body: RefreshIndicator(
+              onRefresh: _handleRefresh,
+              color: colores.headerColor,
+              child: SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.fromLTRB(20, 24, 20, 30),
+                child: Center(
+                  child: Column(
+                    children: [
+                      // --- Toggle moderno Frente/Reverso ---
+                      _buildFlipToggle(colores.headerColor),
+                      const SizedBox(height: 6),
+                      Text(
+                        'Toca la credencial para voltearla',
+                        style: TextStyle(fontSize: 12, color: Colors.grey[500]),
                       ),
-                    ),
-                    const SizedBox(height: 50),
-                    
-                    // --- BOTÓN VALIDAR CREDENCIAL ---
-                    if (colaborador.idCredencial.isNotEmpty)
-                      SizedBox(
-                        width: 250, 
-                        child: ElevatedButton(
-                          onPressed: () => _abrirUrl(colaborador.idCredencial, context),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: colores.botonesColor,
-                            padding: const EdgeInsets.symmetric(vertical: 15),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                          ),
-                          child: const Text(
-                            'Validar Credencial',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
-                            ),
+                      const SizedBox(height: 24),
+
+                      // --- Credencial ---
+                      ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 300, maxHeight: 500),
+                        child: GestureDetector(
+                          onTap: _girarCredencial,
+                          child: AnimatedBuilder(
+                            animation: _animacionGiro,
+                            builder: (context, child) {
+                              final isUnderHalf = _animacionGiro.value < 0.5;
+                              final rotationY = _animacionGiro.value * (isUnderHalf ? 3.14159 : -3.14159);
+
+                              Widget currentWidget = isUnderHalf
+                                  ? _obtenerCredencialFrontal(colaborador, escuela, colores, esGandhi)
+                                  : Transform(
+                                      alignment: Alignment.center,
+                                      transform: Matrix4.identity()..rotateY(3.14159),
+                                      child: _obtenerCredencialReversa(colaborador, escuela, colores, esGandhi),
+                                    );
+
+                              return Transform(
+                                alignment: Alignment.center,
+                                transform: Matrix4.identity()..rotateY(rotationY),
+                                child: currentWidget,
+                              );
+                            },
                           ),
                         ),
                       ),
-                    // --- FIN BOTÓN VALIDAR CREDENCIAL ---
+                      const SizedBox(height: 32),
 
-                    const SizedBox(height: 30),
-                  ],
+                      // --- Botón Validar Credencial (moderno, full width) ---
+                      if (colaborador.idCredencial.isNotEmpty)
+                        SizedBox(
+                          width: double.infinity,
+                          height: 52,
+                          child: ElevatedButton.icon(
+                            onPressed: () => _abrirUrl(colaborador.idCredencial, context),
+                            icon: const Icon(Icons.verified_rounded, color: Colors.white, size: 22),
+                            label: const Text(
+                              'Validar Credencial',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                            ),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: colores.botonesColor,
+                              elevation: 3,
+                              shadowColor: colores.botonesColor.withOpacity(0.4),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                            ),
+                          ),
+                        ),
+
+                      const SizedBox(height: 20),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -237,7 +355,6 @@ class _PerfilScreenState extends State<PerfilScreen>
       ),
     );
   }
-
   // =========================================================================
   //  METODOS DE DECISIÓN (CONDICIONAL)
   // =========================================================================

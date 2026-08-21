@@ -192,6 +192,8 @@ class _AvisosViewState extends State<AvisosView>
             SnackBarBehavior
                 .floating, // Hace que el SnackBar flote sobre el contenido.
         duration: duration,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        margin: const EdgeInsets.all(12),
       ),
     );
   }
@@ -273,123 +275,119 @@ class _AvisosViewState extends State<AvisosView>
     }
   }
   
-
   /// Muestra un diálogo ([Dialog]) con los detalles completos de un [AvisoModel].
   ///
   /// Si el aviso no ha sido leído previamente, lo marca como leído a través del [UserProvider].
   ///
   /// [aviso]: El [AvisoModel] cuyos detalles se mostrarán.
-  /// Muestra un diálogo ([Dialog]) con los detalles completos de un [AvisoModel].
-  ///
-  /// Si el aviso no ha sido leído previamente, lo marca como leído a través del [UserProvider].
-  ///
-  /// [aviso]: El [AvisoModel] cuyos detalles se mostrarán.
-  // Tu método _mostrarAviso modificado
-  void _mostrarAviso(AvisoModel aviso) {
-      // Si el aviso no ha sido leído, lo marca como leído.
-      if (!aviso.leido) {
-        _userProvider.markAvisoAsRead(aviso.idCalendario);
-      }
+void _mostrarAviso(AvisoModel aviso) {
+  // Si el aviso no ha sido leído, lo marca como leído.
+  if (!aviso.leido) {
+    _userProvider.markAvisoAsRead(aviso.idCalendario);
+  }
 
-      _selectedOption = null;
+  _selectedOption = null;
 
-      showDialog(
-        context: context,
-        builder: (BuildContext context) {
-          final screenWidth = MediaQuery.of(context).size.width;
-          final screenHeight = MediaQuery.of(context).size.height;
-          final dialogWidth = screenWidth * 0.90;
-          final dialogHeight = screenHeight * 0.95;
-          final userProvider = Provider.of<UserProvider>(context, listen: false);
-          final colores = userProvider.colores;
-          final List<String> opciones =
-              [aviso.opcion1, aviso.opcion2, aviso.opcion3, aviso.opcion4, aviso.opcion5]
-                  .whereType<String>()
-                  .where((s) => s.isNotEmpty)
-                  .toList();
+  showDialog(
+    context: context,
+    builder: (BuildContext context) {
+      final screenWidth = MediaQuery.of(context).size.width;
+      final screenHeight = MediaQuery.of(context).size.height;
+      final dialogWidth = screenWidth * 0.90;
+      final dialogHeight = screenHeight * 0.95;
+      final userProvider = Provider.of<UserProvider>(context, listen: false);
+      final colores = userProvider.colores;
+      final List<String> opciones =
+          [aviso.opcion1, aviso.opcion2, aviso.opcion3, aviso.opcion4, aviso.opcion5]
+              .whereType<String>()
+              .where((s) => s.isNotEmpty)
+              .toList();
 
-          return Dialog(
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(15),
-            ),
-            insetPadding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 10.0),
-            backgroundColor: Colors.white,
-            child: ConstrainedBox(
-              constraints: BoxConstraints(
-                minWidth: dialogWidth,
-                maxWidth: dialogWidth,
-                minHeight: dialogHeight,
-                maxHeight: dialogHeight,
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.max,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  // --- Encabezado ---
-                  Container(
-                    padding: const EdgeInsets.symmetric(vertical: 15.0, horizontal: 20.0),
-                    decoration: BoxDecoration(
-                      color: colores.headerColor,
-                      borderRadius: const BorderRadius.only(
-                        topLeft: Radius.circular(15),
-                        topRight: Radius.circular(15),
-                      ),
-                    ),
-                    child: Text(
-                      aviso.titulo,
-                      style: const TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
+      return Dialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        insetPadding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 10.0),
+        backgroundColor: Colors.white,
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            minWidth: dialogWidth,
+            maxWidth: dialogWidth,
+            minHeight: dialogHeight,
+            maxHeight: dialogHeight,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.max,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // --- Encabezado ---
+              Container(
+                padding: const EdgeInsets.symmetric(vertical: 18.0, horizontal: 20.0),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [colores.headerColor, colores.headerColor.withOpacity(0.85)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
                   ),
+                  borderRadius: const BorderRadius.only(
+                    topLeft: Radius.circular(20),
+                    topRight: Radius.circular(20),
+                  ),
+                ),
+                child: Text(
+                  aviso.titulo,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontSize: 19,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
 
-                  // --- Contenido scrollable dentro de Expanded ---
-                  Expanded(
-                    child: Padding(
-                      padding: const EdgeInsets.all(10.0),
-                      child: Column(
+              // --- Contenido scrollable dentro de Expanded ---
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
                         children: [
+                          Icon(Icons.calendar_today_rounded, size: 14, color: Colors.grey.shade600),
+                          const SizedBox(width: 6),
                           Text(
                             DateFormat('EEEE d \'de\' MMMM \'del\' yyyy', 'es_ES').format(aviso.fecha),
-                            style: const TextStyle(fontSize: 14, color: Colors.black),
+                            style: TextStyle(fontSize: 13, color: Colors.grey.shade700, fontWeight: FontWeight.w500),
                           ),
-                          const SizedBox(height: 5),
-                          const Divider(color: Colors.grey, thickness: 0.5),
-                          const SizedBox(height: 10),
-                          CustomPaint(
-                            size: Size(dialogWidth * 0.6, 5),
-                            painter: _SharpLinePainter(),
-                          ),
-                          CustomPaint(
-                            size: Size(dialogWidth * 0.6, 5),
-                            painter: _SharpLinePainter(),
-                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      const Divider(color: Color(0xFFE5E7EB), thickness: 1),
+                      const SizedBox(height: 10),
 
-                          // Contenido del aviso: imagen, PDF o texto
-                          if (aviso.archivo != null && aviso.archivo!.isNotEmpty)
-                            Expanded(
-                              child: Align(
-                                alignment: Alignment.topCenter,
-                                child: FutureBuilder<String?>(
-                                  future: userProvider.getAvisoImagePath(aviso),
-                                  builder: (BuildContext context, AsyncSnapshot<String?> snapshot) {
-                                    if (snapshot.connectionState == ConnectionState.waiting) {
-                                      return const Center(child: CircularProgressIndicator());
-                                    }
+                      // Contenido del aviso: imagen, PDF o texto
+                      if (aviso.archivo != null && aviso.archivo!.isNotEmpty)
+                        Expanded(
+                          child: Align(
+                            alignment: Alignment.topCenter,
+                            child: FutureBuilder<String?>(
+                              future: userProvider.getAvisoImagePath(aviso),
+                              builder: (BuildContext context, AsyncSnapshot<String?> snapshot) {
+                                if (snapshot.connectionState == ConnectionState.waiting) {
+                                  return const Center(child: CircularProgressIndicator());
+                                }
 
-                                    if (!snapshot.hasData || snapshot.data == null || snapshot.data!.isEmpty) {
-                                      return SingleChildScrollView(
-                                        child: Html(data: aviso.comentario),
-                                      );
-                                    }
-                                    
-                                    final String resourcePath = snapshot.data!;
-                                    final String extension = resourcePath.split('.').last.toLowerCase();
+                                if (!snapshot.hasData || snapshot.data == null) {
+                                  return SingleChildScrollView(
+                                    child: Html(data: aviso.comentario),
+                                  );
+                                }
+                                
+                                final String resourcePath = snapshot.data!;
+                                  final String extension = resourcePath.split('.').last.toLowerCase();
 
-                                    // Lógica de visualización: PDF o imagen
+                                     // Lógica de visualización: PDF o imagen
                                 if (extension == 'pdf') {
                                   // 🚀 LÓGICA DE PDF MODIFICADA para usar Syncfusion en Web y Móvil
                                   if (kIsWeb) {
@@ -409,29 +407,32 @@ class _AvisosViewState extends State<AvisosView>
                                     );
                                   }
                                 }
-                                    else if (['jpg', 'jpeg', 'png', 'gif'].contains(extension)) {
-                                      return InteractiveViewer(
-                                        panEnabled: true,
-                                        minScale: 1.0,
-                                        maxScale: 4.0,
-                                        child: SizedBox(
-                                          width: double.infinity,
-                                          // 🛑 Implementación Condicional
-                                          child: kIsWeb
-                                              ? Image.network( // 🟢 WEB: Usar Image.network y la URL de red
-                                                  resourcePath,
-                                                  fit: BoxFit.contain,
-                                                  errorBuilder: (context, error, stackTrace) {
-                                                    return const Text('No se pudo cargar la imagen (Web).', textAlign: TextAlign.center);
-                                                  },
-                                                )
-                                              : Image.file( // 🔵 MÓVIL: Usar Image.file y la ruta local
-                                                  File(resourcePath),
-                                                  fit: BoxFit.contain,
-                                                  errorBuilder: (context, error, stackTrace) {
-                                                    return const Text('No se pudo cargar la imagen (Móvil).', textAlign: TextAlign.center);
-                                                  },
-                                                ),
+                                     else if (['jpg', 'jpeg', 'png', 'gif'].contains(extension)) {
+                                      return ClipRRect(
+                                        borderRadius: BorderRadius.circular(12),
+                                        child: InteractiveViewer(
+                                          panEnabled: true,
+                                          minScale: 1.0,
+                                          maxScale: 4.0,
+                                          child: SizedBox(
+                                            width: double.infinity,
+                                            // 🛑 Implementación Condicional
+                                            child: kIsWeb
+                                                ? Image.network( // 🟢 WEB: Usar Image.network y la URL de red
+                                                    resourcePath,
+                                                    fit: BoxFit.contain,
+                                                    errorBuilder: (context, error, stackTrace) {
+                                                      return const Text('No se pudo cargar la imagen (Web).', textAlign: TextAlign.center);
+                                                    },
+                                                  )
+                                                : Image.file( // 🔵 MÓVIL: Usar Image.file y la ruta local
+                                                    File(resourcePath),
+                                                    fit: BoxFit.contain,
+                                                    errorBuilder: (context, error, stackTrace) {
+                                                      return const Text('No se pudo cargar la imagen (Móvil).', textAlign: TextAlign.center);
+                                                    },
+                                                  ),
+                                          ),
                                         ),
                                       );
                                     } else {
@@ -441,40 +442,49 @@ class _AvisosViewState extends State<AvisosView>
                                       );
                                     }
                                     // ⭐️ FIN DEL CÓDIGO MODIFICADO ⭐️
-                                  },
-                                ),
-                              ),
-                            )
-                          else
-                            Expanded(
-                              child: SingleChildScrollView(
-                                child: Align(
-                                  alignment: Alignment.topLeft,
-                                  child: Html(data: aviso.comentario),
-                                ),
-                              ),
+                              },
                             ),
-                          
-                          // --- Formulario de respuesta condicional ---
-                          if (aviso.tipoRespuesta != null &&
-                              (aviso.tipoRespuesta!.toLowerCase() == 'siono' ||
-                                  aviso.tipoRespuesta!.toLowerCase() == 'seleccion'))
-                            StatefulBuilder(
-                              builder: (BuildContext context, StateSetter setStateForm) {
-                                return Padding(
-                                  padding: const EdgeInsets.only(top: 20.0),
-                                  child: Column(
-                                    children: [
-                                      const Text(
-                                        'Por favor, responde a este aviso:',
-                                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                                      ),
-                                      const SizedBox(height: 10),
-                                      if (aviso.tipoRespuesta!.toLowerCase() == 'siono')
-                                        Row(
-                                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                                          children: [
-                                            ElevatedButton(
+                          ),
+                        )
+                      else
+                        Expanded(
+                          child: SingleChildScrollView(
+                            child: Align(
+                              alignment: Alignment.topLeft,
+                              child: Html(data: aviso.comentario),
+                            ),
+                          ),
+                        ),
+                      
+                      // --- Formulario de respuesta condicional ---
+                      if (aviso.tipoRespuesta != null &&
+                          (aviso.tipoRespuesta!.toLowerCase() == 'siono' ||
+                              aviso.tipoRespuesta!.toLowerCase() == 'seleccion'))
+                        StatefulBuilder(
+                          builder: (BuildContext context, StateSetter setStateForm) {
+                            return Container(
+                              margin: const EdgeInsets.only(top: 16.0),
+                              padding: const EdgeInsets.all(16.0),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFF6F7FB),
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    'Por favor, responde a este aviso:',
+                                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                                  ),
+                                  const SizedBox(height: 12),
+                                  if (aviso.tipoRespuesta!.toLowerCase() == 'siono')
+                                    Row(
+                                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                                      children: [
+                                        Expanded(
+                                          child: Padding(
+                                            padding: const EdgeInsets.symmetric(horizontal: 4),
+                                            child: ElevatedButton(
                                               onPressed: aviso.segRespuesta != null && aviso.segRespuesta!.isNotEmpty
                                                   ? null
                                                   : () {
@@ -483,13 +493,23 @@ class _AvisosViewState extends State<AvisosView>
                                                       });
                                                     },
                                               style: ElevatedButton.styleFrom(
-                                                backgroundColor: _selectedOption == 'Sí' ? colores.botonesColor : Colors.grey.shade200,
-                                                foregroundColor: _selectedOption == 'Sí' ? Colors.white : Colors.black,
-                                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                                backgroundColor: _selectedOption == 'Sí' ? colores.botonesColor : Colors.white,
+                                                foregroundColor: _selectedOption == 'Sí' ? Colors.white : Colors.black87,
+                                                elevation: 0,
+                                                shape: RoundedRectangleBorder(
+                                                  borderRadius: BorderRadius.circular(12),
+                                                  side: BorderSide(color: colores.botonesColor.withOpacity(0.4)),
+                                                ),
+                                                padding: const EdgeInsets.symmetric(vertical: 12),
                                               ),
                                               child: const Text('Sí'),
                                             ),
-                                            ElevatedButton(
+                                          ),
+                                        ),
+                                        Expanded(
+                                          child: Padding(
+                                            padding: const EdgeInsets.symmetric(horizontal: 4),
+                                            child: ElevatedButton(
                                               onPressed: aviso.segRespuesta != null && aviso.segRespuesta!.isNotEmpty
                                                   ? null
                                                   : () {
@@ -498,99 +518,116 @@ class _AvisosViewState extends State<AvisosView>
                                                       });
                                                     },
                                               style: ElevatedButton.styleFrom(
-                                                backgroundColor: _selectedOption == 'No' ? colores.botonesColor : Colors.grey.shade200,
-                                                foregroundColor: _selectedOption == 'No' ? Colors.white : Colors.black,
-                                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                                backgroundColor: _selectedOption == 'No' ? colores.botonesColor : Colors.white,
+                                                foregroundColor: _selectedOption == 'No' ? Colors.white : Colors.black87,
+                                                elevation: 0,
+                                                shape: RoundedRectangleBorder(
+                                                  borderRadius: BorderRadius.circular(12),
+                                                  side: BorderSide(color: colores.botonesColor.withOpacity(0.4)),
+                                                ),
+                                                padding: const EdgeInsets.symmetric(vertical: 12),
                                               ),
                                               child: const Text('No'),
                                             ),
-                                          ],
-                                        )
-                                      else if (aviso.tipoRespuesta!.toLowerCase() == 'seleccion')
-                                        Column(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: opciones.map((opcion) {
-                                            return RadioListTile<String>(
-                                              title: Text(opcion),
-                                              value: opcion,
-                                              groupValue: aviso.segRespuesta != null && aviso.segRespuesta!.isNotEmpty
-                                                  ? aviso.segRespuesta
-                                                  : _selectedOption,
-                                              onChanged: aviso.segRespuesta != null && aviso.segRespuesta!.isNotEmpty
-                                                  ? null
-                                                  : (String? value) {
-                                                      setStateForm(() {
-                                                        _selectedOption = value;
-                                                      });
-                                                    },
-                                              activeColor: colores.botonesColor,
-                                            );
-                                          }).toList(),
+                                          ),
                                         ),
-                                      const SizedBox(height: 15),
-                                      if (aviso.segRespuesta == null || aviso.segRespuesta!.isEmpty)
-                                        ElevatedButton(
-                                          onPressed: _selectedOption != null
-                                              ? () async {
-                                                  if (_selectedOption != null) {
-                                                    await _userProvider.markAvisoAsRead(
-                                                      aviso.idCalendario,
-                                                      respuesta: _selectedOption,
-                                                    );
-                                                    if (mounted) Navigator.of(context).pop();
-                                                  }
+                                      ],
+                                    )
+                                  else if (aviso.tipoRespuesta!.toLowerCase() == 'seleccion')
+                                    Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: opciones.map((opcion) {
+                                        return RadioListTile<String>(
+                                          title: Text(opcion),
+                                          value: opcion,
+                                          groupValue: aviso.segRespuesta != null && aviso.segRespuesta!.isNotEmpty
+                                              ? aviso.segRespuesta
+                                              : _selectedOption,
+                                          onChanged: aviso.segRespuesta != null && aviso.segRespuesta!.isNotEmpty
+                                              ? null
+                                              : (String? value) {
+                                                  setStateForm(() {
+                                                    _selectedOption = value;
+                                                  });
+                                                },
+                                          activeColor: colores.botonesColor,
+                                        );
+                                      }).toList(),
+                                    ),
+                                  const SizedBox(height: 14),
+                                  if (aviso.segRespuesta == null || aviso.segRespuesta!.isEmpty)
+                                    SizedBox(
+                                      width: double.infinity,
+                                      child: ElevatedButton(
+                                        onPressed: _selectedOption != null
+                                            ? () async {
+                                                if (_selectedOption != null) {
+                                                  await _userProvider.markAvisoAsRead(
+                                                    aviso.idCalendario,
+                                                    respuesta: _selectedOption,
+                                                  );
+                                                  if (mounted) Navigator.of(context).pop();
                                                 }
-                                              : null,
-                                          style: ElevatedButton.styleFrom(
-                                            backgroundColor: colores.botonesColor,
-                                            foregroundColor: Colors.white,
-                                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                                            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 30),
-                                          ),
-                                          child: const Text('Enviar Respuesta'),
-                                        )
-                                      else
-                                        Text(
-                                          'Ya has respondido este aviso: "${aviso.segRespuesta}"',
-                                          style: TextStyle(
-                                            color: colores.botonesColor,
-                                            fontWeight: FontWeight.bold,
-                                          ),
+                                              }
+                                            : null,
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: colores.botonesColor,
+                                          foregroundColor: Colors.white,
+                                          elevation: 0,
+                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                          padding: const EdgeInsets.symmetric(vertical: 14),
                                         ),
-                                    ],
-                                  ),
-                                );
-                              },
-                            ),
-                        ],
-                      ),
-                    ),
-                  ),
-
-                  // --- Botón "Cerrar" al fondo del modal ---
-                  Padding(
-                    padding: const EdgeInsets.all(20.0),
-                    child: SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        onPressed: () => Navigator.of(context).pop(),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: colores.botonesColor,
-                          foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 30),
+                                        child: const Text('Enviar respuesta'),
+                                      ),
+                                    )
+                                  else
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+                                      decoration: BoxDecoration(
+                                        color: colores.botonesColor.withOpacity(0.12),
+                                        borderRadius: BorderRadius.circular(10),
+                                      ),
+                                      child: Text(
+                                        'Ya has respondido este aviso: "${aviso.segRespuesta}"',
+                                        style: TextStyle(
+                                          color: colores.botonesColor,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            );
+                          },
                         ),
-                        child: const Text('Cerrar', style: TextStyle(fontSize: 16)),
-                      ),
-                    ),
+                    ],
                   ),
-                ],
+                ),
               ),
-            ),
-          );
-        },
+              // --- Botón "Cerrar" al fondo del modal ---
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: colores.botonesColor,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 30),
+                    ),
+                    child: const Text('Cerrar', style: TextStyle(fontSize: 16)),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
       );
-    }
+    },
+  );
+}
 
   /// Función auxiliar para eliminar etiquetas HTML y truncar el texto si es necesario.
   ///
@@ -624,7 +661,7 @@ class _AvisosViewState extends State<AvisosView>
   /// 1. Avisos no leídos aparecen primero.
   /// 2. Avisos leídos aparecen después.
   /// 3. Dentro de cada grupo, los avisos se ordenan por fecha de forma descendente (más reciente primero).
-   List<AvisoModel> get avisosFiltrados {
+  List<AvisoModel> get avisosFiltrados {
     // 1. Definir el punto de referencia: Hoy, a medianoche.
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day); // Hoy a 00:00:00
@@ -640,25 +677,15 @@ class _AvisosViewState extends State<AvisosView>
         final avisoStartDate = DateTime(aviso.fecha.year, aviso.fecha.month, aviso.fecha.day);
 
         // CONDICIÓN 1: AVISO NO VISIBLE (Fecha de inicio es posterior a hoy)
-        // Ejemplo: Aviso 2025-11-10. Si hoy es 2025-10-10, esAfter devuelve TRUE.
         if (avisoStartDate.isAfter(today)) {
             return false; // Descartar si aún no es la fecha de inicio.
         }
 
         // CONDICIÓN 2: AVISO ARCHIVADO (Fecha de fin es anterior a hoy)
-        // Convertimos la fecha de fin del aviso a medianoche.
         final avisoEndDate = DateTime(aviso.fechaFin.year, aviso.fechaFin.month, aviso.fechaFin.day);
-        
-        // isBefore devuelve TRUE si la fecha del aviso es ESTRICTAMENTE anterior a hoy.
-        // Ejemplo: Hoy es 2025-10-10. Si fecha_fin es 2025-10-09, isBefore devuelve TRUE.
         final bool isArchivedByDate = avisoEndDate.isBefore(today);
 
         // -------------------------------------------------------------
-        
-        // Condición para el filtro de fecha (el filtro de la UI)
-        // Ya que avisos.fecha es DateTime, la comparación es segura.
-        final bool pasaFecha =
-            fechaFiltro == null || aviso.fecha.isAfter(fechaFiltro!);
 
         // Condición para el filtro de estado de lectura.
         final bool pasaLectura =
@@ -668,11 +695,9 @@ class _AvisosViewState extends State<AvisosView>
 
         // Lógica principal:
         if (filtroLectura == 'Archivados') {
-            // Si el filtro es 'Archivados', solo mostramos los que cumplen esa condición.
-            return isArchivedByDate && pasaFecha;
+            return isArchivedByDate;
         } else {
-            // Para 'Todos', 'Leídos' y 'No leídos', NO mostramos los avisos archivados.
-            return !isArchivedByDate && pasaFecha && pasaLectura;
+            return !isArchivedByDate && pasaLectura;
         }
     }).toList();
 
@@ -694,9 +719,173 @@ class _AvisosViewState extends State<AvisosView>
     return filtered;
   }
 
+    // ============================================================
+  // FILTROS
+  // ============================================================
+
+  /// Construye la barra de filtros: un botón centrado que muestra el
+  /// filtro activo y abre un modal inferior con las opciones. Si hay
+  /// un filtro distinto de 'Todos' aplicado, se muestra debajo un
+  /// acceso rápido para limpiarlo.
+  Widget _buildFilterBar(Colores colores) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+      child: Column(
+        children: [
+          Center(
+            child: SizedBox(
+              width: 250,
+              child: _buildFilterButton(
+                icon: Icons.filter_list_rounded,
+                label: filtroLectura,
+                active: filtroLectura != 'Todos',
+                color: colores.headerColor,
+                onTap: () => _showFilterMenu(colores),
+              ),
+            ),
+          ),
+          if (filtroLectura != 'Todos')
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Align(
+                alignment: Alignment.center,
+                child: TextButton.icon(
+                  onPressed: () => setState(() => filtroLectura = 'Todos'),
+                  icon: const Icon(Icons.close_rounded, size: 17),
+                  label: const Text('Mostrar todos'),
+                  style: TextButton.styleFrom(foregroundColor: Colors.grey.shade700),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  /// Botón que representa el filtro actualmente seleccionado y abre el menú de opciones.
+  Widget _buildFilterButton({
+    required IconData icon,
+    required String label,
+    required bool active,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return Material(
+      color: active ? color.withOpacity(0.10) : Colors.white,
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: active ? color.withOpacity(0.45) : Colors.grey.shade200,
+            ),
+          ),
+          child: Row(
+            children: [
+              Icon(icon, size: 20, color: active ? color : Colors.grey.shade600),
+              const SizedBox(width: 9),
+              Expanded(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: active ? FontWeight.w700 : FontWeight.w600,
+                    color: active ? color : Colors.grey.shade700,
+                  ),
+                ),
+              ),
+              Icon(Icons.keyboard_arrow_down_rounded, size: 20, color: Colors.grey.shade500),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Muestra el modal inferior con las opciones de filtro de lectura.
+  void _showFilterMenu(Colores colores) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return Container(
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 30),
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade300,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+              const SizedBox(height: 18),
+              const Text(
+                'Filtrar avisos',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+              ),
+              const SizedBox(height: 14),
+              ...['Todos', 'No leídos', 'Leídos', 'Archivados'].map((filtro) {
+                final selected = filtroLectura == filtro;
+                return ListTile(
+                  onTap: () {
+                    setState(() => filtroLectura = filtro);
+                    Navigator.pop(context);
+                  },
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  tileColor: selected ? colores.headerColor.withOpacity(0.08) : null,
+                  leading: Icon(
+                    _getFilterIcon(filtro),
+                    color: selected ? colores.headerColor : Colors.grey.shade600,
+                  ),
+                  title: Text(
+                    filtro,
+                    style: TextStyle(
+                      fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                      color: selected ? colores.headerColor : Colors.black87,
+                    ),
+                  ),
+                  trailing: selected
+                      ? Icon(Icons.check_circle_rounded, color: colores.headerColor)
+                      : null,
+                );
+              }),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  /// Ícono representativo para cada opción de filtro de lectura.
+  IconData _getFilterIcon(String filtro) {
+    switch (filtro) {
+      case 'No leídos':
+        return Icons.mark_email_unread_rounded;
+      case 'Leídos':
+        return Icons.mark_email_read_rounded;
+      case 'Archivados':
+        return Icons.inventory_2_rounded;
+      default:
+        return Icons.notifications_rounded;
+    }
+  }
+
   /// Muestra un selector de fecha ([showDatePicker]) para permitir al usuario
   /// filtrar los avisos por una fecha específica.
-  void _seleccionarFecha() async {
+  /*void _seleccionarFecha() async {
     final DateTime? picked = await showDatePicker(
       context: context,
       initialDate: fechaFiltro ?? DateTime.now(), // Fecha inicial del selector.
@@ -732,7 +921,7 @@ class _AvisosViewState extends State<AvisosView>
             picked; // Actualiza la fecha de filtro y reconstruye la UI.
       });
     }
-  }
+  }*/
 
   @override
   /// Un getter que, al ser `true`, indica a [AutomaticKeepAliveClientMixin]
@@ -767,7 +956,9 @@ Widget build(BuildContext context) {
 
     return SafeArea(
       child: Scaffold(
+        backgroundColor: const Color(0xFFF5F6FA),
         appBar: AppBar(
+          elevation: 0,
           title: const Text(
             'Avisos',
             style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
@@ -777,6 +968,7 @@ Widget build(BuildContext context) {
         ),
 
         body: RefreshIndicator(
+          color: colores.headerColor,
           // Permite al usuario "arrastrar para refrescar" la lista de avisos.
           onRefresh: () async {
             final now = DateTime.now();
@@ -810,47 +1002,9 @@ Widget build(BuildContext context) {
           },
           child: Column(
             children: [
-              // Sección de controles de filtrado (fecha y estado de lectura).
-              Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16.0,
-                  vertical: 8.0,
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    // Botón para seleccionar la fecha de filtro.
-                    TextButton.icon(
-                      icon: const Icon(Icons.calendar_today, size: 18),
-                      label: Text(
-                        fechaFiltro != null
-                            ? DateFormat('dd/MM/yyyy').format(
-                              fechaFiltro!,
-                            ) // Muestra la fecha seleccionada.
-                            : 'Filtrar por fecha', // Texto por defecto.
-                        style: const TextStyle(color: Colors.black),
-                      ),
-                      onPressed: _seleccionarFecha, // Llama al selector de fecha.
-                    ),
-                    // Dropdown para seleccionar el filtro de lectura.
-                    DropdownButton<String>(
-                      value: filtroLectura,
-                      icon: const Icon(Icons.filter_list),
-                      items:
-                          ['Todos', 'Leídos', 'No leídos', 'Archivados']
-                              .map(
-                                (v) => DropdownMenuItem(value: v, child: Text(v)),
-                              )
-                              .toList(),
-                      onChanged:
-                          (value) => setState(
-                            () => filtroLectura = value!,
-                          ), // Actualiza el filtro y reconstruye la UI.
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 10),
+              // --- Barra de filtros: botón que abre un modal inferior con las opciones ---
+              _buildFilterBar(colores),
+              // Área principal de la lista de avisos.
               // Área principal de la lista de avisos.
               Expanded(
                 // El indicador de carga solo se muestra en la carga inicial
@@ -859,8 +1013,8 @@ Widget build(BuildContext context) {
                     _isInitialLoading &&
                             _userProvider.avisos.isEmpty &&
                             _errorMessage == null
-                        ? const Center(
-                          child: CircularProgressIndicator(),
+                        ? Center(
+                          child: CircularProgressIndicator(color: colores.headerColor),
                         ) // Indicador de carga.
                         : _errorMessage !=
                             null // Si hay un mensaje de error.
@@ -905,139 +1059,145 @@ Widget build(BuildContext context) {
                             .isEmpty // Si la lista filtrada está vacía.
                         ? SingleChildScrollView(
                           physics: const AlwaysScrollableScrollPhysics(),
-                          child: const Center(
+                          child: Center(
                             child: Padding(
-                              padding: EdgeInsets.all(20.0),
-                              child: Text(
-                                'No hay avisos para mostrar según los filtros.',
-                              ), // Mensaje si no hay avisos.
+                              padding: const EdgeInsets.all(40.0),
+                              child: Column(
+                                children: [
+                                  Icon(Icons.notifications_off_rounded, size: 56, color: Colors.grey.shade400),
+                                  const SizedBox(height: 12),
+                                  Text(
+                                    'No hay avisos para mostrar según los filtros.',
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(color: Colors.grey.shade600),
+                                  ),
+                                ],
+                              ),
                             ),
                           ),
                         )
                         : ListView.builder(
-                          // Constructor de lista para mostrar los avisos.
                           physics: const AlwaysScrollableScrollPhysics(),
-                          padding: const EdgeInsets.symmetric(horizontal: 16),
-                          itemCount:
-                              avisosFiltrados
-                                  .length, // Número de avisos a mostrar.
+                          padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+                          itemCount: avisosFiltrados.length,
                           itemBuilder: (context, index) {
-                            final aviso = avisosFiltrados[index]; // Aviso actual.
+                            final aviso = avisosFiltrados[index];
                             final IconData iconoAviso = _getIconFromFa(aviso.seccion);
-                            return Card(
-                              elevation:
-                                  aviso.leido
-                                      ? 1
-                                      : 4, // Menor elevación para avisos leídos.
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                                side:
-                                    aviso
-                                            .leido // Borde diferente para avisos no leídos.
-                                        ? BorderSide.none
-                                        : BorderSide(
-                                          color: colores.headerColor,
-                                          width: 1.5,
-                                        ),
-                              ),
+                            final bool leido = aviso.leido;
+
+                            const Color colorFondoLeido = Color(0xFFDDE1EA);
+                            const Color colorTextoLeido = Color(0xFF5B6472);
+
+                            return Container(
                               margin: const EdgeInsets.only(bottom: 12),
-                              color:
-                                  aviso
-                                          .leido // Color de fondo diferente para avisos no leídos.
-                                      ? Colors.white
-                                      : Colors.indigo.shade50,
-                              child: InkWell(
-                                onTap:
-                                    () => _mostrarAviso(
-                                      aviso,
-                                    ), // Al tocar, muestra el detalle del aviso.
-                                borderRadius: BorderRadius.circular(12),
-                                child: Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                    vertical: 12.0,
-                                    horizontal: 16.0,
+                              decoration: BoxDecoration(
+                                color: leido ? colorFondoLeido : Colors.white,
+                                borderRadius: BorderRadius.circular(18),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(leido ? 0.03 : 0.06),
+                                    blurRadius: 10,
+                                    offset: const Offset(0, 4),
                                   ),
-                                  child: Row(
-                                    crossAxisAlignment: CrossAxisAlignment.center,
+                                ],
+                                border: leido
+                                    ? null
+                                    : Border.all(color: colores.headerColor.withOpacity(0.25), width: 1.2),
+                              ),
+                              child: Material(
+                                color: Colors.transparent,
+                                child: InkWell(
+                                  onTap: () => _mostrarAviso(aviso),
+                                  borderRadius: BorderRadius.circular(18),
+                                  child: Stack(
                                     children: [
-                                      // Icono de notificación.
-                                      Icon(
-                                        iconoAviso,
-                                        color:
-                                            aviso.leido
-                                                ? Colors.grey
-                                                : colores.headerColor,
-                                        size: 28,
-                                      ),
-                                      const SizedBox(width: 12),
-                                      // Línea divisoria vertical.
-                                      Container(
-                                        height: 40,
-                                        width: 1.5,
-                                        color: Colors.grey.shade300,
-                                      ),
-                                      const SizedBox(width: 12),
-                                      // Contenido del aviso (fecha, título, comentario).
-                                      Expanded(
-                                        child: Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
+                                      Padding(
+                                        padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+                                        child: Row(
+                                          crossAxisAlignment: CrossAxisAlignment.center,
                                           children: [
-                                            // Fecha del aviso.
-                                            Text(
-                                              DateFormat(
-                                                'dd/MM/yyyy',
-                                              ).format(aviso.fecha),
-                                              style: TextStyle(
-                                                fontSize: 13,
-                                                fontWeight: FontWeight.bold,
-                                                color: colores.botonesColor,
+                                            Container(
+                                              width: 46,
+                                              height: 46,
+                                              decoration: BoxDecoration(
+                                                shape: BoxShape.circle,
+                                                color: leido
+                                                    ? colorTextoLeido.withOpacity(0.15)
+                                                    : colores.headerColor.withOpacity(0.12),
+                                              ),
+                                              child: Icon(
+                                                iconoAviso,
+                                                color: leido ? colorTextoLeido : colores.headerColor,
+                                                size: 22,
                                               ),
                                             ),
-                                            const SizedBox(height: 4),
-                                            // Título del aviso (mayúsculas, truncado si es largo).
-                                            Text(
-                                              aviso.titulo.toUpperCase(),
-                                              style: TextStyle(
-                                                fontWeight:
-                                                    aviso.leido
-                                                        ? FontWeight.normal
-                                                        : FontWeight.bold,
-                                                fontSize: 16,
-                                                color:
-                                                    aviso.leido
-                                                        ? Colors.black87
-                                                        : Colors.black,
+                                            const SizedBox(width: 14),
+                                            Expanded(
+                                              child: Padding(
+                                                padding: const EdgeInsets.only(right: 70),
+                                                child: Column(
+                                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                                  children: [
+                                                    Text(
+                                                      aviso.titulo.toUpperCase(),
+                                                      style: TextStyle(
+                                                        fontWeight: FontWeight.bold,
+                                                        fontSize: 15.5,
+                                                        color: leido ? colorTextoLeido : Colors.black87,
+                                                      ),
+                                                      maxLines: 2,
+                                                      overflow: TextOverflow.ellipsis,
+                                                    ),
+                                                    const SizedBox(height: 6),
+                                                    Row(
+                                                      children: [
+                                                        Icon(
+                                                          Icons.calendar_today_rounded,
+                                                          size: 12,
+                                                          color: leido ? colorTextoLeido : Colors.grey.shade500,
+                                                        ),
+                                                        const SizedBox(width: 4),
+                                                        Text(
+                                                          DateFormat('dd/MM/yyyy').format(aviso.fecha),
+                                                          style: TextStyle(
+                                                            fontSize: 12.5,
+                                                            fontWeight: FontWeight.w500,
+                                                            color: leido ? colorTextoLeido : Colors.grey.shade600,
+                                                          ),
+                                                        ),
+                                                      ],
+                                                    ),
+                                                  ],
+                                                ),
                                               ),
-                                              maxLines: 2,
-                                              overflow: TextOverflow.ellipsis,
                                             ),
-                                            const SizedBox(height: 4),
-                                            // Previsualización del comentario (sin HTML, truncado).
-                                            Text(
-                                              _stripHtmlIfNeeded(
-                                                aviso.comentario,
-                                                maxLength: 80,
-                                              ),
-                                              style: TextStyle(
-                                                fontSize: 13,
-                                                color:
-                                                    aviso.leido
-                                                        ? Colors.grey.shade600
-                                                        : Colors.black54,
-                                              ),
-                                              maxLines: 2,
-                                              overflow: TextOverflow.ellipsis,
+                                            Icon(
+                                              Icons.arrow_forward_ios_rounded,
+                                              size: 16,
+                                              color: leido ? colorTextoLeido : Colors.grey.shade400,
                                             ),
                                           ],
                                         ),
                                       ),
-                                      const SizedBox(width: 8),
-                                      // Icono de flecha para indicar que es clickeable.
-                                      const Icon(
-                                        Icons.arrow_forward_ios,
-                                        size: 18,
-                                        color: Colors.grey,
+                                      Positioned(
+                                        top: 12,
+                                        right: 42,
+                                        child: Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                                          decoration: BoxDecoration(
+                                            color: leido ? colorTextoLeido : colores.headerColor,
+                                            borderRadius: BorderRadius.circular(20),
+                                          ),
+                                          child: Text(
+                                            leido ? 'LEÍDO' : 'NUEVO',
+                                            style: const TextStyle(
+                                              color: Colors.white,
+                                              fontSize: 10,
+                                              fontWeight: FontWeight.bold,
+                                              letterSpacing: 0.4,
+                                            ),
+                                          ),
+                                        ),
                                       ),
                                     ],
                                   ),

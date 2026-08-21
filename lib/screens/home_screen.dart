@@ -6,7 +6,7 @@ import 'package:oficinaescolar_colaboradores/screens/asistencia_calificacion_arc
 import 'package:oficinaescolar_colaboradores/screens/webs_interes_screen.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
-
+import 'package:oficinaescolar_colaboradores/services/aviso_navigation_signal.dart';
 // Importa tus constantes, providers y modelos
 import 'package:oficinaescolar_colaboradores/config/api_constants.dart';
 import 'package:oficinaescolar_colaboradores/providers/user_provider.dart';
@@ -33,6 +33,8 @@ class _HomeScreenState extends State<HomeScreen> {
   int _pageIndex = 0;
   late UserProvider _userProvider;
   bool _isInitialPageIndexSet = false;
+  bool _isLoadingInitialData = true; 
+  String? _forceSectionTab;
 
   @override
   void initState() {
@@ -42,17 +44,31 @@ class _HomeScreenState extends State<HomeScreen> {
       _userProvider = Provider.of<UserProvider>(context, listen: false);
       await _loadAllData();
       _userProvider.autoRefreshTrigger.addListener(_onAutoRefreshTriggered);
+      if (pendingOpenSection.value != null) {
+        final section = pendingOpenSection.value;
+        pendingOpenSection.value = null;
+        if (mounted) setState(() => _forceSectionTab = section);
+      }
     });
   }
+
+  void _onPendingOpenSection() {
+  if (pendingOpenSection.value != null && mounted) {
+    final section = pendingOpenSection.value;
+    pendingOpenSection.value = null;
+    setState(() => _forceSectionTab = section);
+  }
+}
 
   @override
   void dispose() {
     debugPrint('HomeScreen: dispose - Limpiando recursos de HomeScreen.');
     // Se asegura de que _userProvider se haya inicializado antes de remover el listener
     // Acceso más directo a la variable de instancia:
-if (mounted) {
-    _userProvider.autoRefreshTrigger.removeListener(_onAutoRefreshTriggered);
-}
+    if (mounted) {
+        _userProvider.autoRefreshTrigger.removeListener(_onAutoRefreshTriggered);
+        pendingOpenSection.removeListener(_onPendingOpenSection);
+    }
     super.dispose();
   }
 
@@ -64,8 +80,10 @@ if (mounted) {
   Future<void> _loadAllData() async {
     debugPrint('HomeScreen: _loadAllData - Iniciando carga inicial de todos los datos.');
     await _userProvider.initializeAllUserData();
+    if (mounted) {
+      setState(() => _isLoadingInitialData = false);
+    }
   }
-
   void _abrirDatosEscuela() {
     debugPrint('HomeScreen: _abrirDatosEscuela - Navegando a DatosEscuelaScreen.');
     final escuelaModel = _userProvider.escuelaModel;
@@ -92,6 +110,15 @@ if (mounted) {
       ),
     );
   }
+
+  int _indexForSection(List<Widget> pages, String section) {
+  switch (section) {
+    case 'avisos':
+      return pages.indexWhere((p) => p is AvisosView);
+    default:
+      return -1;
+  }
+}
 
   String nombresApellidoPat(ColaboradorModel? colaborador) { 
     if (colaborador == null) {
@@ -404,15 +431,19 @@ if (mounted) {
     _userProvider = Provider.of<UserProvider>(context);
 
     if (_userProvider.colaboradorModel == null || _userProvider.escuelaModel == null) {
-      /*debugPrint('HomeScreen: build - Datos de colaborador o escuela nulos. Mostrando CircularProgressIndicator.');
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));*/
-      // Redirige al login si la sesión está vacía
+      // ⭐️ Mientras siga cargando, solo mostramos el loader (no redirigimos aún)
+      if (_isLoadingInitialData) {
+        return const Scaffold(
+          body: Center(child: CircularProgressIndicator()),
+        );
+      }
+
+      // Solo si YA terminó de cargar y sigue sin datos, redirigimos
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
           Navigator.pushReplacementNamed(context, '/');
         }
       });
-      // Retorna un widget vacío mientras navega
       return const SizedBox.shrink();
     }
     
@@ -425,6 +456,14 @@ if (mounted) {
       // ⭐️ USAR EL ÍNDICE CALCULADO PARA INICIALIZAR LA PÁGINA ⭐️
       _pageIndex = (avisosIndex != -1) ? avisosIndex : 0;
       _isInitialPageIndexSet = true;
+    }
+
+    if (_forceSectionTab != null && dynamicPages.isNotEmpty) {
+      final idx = _indexForSection(dynamicPages, _forceSectionTab!);
+      if (idx != -1) {
+        _pageIndex = idx;
+      }
+      _forceSectionTab = null;
     }
     
     final ColaboradorModel? colaborador = _userProvider.colaboradorModel;
