@@ -8,6 +8,7 @@ import 'package:oficinaescolar_colaboradores/models/colaborador_model.dart';
 import 'package:oficinaescolar_colaboradores/utils/snackbar_util.dart';
 import 'dart:io';
 import 'package:flutter_html/flutter_html.dart';
+import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
 
 class CrearAvisoScreen extends StatefulWidget {
   final Map<String, dynamic>? avisoParaEditar;
@@ -481,106 +482,207 @@ final List<String> listaSalones =
       }
     }
 
-    void _mostrarPreviewAviso(Map<String, dynamic> avisoData) {
+  void _mostrarPreviewAviso(Map<String, dynamic> avisoData) {
     final userProvider = Provider.of<UserProvider>(context, listen: false);
     final colores = userProvider.colores;
     final String? archivo = avisoData['archivo'] as String?;
     final String cuerpo = avisoData['cuerpo'] as String? ?? '';
+    final bool tieneArchivo = archivo != null && archivo.isNotEmpty;
+    final bool esPdf = tieneArchivo && archivo.toLowerCase().endsWith('.pdf');
+    final String tipoRespuesta = avisoData['requiere_respuesta'] as String? ?? 'Ninguna';
+    final List<String> opcionesPreview = avisoData['opciones_multiples'] != null &&
+            (avisoData['opciones_multiples'] as String).isNotEmpty
+        ? (avisoData['opciones_multiples'] as String).split(',').map((e) => e.trim()).toList()
+        : <String>[];
 
     showDialog(
       context: context,
       builder: (dialogContext) {
         final screenWidth = MediaQuery.of(dialogContext).size.width;
         final screenHeight = MediaQuery.of(dialogContext).size.height;
+        final dialogWidth = screenWidth * 0.90;
+        final dialogHeight = screenHeight * 0.95;
 
         return Dialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-          insetPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          insetPadding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 10.0),
           backgroundColor: Colors.white,
           child: ConstrainedBox(
             constraints: BoxConstraints(
-              minWidth: screenWidth * 0.90,
-              maxWidth: screenWidth * 0.90,
-              minHeight: screenHeight * 0.85,
-              maxHeight: screenHeight * 0.90,
+              minWidth: dialogWidth,
+              maxWidth: dialogWidth,
+              minHeight: dialogHeight,
+              maxHeight: dialogHeight,
             ),
             child: Column(
               mainAxisSize: MainAxisSize.max,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                // --- Encabezado, idéntico al de AvisosView._mostrarAviso ---
                 Container(
-                  padding: const EdgeInsets.symmetric(vertical: 15, horizontal: 20),
+                  padding: const EdgeInsets.symmetric(vertical: 18.0, horizontal: 20.0),
                   decoration: BoxDecoration(
-                    color: colores.headerColor,
+                    gradient: LinearGradient(
+                      colors: [colores.headerColor, colores.headerColor.withOpacity(0.85)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
                     borderRadius: const BorderRadius.only(
-                      topLeft: Radius.circular(15),
-                      topRight: Radius.circular(15),
+                      topLeft: Radius.circular(20),
+                      topRight: Radius.circular(20),
                     ),
                   ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.visibility_outlined, color: Colors.white, size: 20),
-                      const SizedBox(width: 10),
-                      const Expanded(
-                        child: Text(
-                          'Vista previa del aviso',
-                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
-                        ),
-                      ),
-                    ],
+                  child: Text(
+                    avisoData['titulo'] as String? ?? '',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(fontSize: 19, fontWeight: FontWeight.bold, color: Colors.white),
                   ),
                 ),
+
+                // --- Contenido, mismo layout que el detalle real ---
                 Expanded(
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.all(20),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16.0),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          avisoData['titulo'] as String? ?? '',
-                          style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'Del ${avisoData['fecha_inicio']} al ${avisoData['fecha_fin']}',
-                          style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Destinatario: ${_destinatarioSeleccionado}'
-                          '${_seleccionEspecifica != null ? " · $_seleccionEspecifica" : ""}',
-                          style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
-                        ),
-                        const Divider(height: 24),
-                        if (archivo != null && archivo.isNotEmpty) ...[
-                          Container(
-                            padding: const EdgeInsets.all(5),
-                            decoration: BoxDecoration(
-                              border: Border.all(color: Colors.grey.shade300),
-                              borderRadius: BorderRadius.circular(10),
+                        Row(
+                          children: [
+                            Icon(Icons.calendar_today_rounded, size: 14, color: Colors.grey.shade600),
+                            const SizedBox(width: 6),
+                            Text(
+                              'Del ${avisoData['fecha_inicio']} al ${avisoData['fecha_fin']}',
+                              style: TextStyle(fontSize: 13, color: Colors.grey.shade700, fontWeight: FontWeight.w500),
                             ),
-                            child: (archivo.toLowerCase().endsWith('.pdf'))
-                                ? ListTile(
-                                    leading: const Icon(Icons.picture_as_pdf, color: Colors.red),
-                                    title: Text(archivo.split('/').last),
+                          ],
+                        ),
+                        const SizedBox(height: 10),
+                        const Divider(color: Color(0xFFE5E7EB), thickness: 1),
+                        const SizedBox(height: 10),
+
+                        // Contenido: imagen / pdf (sin nombre de archivo) / html
+                        if (tieneArchivo)
+                          Expanded(
+                            child: Align(
+                              alignment: Alignment.topCenter,
+                              child: esPdf
+                                      ? SizedBox(
+                                          width: double.infinity,
+                                          height: double.infinity,
+                                          child: SfPdfViewer.file(
+                                            File(archivo!),
+                                            canShowHyperlinkDialog: true,
+                                            enableDocumentLinkAnnotation: true,
+                                          ),
+                                        )
+                                      : ClipRRect(
+                                      borderRadius: BorderRadius.circular(12),
+                                      child: InteractiveViewer(
+                                        panEnabled: true,
+                                        minScale: 1.0,
+                                        maxScale: 4.0,
+                                        child: SizedBox(
+                                          width: double.infinity,
+                                          child: Image.file(
+                                            File(archivo),
+                                            fit: BoxFit.contain,
+                                            errorBuilder: (context, error, stackTrace) =>
+                                                const Text('No se pudo cargar la imagen.', textAlign: TextAlign.center),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                            ),
+                          )
+                        else
+                          Expanded(
+                            child: SingleChildScrollView(
+                              child: Align(
+                                alignment: Alignment.topLeft,
+                                child: Html(data: cuerpo),
+                              ),
+                            ),
+                          ),
+
+                        // --- Sección de respuesta, mismo estilo que el detalle real ---
+                        if (tipoRespuesta.toLowerCase() == 'siono' || tipoRespuesta.toLowerCase() == 'seleccion')
+                          Container(
+                            margin: const EdgeInsets.only(top: 16.0),
+                            padding: const EdgeInsets.all(16.0),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF6F7FB),
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'Este aviso pedirá una respuesta:',
+                                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                                ),
+                                const SizedBox(height: 12),
+                                if (tipoRespuesta.toLowerCase() == 'siono')
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                                    children: [
+                                      Expanded(
+                                        child: Padding(
+                                          padding: const EdgeInsets.symmetric(horizontal: 4),
+                                          child: OutlinedButton(
+                                            onPressed: null,
+                                            style: OutlinedButton.styleFrom(
+                                              shape: RoundedRectangleBorder(
+                                                borderRadius: BorderRadius.circular(12),
+                                              ),
+                                              side: BorderSide(color: colores.botonesColor.withOpacity(0.4)),
+                                              padding: const EdgeInsets.symmetric(vertical: 12),
+                                            ),
+                                            child: const Text('Sí'),
+                                          ),
+                                        ),
+                                      ),
+                                      Expanded(
+                                        child: Padding(
+                                          padding: const EdgeInsets.symmetric(horizontal: 4),
+                                          child: OutlinedButton(
+                                            onPressed: null,
+                                            style: OutlinedButton.styleFrom(
+                                              shape: RoundedRectangleBorder(
+                                                borderRadius: BorderRadius.circular(12),
+                                              ),
+                                              side: BorderSide(color: colores.botonesColor.withOpacity(0.4)),
+                                              padding: const EdgeInsets.symmetric(vertical: 12),
+                                            ),
+                                            child: const Text('No'),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
                                   )
-                                : Image.file(File(archivo), fit: BoxFit.contain, height: 220),
+                                else if (tipoRespuesta.toLowerCase() == 'seleccion')
+                                  Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: opcionesPreview.map((opcion) {
+                                      return RadioListTile<String>(
+                                        title: Text(opcion),
+                                        value: opcion,
+                                        groupValue: null,
+                                        onChanged: null,
+                                        activeColor: colores.botonesColor,
+                                      );
+                                    }).toList(),
+                                  ),
+                              ],
+                            ),
                           ),
-                        ] else
-                          Html(data: cuerpo),
-                        if (_respuestaSeleccionada != 'Ninguna') ...[
-                          const SizedBox(height: 16),
-                          Text(
-                            'Este aviso pedirá respuesta: $_respuestaSeleccionada',
-                            style: TextStyle(fontSize: 13, fontStyle: FontStyle.italic, color: colores.botonesColor),
-                          ),
-                        ],
                       ],
                     ),
                   ),
                 ),
+
+                // --- Botones: mismo patrón que ya tenías (editar / publicar) ---
                 Padding(
-                  padding: const EdgeInsets.all(20),
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                   child: Row(
                     children: [
                       Expanded(
