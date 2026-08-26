@@ -231,101 +231,147 @@ class _AsistenciaCalificacionArchivoScreenState extends State<AsistenciaCalifica
     
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Archivos y Clubes',  style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)), // ⭐️ TÍTULO MODIFICADO ⭐️
+        title: const Text(
+          'Archivos y Clubes',
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+          ),
+        ),
         backgroundColor: headerColor, 
         centerTitle: true,
       ),
+
       // ✅ IMPLEMENTACIÓN DEL REFRESH INDICATOR
       body: RefreshIndicator(
         onRefresh: () async {
-            final now = DateTime.now();
-            if (_lastManualRefreshTime != null &&
-                now.difference(_lastManualRefreshTime!).inSeconds < 60) {
-              _showSnackBar('Datos actualizados', backgroundColor: Colors.green);
-              return;
-            }
+          final now = DateTime.now();
 
+          if (_lastManualRefreshTime != null &&
+              now.difference(_lastManualRefreshTime!).inSeconds < 60) {
             _showSnackBar(
-              'Recargando datos...',
-              duration: const Duration(seconds: 1),
-              backgroundColor: Colors.grey,
+              'Datos actualizados',
+              backgroundColor: Colors.green,
             );
+            return;
+          }
 
-            _lastManualRefreshTime = now; 
+          _showSnackBar(
+            'Recargando datos...',
+            duration: const Duration(seconds: 1),
+            backgroundColor: Colors.grey,
+          );
 
-            await _cargarDatosAsistencia(forceReload: true);
+          _lastManualRefreshTime = now; 
 
-            if (_errorMessage == null) {
-              _showSnackBar(
-                'Datos actualizados.',
-                backgroundColor: Colors.green,
-                duration: const Duration(seconds: 2),
-              );
-            }
+          await _cargarDatosAsistencia(forceReload: true);
+
+          if (_errorMessage == null) {
+            _showSnackBar(
+              'Datos actualizados.',
+              backgroundColor: Colors.green,
+              duration: const Duration(seconds: 2),
+            );
+          }
         },
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: _isLoading && _errorMessage == null && userProvider.colaboradorModel == null
-              ? const Center(child: CircularProgressIndicator())
-              : _errorMessage != null
-                  ? _buildErrorWidget() // Mostrar error
-                  // ⭐️ CONDICIÓN PARA MOSTRAR CONTENIDO O MENSAJE DE PERMISOS ⭐️
-                  : (_puedeVerSalones || _puedeVerClubes) 
-                      ? Column( // Contenido principal (si hay permisos)
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            Text(
-                              'Selecciona la opcion deseada:',
-                              style: Theme.of(context).textTheme.titleLarge,
-                            ),
-                            const SizedBox(height: 20),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                              children: [
-                                // ⭐️ BOTÓN CONDICIONAL: Salones (permiso 'califica') ⭐️
-                                if (_puedeVerSalones)
-                                  _construirBotonOpcion(
-                                    context,
-                                    title: 'Salones',
-                                    icon: Icons.class_, // ⭐️ ICONO MODIFICADO ⭐️
-                                    value: 'salon', // ⭐️ VALOR MODIFICADO ⭐️
-                                    headerColor: headerColor
-                                  ),
-                                // ⭐️ BOTÓN CONDICIONAL: Clubes (permiso 'asis_clubes') ⭐️
-                                if (_puedeVerClubes)
-                                  _construirBotonOpcion( // Botón Clubes (sin cambios)
-                                    context,
-                                    title: 'Clubes',
-                                    icon: Icons.sports_soccer,
-                                    value: 'clubes',
-                                    headerColor: headerColor
-                                  ),
-                              ],
-                            ),
-                            const SizedBox(height: 30),
 
-                            if (_selectedOption != null) ...[
-                              Text(
-                                _selectedOption == 'salon' ? 'Salones asignados:' : 'Clubes asignados:', // ⭐️ ETIQUETA MODIFICADA ⭐️
-                                style: Theme.of(context).textTheme.titleLarge,
-                              ),
-                              const SizedBox(height: 20),
-                              Expanded(
-                                // ⭐️ MÉTODO MODIFICADO: Redirigimos a la lista correcta ⭐️
-                                child: _selectedOption == 'salon' 
-                                    ? _construirListaSalones(userProvider)
-                                    : _construirListaClubes(userProvider), // Mantenemos lista de clubes
-                              ),
-                            ],
-                          ],
-                      )
-                      : Center( // Si no tiene NINGÚN permiso
-                          child: Text(
-                            'No tienes permisos de Asistencia o Calificación asignados.',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(color: Colors.grey.shade600, fontSize: 18, fontWeight: FontWeight.bold),
-                          ),
-                        ),
+        // ⭐️ FIX: MISMA ESTRUCTURA DE SCROLL QUE ASISTENCIAS
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            return SingleChildScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.all(16.0),
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  minHeight: constraints.maxHeight - 32,
+                ),
+                child:
+                    _isLoading &&
+                            _errorMessage == null &&
+                            userProvider.colaboradorModel == null
+                        ? const Center(
+                            child: CircularProgressIndicator(),
+                          )
+                        : _errorMessage != null
+                            ? _buildErrorWidget()
+                            : (_puedeVerSalones || _puedeVerClubes)
+                                ? Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.stretch,
+                                    children: [
+                                      Text(
+                                        'Selecciona la opcion deseada:',
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .titleLarge,
+                                      ),
+                                      const SizedBox(height: 20),
+                                      Row(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.spaceEvenly,
+                                        children: [
+                                          // ⭐️ BOTÓN CONDICIONAL: Salones
+                                          if (_puedeVerSalones)
+                                            _construirBotonOpcion(
+                                              context,
+                                              title: 'Salones',
+                                              icon: Icons.class_,
+                                              value: 'salon',
+                                              headerColor: headerColor,
+                                            ),
+
+                                          // ⭐️ BOTÓN CONDICIONAL: Clubes
+                                          if (_puedeVerClubes)
+                                            _construirBotonOpcion(
+                                              context,
+                                              title: 'Clubes',
+                                              icon: Icons.sports_soccer,
+                                              value: 'clubes',
+                                              headerColor: headerColor,
+                                            ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 30),
+
+                                      if (_selectedOption != null) ...[
+                                        Text(
+                                          _selectedOption == 'salon'
+                                              ? 'Salones asignados:'
+                                              : 'Clubes asignados:',
+                                          style: Theme.of(context)
+                                              .textTheme
+                                              .titleLarge,
+                                        ),
+                                        const SizedBox(height: 20),
+
+                                        // ⭐️ FIX:
+                                        // Ya no usamos Expanded porque
+                                        // el scroll principal es el
+                                        // SingleChildScrollView.
+                                        _selectedOption == 'salon'
+                                            ? _construirListaSalones(
+                                                userProvider,
+                                              )
+                                            : _construirListaClubes(
+                                                userProvider,
+                                              ),
+                                      ],
+                                    ],
+                                  )
+                                : Center(
+                                    child: Text(
+                                      'No tienes permisos de Asistencia o Calificación asignados.',
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                        color: Colors.grey.shade600,
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+              ),
+            );
+          },
         ),
       ),
     );
@@ -361,6 +407,9 @@ class _AsistenciaCalificacionArchivoScreenState extends State<AsistenciaCalifica
       }
 
       return ListView.builder(
+          // ⭐️ FIX: El scroll lo maneja el SingleChildScrollView
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
           itemCount: salonNombres.length,
           itemBuilder: (context, index) {
               final salon = salonNombres[index];
@@ -396,7 +445,7 @@ class _AsistenciaCalificacionArchivoScreenState extends State<AsistenciaCalifica
   
   // -------------------------------------------------------------
   // ✅ MÉTODOS Y WIDGETS AUXILIARES (Ajustados)
-  // -------------------------------------------------------------
+  // -------------------------------------------------
   
   // ✅ WIDGET: Para mostrar errores (Sin Cambios)
   Widget _buildErrorWidget() {
@@ -479,7 +528,7 @@ class _AsistenciaCalificacionArchivoScreenState extends State<AsistenciaCalifica
     );
   }
 
-  // ✅ MÉTODO: Construir lista de clubes (Extraído del método original _construirListaCursos)
+  // ✅ Método: Construir lista de clubes
   Widget _construirListaClubes(UserProvider userProvider) { 
     final Color headerColor = userProvider.colores.headerColor; 
     final List items = userProvider.colaboradorClubes;
@@ -495,6 +544,9 @@ class _AsistenciaCalificacionArchivoScreenState extends State<AsistenciaCalifica
     }
 
     return ListView.builder(
+      // ⭐️ FIX: El scroll lo maneja el SingleChildScrollView
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
       itemCount: items.length,
       itemBuilder: (context, index) {
         final ClubModel club = items[index] as ClubModel;
@@ -507,7 +559,10 @@ class _AsistenciaCalificacionArchivoScreenState extends State<AsistenciaCalifica
             child: ListTile(
                 title: Text(title),
                 subtitle: Text(subtitle),
-                trailing: Icon(Icons.arrow_forward_ios, color: headerColor), // Usar headerColor
+                trailing: Icon(
+                  Icons.arrow_forward_ios,
+                  color: headerColor,
+                ),
                 onTap: () {
                     Navigator.push(
                         context, 
@@ -525,3 +580,4 @@ class _AsistenciaCalificacionArchivoScreenState extends State<AsistenciaCalifica
     );
   }
 }
+

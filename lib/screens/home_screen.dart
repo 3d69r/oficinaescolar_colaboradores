@@ -50,6 +50,7 @@ class _HomeScreenState extends State<HomeScreen> {
         if (mounted) setState(() => _forceSectionTab = section);
       }
     });
+    pendingOpenSection.addListener(_onPendingOpenSection);
   }
 
   void _onPendingOpenSection() {

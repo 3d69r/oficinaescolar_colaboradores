@@ -281,66 +281,88 @@ class _AsistenciaScreenState extends State<AsistenciaScreen>
               );
             }
         },
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: _isLoading && _errorMessage == null && userProvider.colaboradorModel == null
-              ? const Center(child: CircularProgressIndicator())
-              : _errorMessage != null
-                  ? _buildErrorWidget() // Mostrar error
-                  // ⭐️ CONDICIÓN PRINCIPAL DE VISIBILIDAD ⭐️
-                  : (_puedeVerMaterias || _puedeVerClubes) 
-                      ? Column( // Contenido principal
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            Text(
-                              'Selecciona la opcion deseada:',
-                              style: Theme.of(context).textTheme.titleLarge,
-                            ),
-                            const SizedBox(height: 20),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                              children: [
-                                // ⭐️ BOTÓN CONDICIONAL: Materia ('materia_asis') ⭐️
-                                if (_puedeVerMaterias)
-                                  _construirBotonOpcion(
-                                    context,
-                                    title: 'Materia',
-                                    icon: Icons.school,
-                                    value: 'materia',
-                                    headerColor: headerColor
+        // ⭐️ FIX: SingleChildScrollView + AlwaysScrollableScrollPhysics ⭐️
+        // Esto garantiza que el pull-to-refresh funcione SIEMPRE,
+        // aunque el contenido sea corto (sin materias/clubes o sin permisos)
+        // y no llene toda la pantalla.
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            return SingleChildScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.all(16.0),
+              child: ConstrainedBox(
+                // ⭐️ Forzamos que el contenido ocupe como mínimo toda la
+                // altura visible, así se puede arrastrar desde cualquier
+                // punto de la pantalla y no solo donde "alcanza" contenido.
+                // ⚠️ NOTA: NO usar IntrinsicHeight aquí, porque ListView
+                // (incluso con shrinkWrap) no soporta cálculo de altura
+                // intrínseca y provoca un crash.
+                constraints: BoxConstraints(
+                  minHeight: constraints.maxHeight - 32, // resta el padding vertical (16 arriba + 16 abajo)
+                ),
+                child: _isLoading && _errorMessage == null && userProvider.colaboradorModel == null
+                    ? const Center(child: CircularProgressIndicator())
+                    : _errorMessage != null
+                        ? _buildErrorWidget() // Mostrar error
+                        // ⭐️ CONDICIÓN PRINCIPAL DE VISIBILIDAD ⭐️
+                        : (_puedeVerMaterias || _puedeVerClubes)
+                            ? Column( // Contenido principal
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  Text(
+                                    'Selecciona la opcion deseada:',
+                                    style: Theme.of(context).textTheme.titleLarge,
                                   ),
-                                // ⭐️ BOTÓN CONDICIONAL: Clubes ('asis_clubes') ⭐️
-                                if (_puedeVerClubes)
-                                  _construirBotonOpcion(
-                                    context,
-                                    title: 'Clubes',
-                                    icon: Icons.sports_soccer,
-                                    value: 'clubes',
-                                    headerColor: headerColor
+                                  const SizedBox(height: 20),
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                                    children: [
+                                      // ⭐️ BOTÓN CONDICIONAL: Materia ('materia_asis') ⭐️
+                                      if (_puedeVerMaterias)
+                                        _construirBotonOpcion(
+                                          context,
+                                          title: 'Materia',
+                                          icon: Icons.school,
+                                          value: 'materia',
+                                          headerColor: headerColor
+                                        ),
+                                      // ⭐️ BOTÓN CONDICIONAL: Clubes ('asis_clubes') ⭐️
+                                      if (_puedeVerClubes)
+                                        _construirBotonOpcion(
+                                          context,
+                                          title: 'Clubes',
+                                          icon: Icons.sports_soccer,
+                                          value: 'clubes',
+                                          headerColor: headerColor
+                                        ),
+                                    ],
                                   ),
-                              ],
-                            ),
-                            const SizedBox(height: 30),
+                                  const SizedBox(height: 30),
 
-                            if (_selectedOption != null) ...[
-                              Text(
-                                _selectedOption == 'materia' ? 'Materias asignadas:' : 'Clubes asignados:',
-                                style: Theme.of(context).textTheme.titleLarge,
+                                  if (_selectedOption != null) ...[
+                                    Text(
+                                      _selectedOption == 'materia' ? 'Materias asignadas:' : 'Clubes asignados:',
+                                      style: Theme.of(context).textTheme.titleLarge,
+                                    ),
+                                    const SizedBox(height: 20),
+                                    // ⚠️ Ya no usamos Expanded porque ahora estamos
+                                    // dentro de un SingleChildScrollView (scroll padre).
+                                    // La lista usa shrinkWrap + NeverScrollableScrollPhysics
+                                    // para no competir con el scroll del padre.
+                                    _construirListaCursos(userProvider),
+                                  ],
+                                ],
+                              )
+                            : Center( // Mensaje si no tiene NINGÚN permiso
+                                child: Text(
+                                  'No tienes permisos de Asistencia o Calificación asignados.',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(color: Colors.grey.shade600, fontSize: 18, fontWeight: FontWeight.bold),
+                                ),
                               ),
-                              const SizedBox(height: 20),
-                              Expanded(
-                                child: _construirListaCursos(userProvider),
-                              ),
-                            ],
-                          ],
-                        )
-                      : Center( // Mensaje si no tiene NINGÚN permiso
-                          child: Text(
-                            'No tienes permisos de Asistencia o Calificación asignados.',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(color: Colors.grey.shade600, fontSize: 18, fontWeight: FontWeight.bold),
-                          ),
-                        ),
+              ),
+            );
+          },
         ),
       ),
     );
@@ -348,32 +370,29 @@ class _AsistenciaScreenState extends State<AsistenciaScreen>
   
   // ✅ WIDGET: Para mostrar errores y dar opción de refresh
   Widget _buildErrorWidget() {
-    return SingleChildScrollView(
-      physics: const AlwaysScrollableScrollPhysics(),
-      child: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(20.0),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(
-                Icons.error_outline,
-                size: 60,
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(20.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(
+              Icons.error_outline,
+              size: 60,
+              color: Colors.red,
+            ),
+            const SizedBox(height: 10),
+            Text(
+              // Mensaje informativo sobre cómo reintentar
+              'Error al cargar datos: $_errorMessage\n\nArrastra hacia abajo para reintentar la conexión.',
+              textAlign: TextAlign.center,
+              style: const TextStyle(
                 color: Colors.red,
+                fontSize: 16,
               ),
-              const SizedBox(height: 10),
-              Text(
-                // Mensaje informativo sobre cómo reintentar
-                'Error al cargar datos: $_errorMessage\n\nArrastra hacia abajo para reintentar la conexión.',
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  color: Colors.red,
-                  fontSize: 16,
-                ),
-              ),
-              const SizedBox(height: 10),
-            ],
-          ),
+            ),
+            const SizedBox(height: 10),
+          ],
         ),
       ),
     );
@@ -453,6 +472,8 @@ class _AsistenciaScreenState extends State<AsistenciaScreen>
     }
 
     return ListView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
       itemCount: items.length,
       itemBuilder: (context, index) {
         final item = items[index];
