@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:oficinaescolar_colaboradores/models/escuela_model.dart';
 import 'package:oficinaescolar_colaboradores/providers/user_provider.dart';
+import 'package:oficinaescolar_colaboradores/utils/log_util.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -23,7 +24,7 @@ class WebsInteresScreen extends StatelessWidget {
       if (await canLaunchUrl(uri)) {
         await launchUrl(uri, mode: LaunchMode.externalApplication);
       } else {
-        debugPrint('No se pudo lanzar la URL: $url');
+        appLog('No se pudo lanzar la URL: $url');
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('No se pudo abrir la página web.')),
         );

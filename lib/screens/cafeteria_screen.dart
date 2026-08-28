@@ -10,7 +10,7 @@ import 'package:oficinaescolar_colaboradores/models/colores_model.dart';
 import 'package:dropdown_button2/dropdown_button2.dart';
 import 'package:oficinaescolar_colaboradores/providers/user_provider.dart';
 import 'package:oficinaescolar_colaboradores/config/api_constants.dart';
-
+import 'package:oficinaescolar_colaboradores/utils/log_util.dart';
 // Importa los modelos necesarios
 import 'package:oficinaescolar_colaboradores/models/articulo_model.dart';
 import 'package:oficinaescolar_colaboradores/models/escuela_model.dart';
@@ -56,14 +56,14 @@ class _CafeteriaViewState extends State<CafeteriaView>
   @override
   void initState() {
     super.initState();
-    debugPrint(
+    appLog(
       'CafeteriaView: initState - Inicializando pantalla de cafetería.',
     );
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _userProvider = Provider.of<UserProvider>(context, listen: false);
 
       _autoRefreshListener = () {
-        debugPrint(
+        appLog(
           'CafeteriaView: Gatillo de auto-refresco detectado. Recargando datos de cafetería (silenciosamente)...',
         );
         _loadAllCafeteriaData(forceReload: true);
@@ -90,12 +90,12 @@ class _CafeteriaViewState extends State<CafeteriaView>
 
   @override
   void dispose() {
-    debugPrint(
+    appLog(
       'CafeteriaView: dispose - Removiendo listener de auto-refresco.',
     );
     _userProvider.autoRefreshTrigger.removeListener(_autoRefreshListener);
 
-    debugPrint(
+    appLog(
       'CafeteriaView: dispose - Cancelando temporizador de auto-refresco.',
     );
     _autoRefreshTimer?.cancel();
@@ -110,7 +110,7 @@ class _CafeteriaViewState extends State<CafeteriaView>
   // void didUpdateWidget(covariant CafeteriaView oldWidget) {
   //   super.didUpdateWidget(oldWidget);
   //   if (widget.idColaborador != oldWidget.idColaborador) {
-  //     debugPrint(
+  //     appLog(
   //       'CafeteriaView didUpdateWidget: ID Alumno cambió de ${oldWidget.idColaborador} a ${widget.idColaborador}. Recargando datos.',
   //     );
   //     _loadAllCafeteriaData(forceReload: false);
@@ -122,7 +122,7 @@ class _CafeteriaViewState extends State<CafeteriaView>
     _autoRefreshTimer = Timer.periodic(
       const Duration(minutes: ApiConstants.minutosRecarga),
       (timer) {
-        debugPrint(
+        appLog(
           'CafeteriaView: Disparando auto-refresco por temporizador (${ApiConstants.minutosRecarga} minutos).',
         );
         _loadAllCafeteriaData(forceReload: true);
@@ -148,7 +148,7 @@ class _CafeteriaViewState extends State<CafeteriaView>
   }
 
   Future<void> _loadAllCafeteriaData({bool forceReload = false}) async {
-    debugPrint(
+    appLog(
       'CafeteriaView: _loadAllCafeteriaData llamado (forceReload: $forceReload).',
     );
 
@@ -160,7 +160,7 @@ class _CafeteriaViewState extends State<CafeteriaView>
         _userProvider.idEmpresa.isEmpty ||
         _userProvider.fechaHora.isEmpty ||
         _userProvider.idCiclo.isEmpty) {
-      debugPrint(
+      appLog(
         'UserProvider: Datos de sesión o alumno incompletos para Cafetería.',
       );
       setState(() {
@@ -240,23 +240,23 @@ class _CafeteriaViewState extends State<CafeteriaView>
       }
 
       if (!mounted) {
-        debugPrint(
+        appLog(
           'CafeteriaView: _loadAllCafeteriaData - Widget no montado después de cargar datos.',
         );
         return;
       }
 
-      debugPrint(
+      appLog(
         'CafeteriaView: Todos los datos cargados exitosamente desde UserProvider.',
       );
     } catch (e) {
       if (!mounted) {
-        debugPrint(
+        appLog(
           'CafeteriaView: _loadAllCafeteriaData - Widget no montado durante manejo de excepción.',
         );
         return;
       }
-      debugPrint('CafeteriaView: Excepción general al cargar datos: $e');
+      appLog('CafeteriaView: Excepción general al cargar datos: $e');
       setState(() {
         _errorMessage =
             'Error al cargar datos de cafetería: ${e.toString().replaceFirst('Exception: ', '')}';
@@ -332,7 +332,7 @@ class _CafeteriaViewState extends State<CafeteriaView>
   }
 
   void _showBankAccountModal() {
-    debugPrint('CafeteriaView: _showBankAccountModal llamado.');
+    appLog('CafeteriaView: _showBankAccountModal llamado.');
     showDialog(
       context: context,
       barrierDismissible: true,
@@ -475,7 +475,7 @@ class _CafeteriaViewState extends State<CafeteriaView>
   }
 
   void _showArticulosModal() {
-    debugPrint('CafeteriaView: _showArticulosModal llamado.');
+    appLog('CafeteriaView: _showArticulosModal llamado.');
     showDialog(
       context: context,
       barrierDismissible: true,
@@ -703,7 +703,7 @@ class _CafeteriaViewState extends State<CafeteriaView>
 
     final double totalBalance = _userProvider.ultimoSaldoConocido;
 
-    debugPrint(
+    appLog(
       'CafeteriaView: build llamado. _isLoading: $_isLoading, _errorMessage: $_errorMessage, Movimientos(${movimientos.length}), Articulos(${_userProvider.articulosCaf.length}), Periodos(${periodos.length})',
     );
     final userProvider = Provider.of<UserProvider>(context, listen: false);
@@ -731,12 +731,12 @@ class _CafeteriaViewState extends State<CafeteriaView>
             final now = DateTime.now();
             // Verifica si ha pasado menos de un minuto desde la última recarga manual.
             if (_lastManualRefreshTime != null && now.difference(_lastManualRefreshTime!).inSeconds < 60) {
-              debugPrint('CafeteriaView: Intento de recarga manual demasiado pronto.');
+              appLog('CafeteriaView: Intento de recarga manual demasiado pronto.');
               _showSnackBar('Datos actualizados.', backgroundColor: Colors.green);
               return;
             }
 
-            debugPrint('CafeteriaView: RefreshIndicator activado. Iniciando recarga forzada.');
+            appLog('CafeteriaView: RefreshIndicator activado. Iniciando recarga forzada.');
 
             _showSnackBar(
               'Recargando datos...',

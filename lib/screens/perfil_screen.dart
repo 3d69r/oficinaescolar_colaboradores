@@ -8,6 +8,7 @@ import 'package:oficinaescolar_colaboradores/models/colores_model.dart';
 import 'package:provider/provider.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:url_launcher/url_launcher.dart'; // Importación necesaria para abrir enlaces
+import 'package:oficinaescolar_colaboradores/utils/log_util.dart';
 
 // Cambiamos a StatefulWidget para manejar el estado de la animación y la orientación
 class PerfilScreen extends StatefulWidget {
@@ -77,12 +78,12 @@ class _PerfilScreenState extends State<PerfilScreen>
     final now = DateTime.now();
     if (_lastManualRefreshTime != null &&
         now.difference(_lastManualRefreshTime!).inSeconds < 60) {
-      debugPrint('PerfilScreen: Intento de recarga manual demasiado pronto.');
+      appLog('PerfilScreen: Intento de recarga manual demasiado pronto.');
       _showSnackBar('Datos actualizados.', backgroundColor: Colors.green);
       return;
     }
 
-    debugPrint('PerfilScreen: RefreshIndicator activado. Iniciando recarga forzada.');
+    appLog('PerfilScreen: RefreshIndicator activado. Iniciando recarga forzada.');
 
     _showSnackBar(
       'Recargando perfil...',
@@ -107,7 +108,7 @@ class _PerfilScreenState extends State<PerfilScreen>
       );
     } catch (e) {
       if (!mounted) return;
-      debugPrint('PerfilScreen: Excepción al recargar perfil: $e');
+      appLog('PerfilScreen: Excepción al recargar perfil: $e');
       _showSnackBar(
         'Error al actualizar el perfil: ${e.toString().replaceFirst('Exception: ', '')}',
       );

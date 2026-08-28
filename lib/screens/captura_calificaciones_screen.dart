@@ -12,6 +12,7 @@ import 'package:oficinaescolar_colaboradores/models/colaborador_model.dart';
 import 'package:oficinaescolar_colaboradores/models/boleta_encabezado_model.dart'; 
 import 'package:oficinaescolar_colaboradores/providers/user_provider.dart'; 
 import 'package:oficinaescolar_colaboradores/providers/tipo_curso.dart'; 
+import 'package:oficinaescolar_colaboradores/utils/log_util.dart';
 
 
 
@@ -84,7 +85,7 @@ class _CapturaCalificacionesScreenState extends State<CapturaCalificacionesScree
       });
 
     } catch (e) {
-      debugPrint('Error en la carga de calificaciones: $e');
+      appLog('Error en la carga de calificaciones: $e');
       setState(() {
         _errorMessage = 'Error al cargar datos: ${e.toString()}';
         _isLoading = false;
@@ -128,7 +129,7 @@ class _CapturaCalificacionesScreenState extends State<CapturaCalificacionesScree
 
         _readonlyKeys = keys.toList();
         // Revisa la consola: deberías ver una lista vacía o solo las claves que son *realmente* promedios.
-        debugPrint('Claves de Solo Lectura: $_readonlyKeys'); 
+        appLog('Claves de Solo Lectura: $_readonlyKeys'); 
     }
   // ✅ MÉTODO ACTUALIZADO: Permite la edición de celdas que ya tienen valor,
   // excepto aquellas marcadas como solo lectura (_readonlyKeys).

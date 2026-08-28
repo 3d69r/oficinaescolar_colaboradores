@@ -3,6 +3,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/user_provider.dart';
+import 'package:oficinaescolar_colaboradores/utils/log_util.dart';
 import '../models/comentario_model.dart'; 
 
 class ComentariosScreen extends StatefulWidget {
@@ -65,7 +66,7 @@ class _ComentariosScreenState extends State<ComentariosScreen> {
 
     } catch (e) {
       _showSnackBar(e.toString().replaceFirst('Exception: ', ''), Colors.red);
-      debugPrint('Error al enviar comentario: $e');
+      appLog('Error al enviar comentario: $e');
     } finally {
       setState(() {
         _isLoading = false;

@@ -15,6 +15,7 @@ import 'package:oficinaescolar_colaboradores/models/alumno_salon_model.dart';
 import 'package:oficinaescolar_colaboradores/screens/archivos_calificaciones_screen.dart';
 // ------------------------------------
 import 'package:oficinaescolar_colaboradores/screens/lista_screen.dart';
+import 'package:oficinaescolar_colaboradores/utils/log_util.dart';
 // import 'package:oficinaescolar_colaboradores/screens/captura_calificaciones_screen.dart'; // Ya no se usa
 
 class AsistenciaCalificacionArchivoScreen extends StatefulWidget {
@@ -49,7 +50,7 @@ class _AsistenciaCalificacionArchivoScreenState extends State<AsistenciaCalifica
   @override
   void initState() {
     super.initState();
-    debugPrint(
+    appLog(
       'AsistenciaCalificacionArchivoScreen: initState - Inicializando pantalla de archivos/clubes.',
     );
     
@@ -74,7 +75,7 @@ class _AsistenciaCalificacionArchivoScreenState extends State<AsistenciaCalifica
     
     // 1. Configuración del listener de auto-refresco del UserProvider
     _autoRefreshListener = () {
-      debugPrint(
+      appLog(
         'AsistenciaCalificacionArchivoScreen: Gatillo de auto-refresco del UserProvider detectado. Recargando datos...',
       );
       _cargarDatosAsistencia(forceReload: true);
@@ -100,7 +101,7 @@ class _AsistenciaCalificacionArchivoScreenState extends State<AsistenciaCalifica
 
   @override
   void dispose() {
-    debugPrint(
+    appLog(
       'AsistenciaCalificacionArchivoScreen: dispose - Cancelando temporizador y removiendo listeners.',
     );
     _autoRefreshTimer?.cancel();
@@ -118,7 +119,7 @@ class _AsistenciaCalificacionArchivoScreenState extends State<AsistenciaCalifica
     _autoRefreshTimer = Timer.periodic(
       const Duration(minutes: ApiConstants.minutosRecarga),
       (timer) {
-        debugPrint(
+        appLog(
           'AsistenciaCalificacionArchivoScreen: Disparando auto-refresco por temporizador (${ApiConstants.minutosRecarga} minutos).',
         );
         _cargarDatosAsistencia(forceReload: false); 
@@ -147,7 +148,7 @@ class _AsistenciaCalificacionArchivoScreenState extends State<AsistenciaCalifica
 
   // ⭐️ MÉTODO CLAVE: Carga principal de datos (recarga materias/clubes) ⭐️ (Sin Cambios)
   Future<void> _cargarDatosAsistencia({bool forceReload = false}) async {
-    debugPrint(
+    appLog(
       'AsistenciaCalificacionArchivoScreen: _cargarDatosAsistencia llamado (forceReload: $forceReload).',
     );
 
@@ -176,11 +177,11 @@ class _AsistenciaCalificacionArchivoScreenState extends State<AsistenciaCalifica
       await _userProvider.fetchAndLoadColaboradorData(forceRefresh: forceReload);
 
       if (!mounted) {
-        debugPrint('AsistenciaCalificacionArchivoScreen: Widget no montado después de la carga.');
+        appLog('AsistenciaCalificacionArchivoScreen: Widget no montado después de la carga.');
         return;
       }
 
-      debugPrint(
+      appLog(
         'AsistenciaCalificacionArchivoScreen: Datos de materias/clubes cargados. Materias: ${_userProvider.colaboradorMaterias.length}, Clubes: ${_userProvider.colaboradorClubes.length}',
       );
     } on SocketException {
@@ -342,7 +343,7 @@ class _AsistenciaCalificacionArchivoScreenState extends State<AsistenciaCalifica
                                               .textTheme
                                               .titleLarge,
                                         ),
-                                        const SizedBox(height: 20),
+                                                                                const SizedBox(height: 20),
 
                                         // ⭐️ FIX:
                                         // Ya no usamos Expanded porque
@@ -395,7 +396,6 @@ class _AsistenciaCalificacionArchivoScreenState extends State<AsistenciaCalifica
       if (_errorMessage != null) {
           return _buildErrorWidget();
       }
-
       if (salonNombres.isEmpty) {
           return Center(
               child: Text(

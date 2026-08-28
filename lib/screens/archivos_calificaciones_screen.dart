@@ -5,7 +5,7 @@ import 'package:oficinaescolar_colaboradores/models/datos_archivo_a_subir.dart';
 import 'package:oficinaescolar_colaboradores/screens/pdf_viewer_screen.dart';
 import 'package:provider/provider.dart';
 import 'dart:io'; 
-
+import 'package:oficinaescolar_colaboradores/utils/log_util.dart';
 import 'package:file_picker/file_picker.dart'; 
 // import 'package:shared_preferences/shared_preferences.dart'; // ❌ Eliminada
 
@@ -38,7 +38,7 @@ class _ArchivosCalificacionesScreenState extends State<ArchivosCalificacionesScr
   @override
   void initState() {
     super.initState();
-    debugPrint('DEBUG VISTA: initState - Cargando alumnos del salón.'); // ⭐️ DEBUG
+    appLog('DEBUG VISTA: initState - Cargando alumnos del salón.'); // ⭐️ DEBUG
     _cargarAlumnosDelSalon();
   }
 
@@ -54,7 +54,7 @@ class _ArchivosCalificacionesScreenState extends State<ArchivosCalificacionesScr
       setState(() {
         _alumnosDelSalon = alumnos;
         _isLoading = false;
-        debugPrint('DEBUG VISTA: setState - Alumnos cargados y listos.'); // ⭐️ DEBUG
+        appLog('DEBUG VISTA: setState - Alumnos cargados y listos.'); // ⭐️ DEBUG
       });
     }
   }
@@ -74,7 +74,7 @@ String? nombreArchivoWeb;
 
 void _seleccionarArchivo(AlumnoSalonModel alumno, String campoArchivo) async {
   final key = '${alumno.idCicloAlumno}_$campoArchivo';
-  debugPrint('DEBUG SELECCIONAR: Iniciando selección de archivo para campo: $campoArchivo'); // ⭐️ DEBUG
+  appLog('DEBUG SELECCIONAR: Iniciando selección de archivo para campo: $campoArchivo'); // ⭐️ DEBUG
 
   FilePickerResult? result;
 
@@ -83,9 +83,9 @@ void _seleccionarArchivo(AlumnoSalonModel alumno, String campoArchivo) async {
     // 🔧 Forzar inicialización segura del FilePicker en web
     try {
       await FilePicker.platform.clearTemporaryFiles();
-      debugPrint('DEBUG FILE_PICKER: Inicialización segura completada en Web ✅');
+      appLog('DEBUG FILE_PICKER: Inicialización segura completada en Web ✅');
     } catch (e) {
-      debugPrint('DEBUG FILE_PICKER: Error durante clearTemporaryFiles(): $e');
+      appLog('DEBUG FILE_PICKER: Error durante clearTemporaryFiles(): $e');
     }
   }
 
@@ -100,7 +100,7 @@ void _seleccionarArchivo(AlumnoSalonModel alumno, String campoArchivo) async {
     );
   } catch (e) {
     // Muestra el error capturado en el log y al usuario (SnackBar).
-    debugPrint('FILE_PICKER_CATCH_ERROR: Error al intentar seleccionar archivo: $e');
+    appLog('FILE_PICKER_CATCH_ERROR: Error al intentar seleccionar archivo: $e');
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text('Error de selección (seguridad/web): ${e.toString()}'),
@@ -112,7 +112,7 @@ void _seleccionarArchivo(AlumnoSalonModel alumno, String campoArchivo) async {
 
   // Si la selección fue cancelada o fallida sin lanzar una excepción capturable
   if (result == null || result.files.isEmpty) {
-    debugPrint('DEBUG SELECCIONAR: Selección de archivo cancelada o fallida.'); // ⭐️ DEBUG
+    appLog('DEBUG SELECCIONAR: Selección de archivo cancelada o fallida.'); // ⭐️ DEBUG
     return;
   }
 
@@ -130,7 +130,7 @@ void _seleccionarArchivo(AlumnoSalonModel alumno, String campoArchivo) async {
           // Limpiar las variables Web
           bytesArchivoWeb = null;
           nombreArchivoWeb = null;
-          debugPrint('DEBUG SELECCIONAR: [Móvil] Archivo seleccionado, llamando setState. path: $filePath'); // ⭐️ DEBUG
+          appLog('DEBUG SELECCIONAR: [Móvil] Archivo seleccionado, llamando setState. path: $filePath'); // ⭐️ DEBUG
         });
       }
 
@@ -151,14 +151,14 @@ void _seleccionarArchivo(AlumnoSalonModel alumno, String campoArchivo) async {
           nombreArchivoWeb = nombre;
           // Usar el nombre como referencia temporal en el mapa
           _selectedFilePaths[key] = nombre;
-          debugPrint('DEBUG SELECCIONAR: [Web] Archivo seleccionado, llamando setState. Nombre: $nombre'); // ⭐️ DEBUG
+          appLog('DEBUG SELECCIONAR: [Web] Archivo seleccionado, llamando setState. Nombre: $nombre'); // ⭐️ DEBUG
         });
       }
 
       // 2. Llamar inmediatamente a la función de subida (con el nombre como referencia de path)
       _enviarArchivos(alumno, campoArchivo, nombre);
     } else {
-      debugPrint('DEBUG SELECCIONAR: [Web] Error, bytes o nombre nulos.'); // ⭐️ DEBUG
+      appLog('DEBUG SELECCIONAR: [Web] Error, bytes o nombre nulos.'); // ⭐️ DEBUG
       // ignore: use_build_context_synchronously
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -200,12 +200,12 @@ void _seleccionarArchivo(AlumnoSalonModel alumno, String campoArchivo) async {
           nombreCampoApi: campoArchivo,
           rutaLocal: localPath,
         );
-        debugPrint('DEBUG ENVIAR: [Móvil] Preparando subida. Ruta local: $localPath'); // ⭐️ DEBUG
+        appLog('DEBUG ENVIAR: [Móvil] Preparando subida. Ruta local: $localPath'); // ⭐️ DEBUG
       } else {
         // 🌐 WEB: Usa bytes y nombre
         // 🛠️ CORRECCIÓN WEB: Aquí se lee la data que _seleccionarArchivo acaba de guardar.
         if (bytesArchivoWeb == null || nombreArchivoWeb == null) {
-            debugPrint('DEBUG ENVIAR: [Web] Fallo, bytes/nombre son nulos en _enviarArchivos.'); // ⭐️ DEBUG
+            appLog('DEBUG ENVIAR: [Web] Fallo, bytes/nombre son nulos en _enviarArchivos.'); // ⭐️ DEBUG
             ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(content: Text('Error Web: Archivo no cargado en memoria (bytes/nombre).'), backgroundColor: Colors.red),
             );
@@ -216,7 +216,7 @@ void _seleccionarArchivo(AlumnoSalonModel alumno, String campoArchivo) async {
           bytesArchivo: bytesArchivoWeb,
           nombreArchivo: nombreArchivoWeb,
         );
-        debugPrint('DEBUG ENVIAR: [Web] Preparando subida. Nombre archivo: $nombreArchivoWeb, Bytes length: ${bytesArchivoWeb!.length}'); // ⭐️ DEBUG
+        appLog('DEBUG ENVIAR: [Web] Preparando subida. Nombre archivo: $nombreArchivoWeb, Bytes length: ${bytesArchivoWeb!.length}'); // ⭐️ DEBUG
       }
       
       // Crear la lista para la llamada al Provider
@@ -228,7 +228,7 @@ void _seleccionarArchivo(AlumnoSalonModel alumno, String campoArchivo) async {
 
       try {
           // 🔑 CAMBIO DE ESTRUCTURA: Llamada al Provider con la nueva estructura
-          debugPrint('DEBUG ENVIAR: Llamando a userProvider.uploadCalificacionesArchivos...'); // ⭐️ DEBUG
+          appLog('DEBUG ENVIAR: Llamando a userProvider.uploadCalificacionesArchivos...'); // ⭐️ DEBUG
           final result = await userProvider.uploadCalificacionesArchivos(
               idAlumno: alumno.idAlumno,
               idSalon: alumno.idSalon, 
@@ -283,7 +283,7 @@ void _seleccionarArchivo(AlumnoSalonModel alumno, String campoArchivo) async {
               }
 
               setState(() {
-                  debugPrint('DEBUG ENVIAR: Llamando a setState después de subida exitosa. Esto gatilla el build.'); // ⭐️ DEBUG
+                  appLog('DEBUG ENVIAR: Llamando a setState después de subida exitosa. Esto gatilla el build.'); // ⭐️ DEBUG
                   _selectedFilePaths.remove(key);
                   // Opcional: Limpiar los bytes y nombre después de la subida exitosa
                   bytesArchivoWeb = null;
@@ -303,7 +303,7 @@ void _seleccionarArchivo(AlumnoSalonModel alumno, String campoArchivo) async {
   // ⭐️ MÉTODO MODIFICADO: Quitar Archivo (Añadida llamada a la API de eliminación) ⭐️
   void _quitarArchivo(String idCicloAlumno, String campoArchivo) async {
     if (!mounted) return;
-    debugPrint('DEBUG ELIMINAR: Iniciando eliminación para alumno: $idCicloAlumno, campo: $campoArchivo'); // ⭐️ DEBUG
+    appLog('DEBUG ELIMINAR: Iniciando eliminación para alumno: $idCicloAlumno, campo: $campoArchivo'); // ⭐️ DEBUG
 
     final alumno = _alumnosDelSalon.firstWhere(
       (a) => a.idCicloAlumno == idCicloAlumno,
@@ -362,7 +362,7 @@ void _seleccionarArchivo(AlumnoSalonModel alumno, String campoArchivo) async {
             alumno.archivosCalificacion[campoArchivo] = '';
             
             setState(() {
-              debugPrint('DEBUG ELIMINAR: Llamando a setState después de eliminación exitosa. Esto gatilla el build.'); // ⭐️ DEBUG
+              appLog('DEBUG ELIMINAR: Llamando a setState después de eliminación exitosa. Esto gatilla el build.'); // ⭐️ DEBUG
               _alumnosDelSalon = List.from(_alumnosDelSalon);
             });
 
@@ -400,7 +400,7 @@ void _seleccionarArchivo(AlumnoSalonModel alumno, String campoArchivo) async {
     final String urlBaseServidor = ApiConstants.assetsBaseUrl;
     final userProvider = Provider.of<UserProvider>(context, listen: false);
     
-    debugPrint('DEBUG VISUALIZAR: Intentando visualizar URL: $url'); // ⭐️ DEBUG
+    appLog('DEBUG VISUALIZAR: Intentando visualizar URL: $url'); // ⭐️ DEBUG
     
     if (url.isEmpty || urlBaseServidor.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -421,7 +421,7 @@ void _seleccionarArchivo(AlumnoSalonModel alumno, String campoArchivo) async {
 
     final String urlCompleta = '$baseLimpia/$rutaLimpia'; 
     
-    debugPrint('DEBUG VISUALIZAR: URL completa construida: $urlCompleta'); // ⭐️ DEBUG
+    appLog('DEBUG VISUALIZAR: URL completa construida: $urlCompleta'); // ⭐️ DEBUG
     
     if (!urlCompleta.startsWith('http')) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -457,7 +457,7 @@ void _seleccionarArchivo(AlumnoSalonModel alumno, String campoArchivo) async {
     
     final userProvider = Provider.of<UserProvider>(context, listen: false);
     
-    debugPrint('DEBUG MODAL: Mostrando modal de acciones para campo: $campoArchivo. isUploaded: $isUploaded'); // ⭐️ DEBUG
+    appLog('DEBUG MODAL: Mostrando modal de acciones para campo: $campoArchivo. isUploaded: $isUploaded'); // ⭐️ DEBUG
     
     showDialog(
       context: context,
@@ -490,7 +490,7 @@ void _seleccionarArchivo(AlumnoSalonModel alumno, String campoArchivo) async {
 
  @override
   Widget build(BuildContext context) {
-    debugPrint('DEBUG BUILD: Inicia la reconstrucción (build) de ArchivosCalificacionesScreen.'); // ⭐️ DEBUG
+    appLog('DEBUG BUILD: Inicia la reconstrucción (build) de ArchivosCalificacionesScreen.'); // ⭐️ DEBUG
     final userProvider = Provider.of<UserProvider>(context);
     
     // ⚠️ PUNTO CRÍTICO DE LECTURA DE COLORES ⚠️
@@ -694,7 +694,7 @@ class _AccionesArchivoModal extends StatelessWidget {
     final String campoDisplay = campoArchivo.replaceAll('_', ' ').toUpperCase();
     
     // ⚠️ PUNTO CRÍTICO DE LECTURA DE COLORES ⚠️
-    debugPrint('DEBUG MODAL BUILD: El modal se está construyendo/reconstruyendo.'); // ⭐️ DEBUG
+    appLog('DEBUG MODAL BUILD: El modal se está construyendo/reconstruyendo.'); // ⭐️ DEBUG
     
     return Dialog(
       shape: RoundedRectangleBorder(

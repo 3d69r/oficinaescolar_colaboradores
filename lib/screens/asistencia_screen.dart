@@ -11,6 +11,7 @@ import 'package:oficinaescolar_colaboradores/providers/tipo_curso.dart';
 import 'package:oficinaescolar_colaboradores/models/colaborador_model.dart'; 
 import 'package:oficinaescolar_colaboradores/screens/lista_screen.dart';
 import 'package:oficinaescolar_colaboradores/screens/captura_calificaciones_screen.dart'; 
+import 'package:oficinaescolar_colaboradores/utils/log_util.dart';
 //import 'package:oficinaescolar_colaboradores/screens/preescolar_listado_screen.dart'; 
 
 class AsistenciaScreen extends StatefulWidget {
@@ -44,7 +45,7 @@ class _AsistenciaScreenState extends State<AsistenciaScreen>
   @override
   void initState() {
     super.initState();
-    debugPrint(
+    appLog(
       'AsistenciaScreen: initState - Inicializando pantalla de asistencia/calificaciones.',
     );
     
@@ -71,7 +72,7 @@ class _AsistenciaScreenState extends State<AsistenciaScreen>
 
     // 1. Configuración del listener de auto-refresco del UserProvider
     _autoRefreshListener = () {
-      debugPrint(
+      appLog(
         'AsistenciaScreen: Gatillo de auto-refresco del UserProvider detectado. Recargando datos...',
       );
       // Llama a la función de carga con forceReload=true
@@ -102,7 +103,7 @@ class _AsistenciaScreenState extends State<AsistenciaScreen>
 
   @override
   void dispose() {
-    debugPrint(
+    appLog(
       'AsistenciaScreen: dispose - Cancelando temporizador y removiendo listeners.',
     );
     _autoRefreshTimer?.cancel();
@@ -120,7 +121,7 @@ class _AsistenciaScreenState extends State<AsistenciaScreen>
     _autoRefreshTimer = Timer.periodic(
       const Duration(minutes: ApiConstants.minutosRecarga),
       (timer) {
-        debugPrint(
+        appLog(
           'AsistenciaScreen: Disparando auto-refresco por temporizador (${ApiConstants.minutosRecarga} minutos).',
         );
         // Llamamos con forceReload: false para que la lógica del Provider decida si la caché expiró
@@ -150,7 +151,7 @@ class _AsistenciaScreenState extends State<AsistenciaScreen>
 
   // ⭐️ MÉTODO CLAVE: Carga principal de datos (recarga materias/clubes) ⭐️
   Future<void> _cargarDatosAsistencia({bool forceReload = false}) async {
-    debugPrint(
+    appLog(
       'AsistenciaScreen: _cargarDatosAsistencia llamado (forceReload: $forceReload).',
     );
 
@@ -183,12 +184,12 @@ class _AsistenciaScreenState extends State<AsistenciaScreen>
       await _userProvider.fetchAndLoadColaboradorData(forceRefresh: forceReload);
 
       if (!mounted) {
-        debugPrint('AsistenciaScreen: Widget no montado después de la carga.');
+        appLog('AsistenciaScreen: Widget no montado después de la carga.');
         return;
       }
 
       // El provider notifica a los listeners (que es el método build())
-      debugPrint(
+      appLog(
         'AsistenciaScreen: Datos de materias/clubes cargados. Materias: ${_userProvider.colaboradorMaterias.length}, Clubes: ${_userProvider.colaboradorClubes.length}',
       );
     } on SocketException {
@@ -255,12 +256,12 @@ class _AsistenciaScreenState extends State<AsistenciaScreen>
             final now = DateTime.now();
             if (_lastManualRefreshTime != null &&
                 now.difference(_lastManualRefreshTime!).inSeconds < 60) {
-              debugPrint('AsistenciaScreen: Intento de recarga manual demasiado pronto.');
+              appLog('AsistenciaScreen: Intento de recarga manual demasiado pronto.');
               _showSnackBar('Datos actualizados', backgroundColor: Colors.green);
               return;
             }
 
-            debugPrint('AsistenciaScreen: RefreshIndicator activado. Iniciando recarga forzada.');
+            appLog('AsistenciaScreen: RefreshIndicator activado. Iniciando recarga forzada.');
             _showSnackBar(
               'Recargando datos...',
               duration: const Duration(seconds: 1),

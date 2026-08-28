@@ -3,6 +3,6 @@ import 'package:flutter/foundation.dart';
 
 void appLog(String message) {
   if (kDebugMode) {
-    debugPrint('APP LOG: $message');
+    debugPrint('APP LOG: $message'); // 👈 antes decía appLog(...)
   }
 }

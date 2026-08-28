@@ -8,6 +8,7 @@ import 'dart:io';
 import 'package:oficinaescolar_colaboradores/config/api_constants.dart';
 import 'package:oficinaescolar_colaboradores/providers/user_provider.dart';
 import 'package:oficinaescolar_colaboradores/models/escuela_model.dart';
+import 'package:oficinaescolar_colaboradores/utils/log_util.dart';
 
 //ESTA VISTA SE DEBE CORREGIR EL FILTRADO
 
@@ -34,14 +35,14 @@ class _ContactosScreenState extends State<ContactosScreen>
   @override
   void initState() {
     super.initState();
-    debugPrint(
+    appLog(
       'ContactosScreen: initState - Inicializando pantalla de contactos.',
     );
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _userProvider = Provider.of<UserProvider>(context, listen: false);
 
       _autoRefreshListener = () {
-        debugPrint(
+        appLog(
           'ContactosScreen: Gatillo de auto-refresco del UserProvider detectado. Recargando contactos...',
         );
         _loadContactos(forceReload: true);
@@ -67,7 +68,7 @@ class _ContactosScreenState extends State<ContactosScreen>
 
   @override
   void dispose() {
-    debugPrint(
+    appLog(
       'ContactosScreen: dispose - Cancelando temporizador de auto-refresco y removiendo listeners.',
     );
     _autoRefreshTimer?.cancel();
@@ -80,7 +81,7 @@ class _ContactosScreenState extends State<ContactosScreen>
     _autoRefreshTimer = Timer.periodic(
       const Duration(minutes: ApiConstants.minutosRecarga),
       (timer) {
-        debugPrint(
+        appLog(
           'ContactosScreen: Disparando auto-refresco por temporizador (${ApiConstants.minutosRecarga} minutos).',
         );
         _loadContactos(forceReload: true);
@@ -106,7 +107,7 @@ class _ContactosScreenState extends State<ContactosScreen>
   }
 
   Future<void> _loadContactos({bool forceReload = false}) async {
-    debugPrint(
+    appLog(
       'ContactosScreen: _loadContactos llamado (forceReload: $forceReload).',
     );
 
@@ -136,13 +137,13 @@ class _ContactosScreenState extends State<ContactosScreen>
       await _userProvider.fetchAndLoadSchoolData(forceRefresh: forceReload);
 
       if (!mounted) {
-        debugPrint(
+        appLog(
           'ContactosScreen: _loadContactos - Widget no montado después de la carga de datos del provider.',
         );
         return;
       }
 
-      debugPrint(
+      appLog(
         'ContactosScreen: Contactos cargados desde UserProvider: ${_userProvider.escuelaModel?.contactos.length ?? 0}',
       );
     } on SocketException {
@@ -290,7 +291,7 @@ class _ContactosScreenState extends State<ContactosScreen>
               userNivelEducativo.toLowerCase();
         }).toList();
 
-    debugPrint(
+    appLog(
       'ContactosScreen: build llamado. _errorMessage: $_errorMessage, Contactos filtrados: ${filteredContacts.length}',
     );
 
@@ -310,14 +311,14 @@ class _ContactosScreenState extends State<ContactosScreen>
             final now = DateTime.now();
             if (_lastManualRefreshTime != null &&
                 now.difference(_lastManualRefreshTime!).inSeconds < 60) {
-              debugPrint(
+              appLog(
                 'ContactosScreen: Intento de recarga manual demasiado pronto.',
               );
               _showSnackBar('Datos actualizados.', backgroundColor: Colors.green);
               return;
             }
 
-            debugPrint(
+            appLog(
               'ContactosScreen: RefreshIndicator activado. Iniciando recarga forzada.',
             );
             _showSnackBar(

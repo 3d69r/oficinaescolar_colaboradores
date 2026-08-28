@@ -9,6 +9,7 @@ import 'package:provider/provider.dart';
 import 'package:oficinaescolar_colaboradores/config/api_constants.dart';
 import 'package:oficinaescolar_colaboradores/providers/user_provider.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:oficinaescolar_colaboradores/utils/log_util.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -508,11 +509,11 @@ class _LoginScreenState extends State<LoginScreen> {
     final encodedBody = body.entries
         .map((e) => '${e.key}=${e.value}')
         .join('&');
-    debugPrint(
+    appLog(
       'ForgotPassword - Cuerpo enviado (form-urlencoded): $encodedBody',
     );
     // Agregamos el print de la URL para depuración
-    debugPrint('ForgotPassword - URL de la solicitud: $url');
+    appLog('ForgotPassword - URL de la solicitud: $url');
 
     try {
       setState(() => isLoading = true);
@@ -522,7 +523,7 @@ class _LoginScreenState extends State<LoginScreen> {
         body: body,
       );
 
-      debugPrint(
+      appLog(
         'ForgotPassword response (${response.statusCode}): ${response.body}',
       );
 

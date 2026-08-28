@@ -4,6 +4,7 @@ import 'package:oficinaescolar_colaboradores/providers/user_provider.dart';
 import 'package:oficinaescolar_colaboradores/models/escuela_model.dart';
 import 'package:oficinaescolar_colaboradores/config/api_constants.dart';
 import 'package:provider/provider.dart';
+import 'package:oficinaescolar_colaboradores/utils/log_util.dart';
 
 
 class DatosEscuelaScreen extends StatelessWidget {
@@ -200,7 +201,7 @@ class DatosEscuelaScreen extends StatelessWidget {
                                     imageUrl: schoolLogoUrl,
                                     fit: BoxFit.contain,
                                     errorWidget: (context, url, error) {
-                                      debugPrint(
+                                      appLog(
                                           'Error al cargar imagen del logo: $error');
                                       return const Icon(Icons.wifi_off,
                                           size: 40, color: Colors.white);

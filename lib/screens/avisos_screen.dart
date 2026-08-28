@@ -14,6 +14,7 @@ import 'package:oficinaescolar_colaboradores/config/api_constants.dart';
 import 'package:oficinaescolar_colaboradores/providers/user_provider.dart';
 import 'package:oficinaescolar_colaboradores/models/aviso_model.dart';
 import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
+import 'package:oficinaescolar_colaboradores/utils/log_util.dart';
 //import 'package:url_launcher/url_launcher.dart';
 
 /// Clase [AvisosView]
@@ -89,7 +90,7 @@ class _AvisosViewState extends State<AvisosView>
   /// Se utiliza para la inicialización de datos y configuración de listeners o timers.
   void initState() {
     super.initState();
-    debugPrint('AvisosView: initState - Inicializando pantalla de avisos.');
+    appLog('AvisosView: initState - Inicializando pantalla de avisos.');
     //initializeDateFormatting('es_ES', null);
     // Asegura que las operaciones que dependen del 'context' se ejecuten después de que el widget esté completamente montado.
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -123,7 +124,7 @@ class _AvisosViewState extends State<AvisosView>
   ///
   /// Se utiliza para liberar recursos y cancelar suscripciones (como temporizadores).
   void dispose() {
-    debugPrint(
+    appLog(
       'AvisosView: dispose - Cancelando temporizador de auto-refresco y removiendo listeners.',
     );
     // Cancela el temporizador para evitar fugas de memoria.
@@ -140,7 +141,7 @@ class _AvisosViewState extends State<AvisosView>
     _autoRefreshTimer = Timer.periodic(
       const Duration(minutes: ApiConstants.minutosRecarga),
       (timer) {
-        debugPrint(
+        appLog(
           'AvisosView: Disparando auto-refresco por temporizador (${ApiConstants.minutosRecarga} minutos).',
         );
         // Fuerza una recarga completa de los avisos desde la API.
@@ -231,7 +232,7 @@ class _AvisosViewState extends State<AvisosView>
 
       // Si el widget se desmonta mientras la operación asíncrona está en curso, salir.
       if (!mounted) {
-        debugPrint(
+        appLog(
           'AvisosView: _loadAvisos - Widget no montado después de la carga de avisos del provider.',
         );
         return;
@@ -243,13 +244,13 @@ class _AvisosViewState extends State<AvisosView>
         _errorMessage =
             null; // Confirma que no hay error si la carga fue exitosa.
       });
-      debugPrint(
+      appLog(
         'AvisosView: Avisos cargados desde UserProvider: ${_userProvider.avisos.length} avisos.',
       );
     } catch (e) {
       // Manejo de errores durante la carga de avisos.
       if (!mounted) {
-        debugPrint(
+        appLog(
           'AvisosView: _loadAvisos - Widget no montado durante manejo de excepción.',
         );
         return;
@@ -260,7 +261,7 @@ class _AvisosViewState extends State<AvisosView>
             'Error al cargar avisos: ${e.toString().replaceFirst('Exception: ', '')}';
         // Si hay un error, la lista de avisos se gestiona por el provider, no se vacía aquí.
       });
-      debugPrint('AvisosView: Excepción al cargar avisos: $e');
+      appLog('AvisosView: Excepción al cargar avisos: $e');
       // Muestra un SnackBar con el mensaje de error.
       _showSnackBar(_errorMessage!, backgroundColor: Colors.red);
     } finally {
@@ -947,7 +948,7 @@ Widget build(BuildContext context) {
     // este widget se reconstruirá para reflejar esos cambios.
     _userProvider = Provider.of<UserProvider>(context);
 
-    debugPrint(
+    appLog(
       'AvisosView: build llamado. _errorMessage: $_errorMessage, Avisos filtrados(${avisosFiltrados.length})',
     );
     // [MODIFICACIÓN] Obtener los colores del provider dentro del builder
@@ -974,12 +975,12 @@ Widget build(BuildContext context) {
             final now = DateTime.now();
             // Verifica si ha pasado menos de un minuto desde la última recarga manual.
             if (_lastManualRefreshTime != null && now.difference(_lastManualRefreshTime!).inSeconds < 60) {
-              debugPrint('AvisosView: Intento de recarga manual demasiado pronto.');
+              appLog('AvisosView: Intento de recarga manual demasiado pronto.');
               _showSnackBar('Datos actualizados.', backgroundColor: Colors.green);
               return; 
             }
 
-            debugPrint('AvisosView: RefreshIndicator activado. Iniciando recarga forzada.');
+            appLog('AvisosView: RefreshIndicator activado. Iniciando recarga forzada.');
 
             _showSnackBar(
               'Recargando datos...',

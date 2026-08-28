@@ -6,7 +6,7 @@ import 'package:http/http.dart' as http;
 import 'package:oficinaescolar_colaboradores/providers/user_provider.dart';
 import 'package:oficinaescolar_colaboradores/widgets/input_decoration.dart';
 import 'package:provider/provider.dart';
-
+import 'package:oficinaescolar_colaboradores/utils/log_util.dart';
 class CodeEscuelaScreen extends StatefulWidget {
   const CodeEscuelaScreen({super.key});
 
@@ -46,20 +46,20 @@ class _CodeEscuelaScreenState extends State<CodeEscuelaScreen> {
           final String? message = responseData['message'];
 
           if (message != null) {
-            debugPrint('Mensaje de la API: $message');
+            appLog('Mensaje de la API: $message');
           }
 
-          debugPrint('Notificación a Firebase procesada exitosamente.');
+          appLog('Notificación a Firebase procesada exitosamente.');
         } on FormatException catch (e) {
           // Maneja el caso en que la respuesta no sea un JSON válido
-          debugPrint('Error: La respuesta de la API no es un JSON válido: $e');
+          appLog('Error: La respuesta de la API no es un JSON válido: $e');
         }
       } else {
-        debugPrint(
+        appLog(
             'Error en la llamada a la API. Código de estado: ${response.statusCode}');
       }
     } catch (e) {
-      debugPrint('Excepción al llamar a notificar_firebase: $e');
+      appLog('Excepción al llamar a notificar_firebase: $e');
     }
   }*/
 
@@ -100,34 +100,34 @@ class _CodeEscuelaScreenState extends State<CodeEscuelaScreen> {
           } else {
             // Error de negocio: La API dice que no se encontró la escuela.
             // Mensaje simple y no técnico.
-            debugPrint(
+            appLog(
                 'API Response Error: ${data['message'] ?? 'Escuela no encontrada en la API'}');
             mostrarErrorUsuario('Escuela no encontrada');
             return null;
           }
         } on FormatException catch (e) {
           // Error técnico: El cuerpo de la respuesta no es un JSON válido.
-          debugPrint('Error de JSON Decode: $e');
+          appLog('Error de JSON Decode: $e');
           mostrarErrorUsuario(errorGenerico);
           return null;
         }
       } else {
         // 2. Error de servidor (HTTP no 200: 400, 500, etc.)
         // No mostramos el código de estado al usuario.
-        debugPrint(
+        appLog(
             'Error de servidor HTTP. Código: ${response.statusCode}. Body: ${response.body}');
         mostrarErrorUsuario('Error al conectar con el servicio. Intenta más tarde.');
         return null;
       }
     } on SocketException {
       // 3. Error de conexión (DNS lookup failed, host unreachable, etc.)
-      debugPrint('Excepción de Socket: Falló la conexión de red.');
+      appLog('Excepción de Socket: Falló la conexión de red.');
       mostrarErrorUsuario(errorConexion);
       return null;
     } catch (e) {
       // 4. Cualquier otra excepción (Timeout, error en la URL, etc.)
       // Evitamos mostrar el objeto 'e' que puede contener información técnica.
-      debugPrint('Excepción inesperada en validarCodigoEscuela: $e');
+      appLog('Excepción inesperada en validarCodigoEscuela: $e');
       mostrarErrorUsuario(errorGenerico);
       return null;
     }

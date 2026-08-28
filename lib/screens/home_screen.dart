@@ -11,6 +11,7 @@ import 'package:oficinaescolar_colaboradores/services/aviso_navigation_signal.da
 import 'package:oficinaescolar_colaboradores/config/api_constants.dart';
 import 'package:oficinaescolar_colaboradores/providers/user_provider.dart';
 import 'package:oficinaescolar_colaboradores/models/colaborador_model.dart'; 
+import 'package:oficinaescolar_colaboradores/utils/log_util.dart';
 
 // Importa tus pantallas
 import 'contactos_screen.dart';
@@ -39,7 +40,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    debugPrint('HomeScreen: initState - Inicializando pantalla de inicio.');
+    appLog('HomeScreen: initState - Inicializando pantalla de inicio.');
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       _userProvider = Provider.of<UserProvider>(context, listen: false);
       await _loadAllData();
@@ -63,7 +64,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   void dispose() {
-    debugPrint('HomeScreen: dispose - Limpiando recursos de HomeScreen.');
+    appLog('HomeScreen: dispose - Limpiando recursos de HomeScreen.');
     // Se asegura de que _userProvider se haya inicializado antes de remover el listener
     // Acceso más directo a la variable de instancia:
     if (mounted) {
@@ -74,19 +75,19 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _onAutoRefreshTriggered() async {
-    debugPrint('HomeScreen: Señal de auto-refresco recibida. Recargando datos...');
+    appLog('HomeScreen: Señal de auto-refresco recibida. Recargando datos...');
     await _userProvider.initializeAllUserData();
   }
 
   Future<void> _loadAllData() async {
-    debugPrint('HomeScreen: _loadAllData - Iniciando carga inicial de todos los datos.');
+    appLog('HomeScreen: _loadAllData - Iniciando carga inicial de todos los datos.');
     await _userProvider.initializeAllUserData();
     if (mounted) {
       setState(() => _isLoadingInitialData = false);
     }
   }
   void _abrirDatosEscuela() {
-    debugPrint('HomeScreen: _abrirDatosEscuela - Navegando a DatosEscuelaScreen.');
+    appLog('HomeScreen: _abrirDatosEscuela - Navegando a DatosEscuelaScreen.');
     final escuelaModel = _userProvider.escuelaModel;
     if (escuelaModel != null && mounted) {
       Navigator.push(
@@ -97,7 +98,7 @@ class _HomeScreenState extends State<HomeScreen> {
       );
     } else {
       _showSnackBar('Los datos de la escuela aún no están disponibles.');
-      debugPrint('HomeScreen: Error: escuelaModel es nulo al intentar abrir DatosEscuelaScreen.');
+      appLog('HomeScreen: Error: escuelaModel es nulo al intentar abrir DatosEscuelaScreen.');
     }
   }
 
@@ -145,7 +146,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final String? rawAppPermisos = userProvider.escuelaModel?.appPermisos;
 
     // ⭐️ AÑADIR IMPRESIÓN DE DEPURACIÓN AQUÍ ⭐️
-    debugPrint('DEBUG PERMISOS: Contenido crudo de app_permisos: $rawAppPermisos');
+    appLog('DEBUG PERMISOS: Contenido crudo de app_permisos: $rawAppPermisos');
 
     final List<String> permisos =
         userProvider.escuelaModel?.appPermisos
@@ -161,7 +162,7 @@ class _HomeScreenState extends State<HomeScreen> {
             .toList() ??
         [];
 
-        debugPrint('DEBUG PERMISOS: Contenido crudo de app_permisos: $permisosColab');
+        appLog('DEBUG PERMISOS: Contenido crudo de app_permisos: $permisosColab');
 
     // --- 1. Definir todas las páginas/ítems posibles EXCLUYENDO Avisos ---
     final List<Widget> pagesBeforeAvisos = [];
@@ -398,7 +399,7 @@ class _HomeScreenState extends State<HomeScreen> {
             title: const Text('Cerrar sesión'),
             onTap: () async {
               Navigator.pop(context);
-              debugPrint('HomeScreen: Cerrar sesión presionado. Actualizando token a inactivo y limpiando UserProvider.');
+              appLog('HomeScreen: Cerrar sesión presionado. Actualizando token a inactivo y limpiando UserProvider.');
 
               final idColaborador = userProvider.colaboradorModel?.idColaborador;
               final escuela = userProvider.escuela;
@@ -413,7 +414,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     status: 'inactivo',
                   );
                 } catch (e) {
-                  debugPrint('Error al actualizar token a inactivo: $e');
+                  appLog('Error al actualizar token a inactivo: $e');
                 }
               }
 
@@ -493,7 +494,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   fit: BoxFit.contain,
                   placeholder: (context, url) => const CircularProgressIndicator(),
                   errorWidget: (context, url, error) {
-                    debugPrint('HomeScreen: Error al cargar imagen del logo (CachedNetworkImage): $error');
+                    appLog('HomeScreen: Error al cargar imagen del logo (CachedNetworkImage): $error');
                     return const Icon(
                       Icons.school,
                       color: Colors.white,
