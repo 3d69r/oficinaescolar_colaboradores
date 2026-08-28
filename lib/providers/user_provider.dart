@@ -966,9 +966,8 @@ Future<Map<String, dynamic>> saveAviso(
                 'id_calendario': idAvisoServer, 
                 'titulo': avisoData['titulo'],
                 // NOTA: Guardamos el comentario, o una nota si hay archivo
-                'comentario': hasFile
-                    ? 'Aviso con adjunto: ${(archivoNombre ?? rutaArchivo?.split('/').last) ?? 'archivo'}'
-                    : avisoData['cuerpo'],
+                // DESPUÉS
+                'comentario': hasFile ? '' : avisoData['cuerpo'],
                 'seccion': apiSeccionCode,
                 'valor_especifico': valorEspecifico ?? '', 
                 'tipo_respuesta': tipoRespuesta,

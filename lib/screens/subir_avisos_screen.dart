@@ -4,7 +4,8 @@ import 'package:oficinaescolar_colaboradores/screens/editar_aviso_screen.dart';
 import 'package:provider/provider.dart'; 
 import 'package:intl/intl.dart'; 
 import 'crear_aviso_screen.dart';
-import 'package:oficinaescolar_colaboradores/providers/user_provider.dart'; 
+import 'package:oficinaescolar_colaboradores/providers/user_provider.dart';
+import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart'; 
 // import 'avisos_archivados_screen.dart'; // ❌ ELIMINADA: Ya no se usa
 import 'package:flutter_html/flutter_html.dart'; 
 // ⭐️ IMPORTACIONES NECESARIAS PARA IMAGEN ⭐️
@@ -39,231 +40,318 @@ class _SubirAvisosScreenState extends State<SubirAvisosScreen> {
     });
   }
 
-  // ⭐️ 1. FUNCIÓN PARA EL MODAL SIMPLIFICADO DE VISUALIZACIÓN/EDICIÓN (MODIFICADA) ⭐️
 void _mostrarAvisoParaEdicion(Map<String, dynamic> aviso) {
-    final userProvider = Provider.of<UserProvider>(context, listen: false); 
-    final colores = userProvider.colores;
-    
-    final String titulo = aviso['titulo'] as String? ?? 'Aviso sin Título';
-    final String comentario = aviso['comentario'] as String? ?? 'Aviso sin Contenido';
-    final String fechaStr = aviso.containsKey('fecha_inicio') ? aviso['fecha_inicio'] as String? ?? '' : '';
-    
-    // ⭐️ LÓGICA CLAVE PARA EL ARCHIVO (ACTUALIZADA) ⭐️
-    final String? rutaArchivoAlmacenada = aviso['archivo'] as String?;
-    final bool tieneArchivo = rutaArchivoAlmacenada != null && rutaArchivoAlmacenada.isNotEmpty;
-    
-    String? rutaFinalParaVisualizar;
-    
-    if (tieneArchivo) {
-        // La ruta es una URL completa si empieza con 'http'
-        if (rutaArchivoAlmacenada.toLowerCase().startsWith('http')) {
-            rutaFinalParaVisualizar = rutaArchivoAlmacenada;
-        } else {
-            // Si la ruta NO es una URL completa (como 'assets/...'), prefijamos.
-            // Usamos la constante API para prefijar y asegurar que no haya doble barra
-            String limpiaRuta = rutaArchivoAlmacenada.startsWith('/') ? rutaArchivoAlmacenada.substring(1) : rutaArchivoAlmacenada;
-            rutaFinalParaVisualizar = ApiConstants.assetsBaseUrl + limpiaRuta;
-        }
+  final userProvider = Provider.of<UserProvider>(context, listen: false);
+  final colores = userProvider.colores;
+
+  final String titulo = aviso['titulo'] as String? ?? 'Aviso sin Título';
+  final String cuerpo = aviso['comentario'] as String? ?? '';
+  final String fechaInicio = aviso['fecha_inicio'] as String? ?? '';
+  final String fechaFin = aviso['fecha_fin'] as String? ?? '';
+  final String tipoRespuesta = aviso['tipo_respuesta'] as String? ?? 'Ninguna';
+
+  final List<String> opcionesPreview = [
+    aviso['opcion_1'],
+    aviso['opcion_2'],
+    aviso['opcion_3'],
+  ]
+      .whereType<String>()
+      .map((e) => e.trim())
+      .where((e) => e.isNotEmpty)
+      .toList();
+
+  // Resolver la ruta/URL final del archivo, igual que ya hacías
+  final String? rutaArchivoAlmacenada = aviso['archivo'] as String?;
+  final bool tieneArchivo =
+      rutaArchivoAlmacenada != null && rutaArchivoAlmacenada.isNotEmpty;
+
+  String? rutaFinalParaVisualizar;
+  if (tieneArchivo) {
+    if (rutaArchivoAlmacenada.toLowerCase().startsWith('http')) {
+      rutaFinalParaVisualizar = rutaArchivoAlmacenada;
     } else {
-        rutaFinalParaVisualizar = null;
+      String limpiaRuta = rutaArchivoAlmacenada.startsWith('/')
+          ? rutaArchivoAlmacenada.substring(1)
+          : rutaArchivoAlmacenada;
+      rutaFinalParaVisualizar = ApiConstants.assetsBaseUrl + limpiaRuta;
     }
+  }
 
-    // Usamos rutaFinalParaVisualizar para determinar si es una URL funcional
-    final bool esURL = rutaFinalParaVisualizar != null && rutaFinalParaVisualizar.toLowerCase().startsWith('http');
-    
-    // ---------------------------------------------------------------------------------
-    
-    String fechaFormateada = '';
-    try {
-        final DateTime fecha = DateTime.parse(fechaStr);
-        // Asegúrate de que DateFormat use el idioma español si está configurado en el proyecto
-        fechaFormateada = DateFormat('EEEE d \'de\' MMMM \'del\' yyyy', 'es').format(fecha);
-    } catch (e) {
-        fechaFormateada = 'Fecha no disponible';
-    }
+  final bool esPdf =
+      tieneArchivo && rutaArchivoAlmacenada.toLowerCase().endsWith('.pdf');
 
+  showDialog(
+    context: context,
+    builder: (dialogContext) {
+      final screenWidth = MediaQuery.of(dialogContext).size.width;
+      final screenHeight = MediaQuery.of(dialogContext).size.height;
+      final dialogWidth = screenWidth * 0.90;
+      final dialogHeight = screenHeight * 0.95;
 
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        final screenWidth = MediaQuery.of(context).size.width;
-        final screenHeight = MediaQuery.of(context).size.height;
-        final dialogWidth = screenWidth * 0.90;
-        final dialogHeight = screenHeight * 0.90; 
-
-        return Dialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(15),
+      return Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        insetPadding:
+            const EdgeInsets.symmetric(horizontal: 10.0, vertical: 10.0),
+        backgroundColor: Colors.white,
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            minWidth: dialogWidth,
+            maxWidth: dialogWidth,
+            minHeight: dialogHeight,
+            maxHeight: dialogHeight,
           ),
-          insetPadding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 10.0),
-          backgroundColor: Colors.white,
-          child: ConstrainedBox(
-            constraints: BoxConstraints(
-              minWidth: dialogWidth,
-              maxWidth: dialogWidth,
-              minHeight: dialogHeight,
-              maxHeight: dialogHeight,
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.max,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                // --- Encabezado ---
-                Container(
-                  padding: const EdgeInsets.symmetric(vertical: 15.0, horizontal: 20.0),
-                  decoration: BoxDecoration(
-                    color: colores.headerColor,
-                    borderRadius: const BorderRadius.only(
-                      topLeft: Radius.circular(15),
-                      topRight: Radius.circular(15),
-                    ),
+          child: Column(
+            mainAxisSize: MainAxisSize.max,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // --- Encabezado ---
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(vertical: 18.0, horizontal: 20.0),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      colores.headerColor,
+                      colores.headerColor.withOpacity(0.85)
+                    ],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
                   ),
-                  child: Text(
-                    titulo,
-                    style: const TextStyle(
-                      fontSize: 20,
+                  borderRadius: const BorderRadius.only(
+                    topLeft: Radius.circular(20),
+                    topRight: Radius.circular(20),
+                  ),
+                ),
+                child: Text(
+                  titulo,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                      fontSize: 19,
                       fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
+                      color: Colors.white),
                 ),
+              ),
 
-                // --- Contenido scrollable dentro de Expanded ---
-                Expanded(
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.all(20.0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        // Información de fecha
-                        Text(
-                          fechaFormateada,
-                          style: const TextStyle(fontSize: 14, color: Colors.black),
-                          
-                        ),
-                        const SizedBox(height: 5),
-                        const Divider(color: Colors.grey, thickness: 0.5),
-                        const SizedBox(height: 10),
-                        
-                        // ⭐️ WIDGET DE IMAGEN CONDICIONAL (SI TIENE ARCHIVO) ⭐️
-                        if (tieneArchivo) ...[
-
-                            
-                            const SizedBox(height: 10),
-                            // Lógica para mostrar la imagen según la plataforma y la ruta
-                            Container(
-                              padding: const EdgeInsets.all(5.0),
-                              decoration: BoxDecoration(
-                                border: Border.all(color: Colors.grey.shade300),
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              child: Builder(
-                                builder: (context) {
-                                  // Si es una URL (la hemos construido arriba), usa Image.network
-                                  if (esURL) {
-                                    return Image.network(
-                                      rutaFinalParaVisualizar!, // ⭐️ USAMOS LA RUTA FINAL AQUÍ ⭐️
-                                      fit: BoxFit.contain,
-                                      height: 200, // Altura máxima para el modal
-                                      loadingBuilder: (context, child, loadingProgress) {
-                                        if (loadingProgress == null) return child;
-                                        return const SizedBox(
-                                          height: 200,
-                                          child: Center(child: CircularProgressIndicator()),
-                                        );
-                                      },
-                                      errorBuilder: (context, error, stackTrace) {
-                                        return const SizedBox(
-                                          height: 100,
-                                          child: Center(child: Text('Error al cargar imagen remota. Verifique la URL y la conexión.')),
-                                        );
-                                      },
-                                    );
-                                  // Si es una ruta local y NO es web, usa Image.file
-                                  } else if (!kIsWeb) {
-                                    return Image.file(
-                                      // ⚠️ Nota: Si rutaArchivoAlmacenada contiene 'assets/...' no funcionará en Image.file ⚠️
-                                      // Usamos la ruta almacenada original para Image.file, esperando que sea una ruta de sistema válida.
-                                      File(rutaArchivoAlmacenada), 
-                                      fit: BoxFit.contain,
-                                      height: 200,
-                                      errorBuilder: (context, error, stackTrace) {
-                                        // Muestra un widget si el archivo no existe localmente
-                                        return const SizedBox(
-                                          height: 100,
-                                          child: Center(child: Text('Archivo local no encontrado o no es una imagen.')),
-                                        );
-                                      },
-                                    );
-                                  } else {
-                                    // Web no puede acceder a rutas locales por seguridad, solo a URLs
-                                    return const SizedBox(
-                                        height: 50,
-                                        child: Center(child: Text('Archivo adjunto no disponible.')),
-                                      );
-                                  }
-                                },
-                              ),
-                            ),
-                            const SizedBox(height: 20),
-                        ],
-                        
-                        // ⭐️ CONTENIDO DEL AVISO CON FORMATO HTML ⭐️
-                        Html(
-                          data: comentario,
-                          style: {
-                            "body": Style(
-                              fontSize: FontSize(16.0),
-                              lineHeight: LineHeight(1.5),
-                              margin: Margins.zero, 
-                              padding: HtmlPaddings.zero, 
-                            ),
-                            "h1": Style(fontSize: FontSize(24.0), fontWeight: FontWeight.bold),
-                            "h2": Style(fontSize: FontSize(20.0), fontWeight: FontWeight.bold),
-                            "h3": Style(fontSize: FontSize(18.0), fontWeight: FontWeight.bold),
-                          },
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-
-                // --- Botones al fondo del modal (Editar / Cerrar) ---
-                Padding(
-                  padding: const EdgeInsets.all(20.0),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
+              // --- Contenido ---
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      TextButton(
-                        onPressed: () => Navigator.of(context).pop(),
-                        child: Text('Cerrar', style: TextStyle(color: colores.botonesColor)),
+                      Row(
+                        children: [
+                          Icon(Icons.calendar_today_rounded,
+                              size: 14, color: Colors.grey.shade600),
+                          const SizedBox(width: 6),
+                          Text(
+                            'Del $fechaInicio al $fechaFin',
+                            style: TextStyle(
+                                fontSize: 13,
+                                color: Colors.grey.shade700,
+                                fontWeight: FontWeight.w500),
+                          ),
+                        ],
                       ),
-                      const SizedBox(width: 15),
-                      ElevatedButton.icon(
+                      const SizedBox(height: 10),
+                      const Divider(color: Color(0xFFE5E7EB), thickness: 1),
+                      const SizedBox(height: 10),
+
+                      // Contenido: PDF / imagen / html
+                      if (tieneArchivo)
+                        Expanded(
+                          child: Align(
+                            alignment: Alignment.topCenter,
+                            child: esPdf
+                                ? SizedBox(
+                                    width: double.infinity,
+                                    height: double.infinity,
+                                    child: SfPdfViewer.network(
+                                      rutaFinalParaVisualizar!,
+                                      canShowHyperlinkDialog: true,
+                                      enableDocumentLinkAnnotation: true,
+                                    ),
+                                  )
+                                : ClipRRect(
+                                    borderRadius: BorderRadius.circular(12),
+                                    child: InteractiveViewer(
+                                      panEnabled: true,
+                                      minScale: 1.0,
+                                      maxScale: 4.0,
+                                      child: SizedBox(
+                                        width: double.infinity,
+                                        child: Image.network(
+                                          rutaFinalParaVisualizar!,
+                                          fit: BoxFit.contain,
+                                          loadingBuilder: (context, child,
+                                              loadingProgress) {
+                                            if (loadingProgress == null) {
+                                              return child;
+                                            }
+                                            return const SizedBox(
+                                              height: 200,
+                                              child: Center(
+                                                  child:
+                                                      CircularProgressIndicator()),
+                                            );
+                                          },
+                                          errorBuilder:
+                                              (context, error, stackTrace) =>
+                                                  const Text(
+                                            'No se pudo cargar la imagen.',
+                                            textAlign: TextAlign.center,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                          ),
+                        )
+                      else
+                        Expanded(
+                          child: SingleChildScrollView(
+                            child: Align(
+                              alignment: Alignment.topLeft,
+                              child: Html(data: cuerpo),
+                            ),
+                          ),
+                        ),
+
+                      // --- Sección de respuesta (solo lectura) ---
+                      if (tipoRespuesta.toLowerCase() == 'siono' ||
+                          tipoRespuesta.toLowerCase() == 'seleccion')
+                        Container(
+                          margin: const EdgeInsets.only(top: 16.0),
+                          padding: const EdgeInsets.all(16.0),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF6F7FB),
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'Este aviso pide una respuesta:',
+                                style: TextStyle(
+                                    fontWeight: FontWeight.bold, fontSize: 15),
+                              ),
+                              const SizedBox(height: 12),
+                              if (tipoRespuesta.toLowerCase() == 'siono')
+                                Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceEvenly,
+                                  children: [
+                                    Expanded(
+                                      child: Padding(
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 4),
+                                        child: OutlinedButton(
+                                          onPressed: null,
+                                          style: OutlinedButton.styleFrom(
+                                            shape: RoundedRectangleBorder(
+                                              borderRadius:
+                                                  BorderRadius.circular(12),
+                                            ),
+                                            side: BorderSide(
+                                                color: colores.botonesColor
+                                                    .withOpacity(0.4)),
+                                            padding: const EdgeInsets.symmetric(
+                                                vertical: 12),
+                                          ),
+                                          child: const Text('Sí'),
+                                        ),
+                                      ),
+                                    ),
+                                    Expanded(
+                                      child: Padding(
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 4),
+                                        child: OutlinedButton(
+                                          onPressed: null,
+                                          style: OutlinedButton.styleFrom(
+                                            shape: RoundedRectangleBorder(
+                                              borderRadius:
+                                                  BorderRadius.circular(12),
+                                            ),
+                                            side: BorderSide(
+                                                color: colores.botonesColor
+                                                    .withOpacity(0.4)),
+                                            padding: const EdgeInsets.symmetric(
+                                                vertical: 12),
+                                          ),
+                                          child: const Text('No'),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                )
+                              else if (tipoRespuesta.toLowerCase() ==
+                                  'seleccion')
+                                Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: opcionesPreview.map((opcion) {
+                                    return RadioListTile<String>(
+                                      title: Text(opcion),
+                                      value: opcion,
+                                      groupValue: null,
+                                      onChanged: null,
+                                      activeColor: colores.botonesColor,
+                                    );
+                                  }).toList(),
+                                ),
+                            ],
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+
+              // --- Botones ---
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () => Navigator.of(dialogContext).pop(),
+                        icon: const Icon(Icons.close_rounded),
+                        label: const Text('Cerrar'),
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12)),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ElevatedButton.icon(
                         onPressed: () {
-                          Navigator.of(context).pop(); // Cerrar modal
+                          Navigator.of(dialogContext).pop();
                           _navegarAEdicion(aviso);
                         },
-                        icon: const Icon(Icons.edit, size: 18),
+                        icon: const Icon(Icons.edit_rounded),
                         label: const Text('Editar Aviso'),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: colores.botonesColor,
                           foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12)),
                         ),
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
-        );
-      },
-    );
+        ),
+      );
+    },
+  );
 }
-  
   // ⭐️ 2. FUNCIÓN PARA NAVEGAR A LA VISTA DE EDICIÓN (Modificada para recargar) ⭐️
   void _navegarAEdicion(Map<String, dynamic> aviso) async {
     await Navigator.of(context).push(
