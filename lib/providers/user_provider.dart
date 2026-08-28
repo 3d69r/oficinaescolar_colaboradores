@@ -549,37 +549,51 @@ Future<void> saveColaboradorSessionToPrefs({
     notifyListeners();
   }
 
-  Map<String, List<AlumnoSalonModel>> get groupedAlumnosBySalon {
-    // 1. Obtener los datos (seguro contra nulos)
-    final List<AlumnoSalonModel> alumnos = colaboradorModel?.alumnosSalon ?? [];
-    if (alumnos.isEmpty) return {};
+Map<String, List<AlumnoSalonModel>> get groupedAlumnosBySalon {
+  // 1. Obtener los datos (seguro contra nulos)
+  final List<AlumnoSalonModel> alumnos =
+      colaboradorModel?.alumnosSalon ?? [];
 
-    final Map<String, List<AlumnoSalonModel>> salones = {};
+  if (alumnos.isEmpty) return {};
 
-    // 2. Agrupar alumnos por el nombre del salón
-    for (var alumno in alumnos) {
-      if (salones.containsKey(alumno.salon)) {
-        salones[alumno.salon]!.add(alumno);
-      } else {
-        salones[alumno.salon] = [alumno];
-      }
+  final Map<String, List<AlumnoSalonModel>> salones = {};
+
+  // 2. Agrupar alumnos por salón evitando duplicados
+  //    La combinación ID del alumno + salón debe ser única.
+  for (final alumno in alumnos) {
+    if (!salones.containsKey(alumno.salon)) {
+      salones[alumno.salon] = [];
     }
 
-    // 3. Ordenamiento (Mejora de UX)
-    // a. Ordenar alumnos dentro de cada salón por nombre completo
-    salones.forEach((key, value) {
-      // Nota: Asume que AlumnoSalonModel tiene el getter nombreCompleto
-      value.sort((a, b) => a.nombreCompleto.toLowerCase().compareTo(b.nombreCompleto.toLowerCase()));
-    });
-    
-    // b. Ordenar los salones alfabéticamente
-    final sortedKeys = salones.keys.toList()..sort();
-    
-    final sortedSalones = {for (var key in sortedKeys) key: salones[key]!};
+    final bool yaExiste = salones[alumno.salon]!.any(
+      (a) => a.idAlumno == alumno.idAlumno,
+    );
 
-    return sortedSalones;
+    if (!yaExiste) {
+      salones[alumno.salon]!.add(alumno);
+    }
+  }
+
+  // 3. Ordenar alumnos dentro de cada salón por nombre completo
+  salones.forEach((key, value) {
+    value.sort(
+      (a, b) => a.nombreCompleto
+          .toLowerCase()
+          .compareTo(b.nombreCompleto.toLowerCase()),
+    );
+  });
+
+  // 4. Ordenar los salones alfabéticamente
+  final sortedKeys = salones.keys.toList()..sort();
+
+  // 5. Regresar el mapa ordenado
+  final sortedSalones = {
+    for (final key in sortedKeys)
+      key: salones[key]!,
+  };
+
+  return sortedSalones;
 }
-
   Future<void> enviarComentario(Comentario comentario) async {
     if (_escuela.isEmpty || _idColaborador.isEmpty) {
       appLog('UserProvider: Datos de sesión incompletos para enviar comentario.');
