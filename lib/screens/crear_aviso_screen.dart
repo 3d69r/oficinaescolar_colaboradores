@@ -1075,12 +1075,25 @@ final List<String> listaSalones =
                           children: [
                             Expanded(
                               child: _buildSegmentButton(
-                                label: 'Adjuntar archivo',
-                                icon: Icons.attach_file_rounded,
-                                selected: !_mostrarEditor,
-                                color: dynamicPrimaryColor,
-                                onTap: () => _mostrarMenuAdjuntar(dynamicPrimaryColor),
-                              ),
+  label: 'Adjuntar archivo',
+  icon: Icons.attach_file_rounded,
+  selected: !_mostrarEditor,
+  color: dynamicPrimaryColor,
+  onTap: () async {
+    if (_mostrarEditor) {
+      setState(() {
+        _mostrarEditor = false;
+      });
+
+      // Espera a que Flutter destruya el HtmlEditor
+      await Future.delayed(const Duration(milliseconds: 100));
+    }
+
+    if (!mounted) return;
+
+    _mostrarMenuAdjuntar(dynamicPrimaryColor);
+  },
+),
                             ),
                             Expanded(
                               child: _buildSegmentButton(

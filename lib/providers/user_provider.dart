@@ -224,7 +224,7 @@ Future<void> loadAvisosCreados() async {
 
       appLog('UserProvider: Sincronizando avisos creados desde la API: $avisosCreadosUrl');
       final response = await http.get(avisosCreadosUrl);
-
+  appLog('DEBUG FECHA: response.body = ${response.body}');
       if (response.statusCode != 200) {
         appLog('UserProvider: Error HTTP al sincronizar avisos creados (${response.statusCode}). Se conserva caché local.');
         return;
@@ -248,7 +248,7 @@ Future<void> loadAvisosCreados() async {
                 'seccion': a['seccion']?.toString() ?? '',
                 'valor_especifico': a['valor_especifico']?.toString() ?? '',
                 'tipo_respuesta': a['tipo_respuesta']?.toString() ?? 'Ninguna',
-                'fecha_inicio': a['fecha_inicio']?.toString() ?? '',
+                'fecha_inicio': a['fecha']?.toString() ?? '',
                 'fecha_fin': a['fecha_fin']?.toString() ?? '',
                 'opcion_1': a['opcion_1']?.toString() ?? '',
                 'opcion_2': a['opcion_2']?.toString() ?? '',

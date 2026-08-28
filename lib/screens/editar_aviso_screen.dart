@@ -9,6 +9,8 @@ import 'package:dropdown_button2/dropdown_button2.dart';
 import 'package:oficinaescolar_colaboradores/utils/snackbar_util.dart';
 import 'dart:io';
 import 'dart:typed_data';
+import 'package:oficinaescolar_colaboradores/config/api_constants.dart'; // agregar import
+
 import 'package:flutter/foundation.dart' show kIsWeb;
 
 
@@ -56,6 +58,8 @@ class _EditarAvisoScreenState extends State<EditarAvisoScreen> {
   String? _rutaArchivoAdjunto;
   Uint8List? _archivoBytes;
   String? _archivoNombre;
+
+  bool _esArchivoRemoto = false;
   // ----------------------------------------------------
 
   @override
@@ -122,6 +126,7 @@ class _EditarAvisoScreenState extends State<EditarAvisoScreen> {
 
     if (archivoAdjuntoApi != null && archivoAdjuntoApi.isNotEmpty) {
       _rutaArchivoAdjunto = archivoAdjuntoApi;
+      _esArchivoRemoto = true;
       _mostrarEditor = false;
     } else if (_initialHtmlContent.isNotEmpty) {
       _mostrarEditor = true;
@@ -238,6 +243,7 @@ class _EditarAvisoScreenState extends State<EditarAvisoScreen> {
             _archivoNombre = null;
           }
           _mostrarEditor = false;
+          _esArchivoRemoto = false;
           _cuerpoEditorController.clear();
           _initialHtmlContent = '';
         });
@@ -677,6 +683,71 @@ class _EditarAvisoScreenState extends State<EditarAvisoScreen> {
     );
   }
 
+  Widget _buildArchivoPreview() {
+  final String? ruta = _rutaArchivoAdjunto;
+  if (ruta == null) return const SizedBox.shrink();
+
+  final bool esPdf = ruta.toLowerCase().endsWith('.pdf');
+
+  if (esPdf) {
+    return Container(
+      width: 44,
+      height: 44,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: Colors.red.shade50,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Icon(Icons.picture_as_pdf_rounded, color: Colors.red.shade400),
+    );
+  }
+
+  if (_esArchivoRemoto) {
+    final String url = ruta.toLowerCase().startsWith('http')
+        ? ruta
+        : ApiConstants.assetsBaseUrl +
+            (ruta.startsWith('/') ? ruta.substring(1) : ruta);
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(8),
+      child: Image.network(
+        url,
+        width: 44,
+        height: 44,
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) => Icon(
+          Icons.broken_image_rounded,
+          color: Colors.blue.shade300,
+        ),
+      ),
+    );
+  }
+
+  return ClipRRect(
+    borderRadius: BorderRadius.circular(8),
+    child: kIsWeb && _archivoBytes != null
+        ? Image.memory(
+            _archivoBytes!,
+            width: 44,
+            height: 44,
+            fit: BoxFit.cover,
+            errorBuilder: (context, error, stackTrace) => Icon(
+              Icons.broken_image_rounded,
+              color: Colors.blue.shade300,
+            ),
+          )
+        : Image.file(
+            File(ruta),
+            width: 44,
+            height: 44,
+            fit: BoxFit.cover,
+            errorBuilder: (context, error, stackTrace) => Icon(
+              Icons.broken_image_rounded,
+              color: Colors.blue.shade300,
+            ),
+          ),
+  );
+}
+
   @override
   Widget build(BuildContext context) {
     final userProvider = Provider.of<UserProvider>(context);
@@ -897,45 +968,10 @@ class _EditarAvisoScreenState extends State<EditarAvisoScreen> {
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(color: Colors.blue.shade100),
                         ),
-                        child: Row(
-                          children: [
-                            if (!_rutaArchivoAdjunto!.toLowerCase().endsWith('.pdf'))
-                              ClipRRect(
-                                borderRadius: BorderRadius.circular(8),
-                                child: kIsWeb && _archivoBytes != null
-                                    ? Image.memory(
-                                        _archivoBytes!,
-                                        width: 44,
-                                        height: 44,
-                                        fit: BoxFit.cover,
-                                        errorBuilder: (context, error, stackTrace) => Icon(
-                                          Icons.broken_image_rounded,
-                                          color: Colors.blue.shade300,
-                                        ),
-                                      )
-                                    : Image.file(
-                                        File(_rutaArchivoAdjunto!),
-                                        width: 44,
-                                        height: 44,
-                                        fit: BoxFit.cover,
-                                        errorBuilder: (context, error, stackTrace) => Icon(
-                                          Icons.broken_image_rounded,
-                                          color: Colors.blue.shade300,
-                                        ),
-                                      ),
-                              )
-                            else
-                              Container(
-                                width: 44,
-                                height: 44,
-                                alignment: Alignment.center,
-                                decoration: BoxDecoration(
-                                  color: Colors.red.shade50,
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: Icon(Icons.picture_as_pdf_rounded, color: Colors.red.shade400),
-                              ),
-                            const SizedBox(width: 10),
+child: Row(
+  children: [
+    _buildArchivoPreview(),
+    const SizedBox(width: 10),
                             Expanded(
                                 child: Text(
                                     'Archivo adjunto: ${_rutaArchivoAdjunto!.split('/').last}',
