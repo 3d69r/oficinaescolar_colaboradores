@@ -457,6 +457,42 @@ class DatabaseHelper {
     return [];
   }
   
+  /// Reemplaza toda la lista local de avisos creados con la lista recibida
+  /// desde la API (sincronización completa).
+  Future<void> replaceAvisosCreados(List<Map<String, dynamic>> avisos) async {
+    if (_debeDeshabilitarDb) {
+      appLog('DatabaseHelper: Reemplazo de avisos creados omitido (Web/Desktop).');
+      return;
+    }
+
+    final db = await database;
+    await db.delete(_avisosCreadosTable);
+    appLog('DatabaseHelper: Tabla $_avisosCreadosTable limpiada para sincronización.');
+
+    for (final avisoData in avisos) {
+      final Map<String, dynamic> dataToSave = {
+        'id_aviso': avisoData['id_aviso'],
+        'titulo': avisoData['titulo'],
+        'comentario': avisoData['comentario'],
+        'seccion': avisoData['seccion'],
+        'valor_especifico': avisoData['valor_especifico'],
+        'tipo_respuesta': avisoData['tipo_respuesta'],
+        'fecha_inicio': avisoData['fecha_inicio'],
+        'fecha_fin': avisoData['fecha_fin'],
+        'opcion_1': avisoData['opcion_1'],
+        'opcion_2': avisoData['opcion_2'],
+        'opcion_3': avisoData['opcion_3'],
+        'archivo': avisoData['archivo'],
+      };
+      await db.insert(
+        _avisosCreadosTable,
+        dataToSave,
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
+    }
+    appLog('DatabaseHelper: ${avisos.length} avisos creados sincronizados desde la API.');
+  }
+
   /// Elimina un aviso creado localmente (útil para sincronización o borrado)
   Future<void> deleteAvisoCreado(String idAviso) async {
     // ⭐️ PROTECCIÓN ⭐️

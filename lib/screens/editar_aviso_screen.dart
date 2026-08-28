@@ -5,8 +5,12 @@ import 'package:html_editor_enhanced/html_editor.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:oficinaescolar_colaboradores/models/colaborador_model.dart';
+import 'package:dropdown_button2/dropdown_button2.dart';
 import 'package:oficinaescolar_colaboradores/utils/snackbar_util.dart';
 import 'dart:io';
+import 'dart:typed_data';
+import 'package:flutter/foundation.dart' show kIsWeb;
+
 
 // ----------------------------------------------------------------------
 // ESTA VISTA SOLO SE ENCARGA DE EDITAR Y ELIMINAR AVISOS EXISTENTES
@@ -37,6 +41,7 @@ class _EditarAvisoScreenState extends State<EditarAvisoScreen> {
   List<String> _destinatariosPrincipales = ['Todos'];
   String _destinatarioSeleccionado = 'Todos';
   Map<String, List<String>> _opcionesEspecificas = {};
+  Map<String, String> _idAlumnoPorNombre = {}; // ⭐️ NUEVO
   String? _seleccionEspecifica;
   String _respuestaSeleccionada = 'Ninguna';
 
@@ -49,6 +54,8 @@ class _EditarAvisoScreenState extends State<EditarAvisoScreen> {
   // ⭐️ ESTADOS PARA CONTROL DE ARCHIVO/COMENTARIO ⭐️
   bool _mostrarEditor = false;
   String? _rutaArchivoAdjunto;
+  Uint8List? _archivoBytes;
+  String? _archivoNombre;
   // ----------------------------------------------------
 
   @override
@@ -75,8 +82,15 @@ class _EditarAvisoScreenState extends State<EditarAvisoScreen> {
       final List<String> listaSalones =
           salonesParaMostrar.map((s) => s.salon).toList();
       final List<String> listaAlumnos = colaborador.avisoAlumnos
-          .map((a) => '${a.primerNombre} ${a.apellidoPat} (${a.idAlumno})')
+          .map((a) => '${a.primerNombre} ${a.apellidoPat}')
           .toList();
+
+      // ⭐️ NUEVO: mapa nombre -> id_alumno (para resolver sin depender del texto visible)
+      _idAlumnoPorNombre = {
+        for (var a in colaborador.avisoAlumnos)
+          '${a.primerNombre} ${a.apellidoPat}': a.idAlumno
+      };
+
       final List<String> listaColaboradores = colaborador.avisoColaboradores
           .map((c) => c.nombreCompleto)
           .toList();
@@ -196,7 +210,7 @@ class _EditarAvisoScreenState extends State<EditarAvisoScreen> {
         allowedExtensions: ['pdf', 'jpg', 'jpeg', 'png'],
       );
 
-      if (result != null && result.files.single.path != null) {
+      if (result != null && result.files.isNotEmpty) {
         final PlatformFile pickedFile = result.files.single;
 
         if (pickedFile.size > maxFileSize) {
@@ -206,8 +220,23 @@ class _EditarAvisoScreenState extends State<EditarAvisoScreen> {
           return;
         }
 
+        if (kIsWeb && pickedFile.bytes == null) {
+          if (mounted) {
+            showModernSnackBar(context, 'No se pudo leer el archivo seleccionado.', SnackType.error);
+          }
+          return;
+        }
+
         setState(() {
-          _rutaArchivoAdjunto = pickedFile.path;
+          if (kIsWeb) {
+            _archivoBytes = pickedFile.bytes;
+            _archivoNombre = pickedFile.name;
+            _rutaArchivoAdjunto = pickedFile.name; // solo para mostrar en UI
+          } else {
+            _rutaArchivoAdjunto = pickedFile.path;
+            _archivoBytes = null;
+            _archivoNombre = null;
+          }
           _mostrarEditor = false;
           _cuerpoEditorController.clear();
           _initialHtmlContent = '';
@@ -290,10 +319,9 @@ class _EditarAvisoScreenState extends State<EditarAvisoScreen> {
       final XFile? picked = await _imagePicker.pickImage(source: source, imageQuality: 85);
       if (picked == null) return;
 
-      final file = File(picked.path);
-      final int size = await file.length();
+      final Uint8List bytes = await picked.readAsBytes();
 
-      if (size > maxFileSize) {
+      if (bytes.length > maxFileSize) {
         if (mounted) {
           showModernSnackBar(context, 'La imagen es demasiado grande. Máximo 1 MB.', SnackType.error);
         }
@@ -301,7 +329,15 @@ class _EditarAvisoScreenState extends State<EditarAvisoScreen> {
       }
 
       setState(() {
-        _rutaArchivoAdjunto = picked.path;
+        if (kIsWeb) {
+          _archivoBytes = bytes;
+          _archivoNombre = picked.name;
+          _rutaArchivoAdjunto = picked.name; // solo para mostrar en UI
+        } else {
+          _rutaArchivoAdjunto = picked.path;
+          _archivoBytes = null;
+          _archivoNombre = null;
+        }
         _mostrarEditor = false;
         _cuerpoEditorController.clear();
         _initialHtmlContent = '';
@@ -316,7 +352,6 @@ class _EditarAvisoScreenState extends State<EditarAvisoScreen> {
       }
     }
   }
-
   void _mostrarEditorComentario() {
     setState(() {
       _mostrarEditor = true;
@@ -455,14 +490,23 @@ class _EditarAvisoScreenState extends State<EditarAvisoScreen> {
         destinatarioValor = null;
       }
 
+      // ⭐️ NUEVO: resolver el id_alumno real a partir del nombre seleccionado
+      final String? destinatarioIdAlumno =
+          (_destinatarioSeleccionado == 'Alumno Específico' && destinatarioValor != null)
+              ? _idAlumnoPorNombre[destinatarioValor]
+              : null;
+
       final String idAviso =
-          widget.avisoParaEditar['id_calendario'] as String? ?? '0';
+          widget.avisoParaEditar['id_calendario']?.toString() ??
+          widget.avisoParaEditar['id_aviso']?.toString() ??
+          '0';
 
       final avisoDataParaProvider = {
         'titulo': _tituloController.text,
         'cuerpo': _rutaArchivoAdjunto != null ? '' : cuerpoHtml, // Enviar cuerpo vacío si hay archivo
         'destinatario_tipo': _destinatarioSeleccionado,
         'destinatario_valor': destinatarioValor,
+        'destinatario_id_alumno': destinatarioIdAlumno, // ⭐️ NUEVO
         'requiere_respuesta': tipoRespuestaAPI,
         'fecha_inicio': _fechaInicio.toIso8601String().substring(0, 10),
         'fecha_fin': _fechaFin.toIso8601String().substring(0, 10),
@@ -479,7 +523,11 @@ class _EditarAvisoScreenState extends State<EditarAvisoScreen> {
         showModernSnackBar(context, 'Actualizando aviso...', SnackType.loading);
       });
 
-      final result = await userProvider.saveAviso(avisoDataParaProvider);
+      final result = await userProvider.saveAviso(
+        avisoDataParaProvider,
+        archivoBytes: kIsWeb ? _archivoBytes : null,
+        archivoNombre: kIsWeb ? _archivoNombre : null,
+      );
 
       if (!mounted) return;
 
@@ -854,16 +902,27 @@ class _EditarAvisoScreenState extends State<EditarAvisoScreen> {
                             if (!_rutaArchivoAdjunto!.toLowerCase().endsWith('.pdf'))
                               ClipRRect(
                                 borderRadius: BorderRadius.circular(8),
-                                child: Image.file(
-                                  File(_rutaArchivoAdjunto!),
-                                  width: 44,
-                                  height: 44,
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (context, error, stackTrace) => Icon(
-                                    Icons.broken_image_rounded,
-                                    color: Colors.blue.shade300,
-                                  ),
-                                ),
+                                child: kIsWeb && _archivoBytes != null
+                                    ? Image.memory(
+                                        _archivoBytes!,
+                                        width: 44,
+                                        height: 44,
+                                        fit: BoxFit.cover,
+                                        errorBuilder: (context, error, stackTrace) => Icon(
+                                          Icons.broken_image_rounded,
+                                          color: Colors.blue.shade300,
+                                        ),
+                                      )
+                                    : Image.file(
+                                        File(_rutaArchivoAdjunto!),
+                                        width: 44,
+                                        height: 44,
+                                        fit: BoxFit.cover,
+                                        errorBuilder: (context, error, stackTrace) => Icon(
+                                          Icons.broken_image_rounded,
+                                          color: Colors.blue.shade300,
+                                        ),
+                                      ),
                               )
                             else
                               Container(
@@ -888,8 +947,11 @@ class _EditarAvisoScreenState extends State<EditarAvisoScreen> {
                             IconButton(
                               icon: Icon(Icons.close_rounded,
                                   color: Colors.red.shade400, size: 20),
-                              onPressed: () =>
-                                  setState(() => _rutaArchivoAdjunto = null),
+                              onPressed: () => setState(() {
+                                _rutaArchivoAdjunto = null;
+                                _archivoBytes = null;
+                                _archivoNombre = null;
+                              }),
                             ),
                           ],
                         ),
@@ -993,8 +1055,9 @@ class _EditarAvisoScreenState extends State<EditarAvisoScreen> {
                 fontSize: 13.5,
                 color: Colors.grey.shade600)),
         const SizedBox(height: 8),
-        DropdownButtonFormField<String>(
-          value: value,
+        DropdownButtonFormField2<String>(
+          isExpanded: true,
+          valueListenable: ValueNotifier<String?>(value),
           decoration: InputDecoration(
             filled: true,
             fillColor: const Color(0xFFF7F8FA),
@@ -1009,11 +1072,14 @@ class _EditarAvisoScreenState extends State<EditarAvisoScreen> {
               borderSide: BorderSide(color: dynamicPrimaryColor, width: 2.0),
             ),
           ),
-          isExpanded: true,
-          items: items.map<DropdownMenuItem<String>>((String itemValue) {
-            return DropdownMenuItem<String>(
+          items: items.map<DropdownItem<String>>((String itemValue) {
+            return DropdownItem<String>(
               value: itemValue,
-              child: Text(itemValue, style: const TextStyle(fontSize: 14)),
+              child: Text(
+                itemValue,
+                style: const TextStyle(fontSize: 14),
+                overflow: TextOverflow.ellipsis,
+              ),
             );
           }).toList(),
           onChanged: items.isEmpty ? null : onChanged,
@@ -1023,6 +1089,24 @@ class _EditarAvisoScreenState extends State<EditarAvisoScreen> {
             }
             return null;
           },
+          dropdownStyleData: DropdownStyleData(
+            maxHeight: 280,
+            offset: const Offset(0, -4),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(14),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.08),
+                  blurRadius: 12,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+          ),
+          menuItemStyleData: const MenuItemStyleData(
+            padding: EdgeInsets.symmetric(horizontal: 14),
+          ),
         ),
       ],
     );

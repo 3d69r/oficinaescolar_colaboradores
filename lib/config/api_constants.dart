@@ -139,8 +139,10 @@ class ApiConstants {
 
   /// API: get_avisos/escuela/id_empresa/fechahora/id_alumno
   /// Obtiene los avisos para la escuela, filtrados opcionalmente por alumno.
-  static String getAvisos(String escuela, String idEmpresa, String fechaHora, String idAlumno, String idSalon, String nivelEducativo, String idPersona, String idToken, String idColaborador) {
-    return '${apiBaseUrl}get_avisos/$escuela/$idEmpresa/$fechaHora/$idAlumno/$idSalon/$nivelEducativo/$idPersona/$idToken/$idColaborador';
+  /// [idColaboradorCaptura]: opcional. Si se envía, la API filtra los avisos
+  /// creados por ese colaborador (útil para listar "Mis avisos creados").
+  static String getAvisos(String escuela, String idEmpresa, String fechaHora, String idAlumno, String idSalon, String nivelEducativo, String idPersona, String idToken, String idColaborador, [String idColaboradorCaptura = '0']) {
+    return '${apiBaseUrl}get_avisos/$escuela/$idEmpresa/$fechaHora/$idAlumno/$idSalon/$nivelEducativo/$idPersona/$idToken/$idColaborador/$idColaboradorCaptura';
   }
 
   /// API: get_articulos_caf/escuela/id_empresa/cafeteria/fechahora

@@ -23,12 +23,14 @@ final StreamController<Map<String, dynamic>> _dataPushController =
 
 /// Tipos de push que la app sabe manejar. Agregar aquí un tipo nuevo
 /// es todo lo que se necesita en este archivo.
-const Set<String> _knownPushTypes = {'aviso_nuevo'};
+const Set<String> _knownPushTypes = {'aviso_nuevo', 'aviso_nuevo_cafeteria'};
 
 String? _sectionForTipo(String tipo) {
   switch (tipo) {
     case 'aviso_nuevo':
       return 'avisos';
+    case 'aviso_nuevo_cafeteria':
+      return 'cafeteria';
     default:
       return null;
   }

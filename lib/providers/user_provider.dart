@@ -7,6 +7,7 @@ import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:device_info_plus/device_info_plus.dart';
+import 'dart:typed_data';
 
 import 'package:oficinaescolar_colaboradores/data/database_helper.dart';
 import 'package:oficinaescolar_colaboradores/config/api_constants.dart';
@@ -155,12 +156,15 @@ class UserProvider with ChangeNotifier {
     super.dispose();
   }
 
-  /// ⭐️ [FINAL] Carga la lista de avisos creados usando lógica dual (DB > SharedPreferences o Solo SP en Web).
+  /// ⭐️ [FINAL] Carga la lista de avisos creados: primero desde caché local
+  /// (para respuesta inmediata), luego sincroniza contra la API (fuente de verdad),
+  /// lo que permite ver en cualquier dispositivo/plataforma los avisos creados
+  /// desde otro dispositivo/plataforma.
 Future<void> loadAvisosCreados() async {
     appLog('UserProvider: Intentando cargar avisos creados...');
-    
+
     List<Map<String, dynamic>> loadedActivos = [];
-    
+
     if (kIsWeb) {
         // 🚀 MODO WEB: Saltamos la DB, vamos directo a SharedPreferences.
         loadedActivos = await _getAvisosCreadosFromPrefs(_prefsAvisosCreadosKey);
@@ -168,21 +172,118 @@ Future<void> loadAvisosCreados() async {
     } else {
         // 📱 MODO MÓVIL/DESKTOP: Intentamos DB primero.
         try {
-            loadedActivos = await _dbHelper.getAvisosCreados(); 
+            loadedActivos = await _dbHelper.getAvisosCreados();
             appLog('UserProvider: ${loadedActivos.length} avisos creados (activos) cargados desde DB (Móvil).');
         } catch (e) {
             // Fallback si la DB local falla o no existe (ej. primer arranque en iOS/Android).
             appLog('UserProvider: Fallo al cargar avisos desde DB. Intentando SharedPreferences. Error: $e');
-            
+
             loadedActivos = await _getAvisosCreadosFromPrefs(_prefsAvisosCreadosKey);
             appLog('UserProvider: ${loadedActivos.length} activos cargados desde SharedPreferences (Fallback Móvil).');
         }
     }
 
-    // 3. ACTUALIZAR ESTADO
-    _avisosCreados = loadedActivos.toList(); 
+    // Mostramos primero lo que tengamos en caché (respuesta inmediata).
+    _avisosCreados = loadedActivos.toList();
     notifyListeners();
+
+    // 🌐 Ahora sincronizamos contra la API, fuente de verdad real.
+    await _sincronizarAvisosCreadosDesdeApi();
 }
+
+  /// Consulta la API por los avisos creados por el colaborador actual
+  /// (usando el parámetro id_colaborador_captura) y sincroniza la caché local.
+  /// Si falla la conexión, se conserva silenciosamente lo que ya había en caché.
+  Future<void> _sincronizarAvisosCreadosDesdeApi() async {
+    final String escuelaCode = _escuela;
+    final String idEmpresa = _idEmpresa;
+    final String idColaboradorActual = _idColaborador;
+    final String idToken = _idToken ?? '0';
+    final String fechaHoraApiCall = _fechaHora.isNotEmpty ? _fechaHora : generateApiFechaHora();
+
+    if (escuelaCode.isEmpty || idEmpresa.isEmpty || idColaboradorActual.isEmpty) {
+      appLog('UserProvider: Datos de sesión incompletos para sincronizar avisos creados.');
+      return;
+    }
+
+    try {
+      final avisosCreadosUrl = Uri.parse(
+        ApiConstants.getAvisos(
+          escuelaCode,
+          idEmpresa,
+          fechaHoraApiCall,
+          '0', // idAlumno: no filtramos por destinatario alumno
+          '0', // idSalon
+          '0', // nivelEducativo
+          '0', // idPersona
+          idToken,
+          '0', // idColaborador (destinatario): no filtramos por receptor
+          idColaboradorActual, // idColaboradorCaptura: SÍ filtramos por quien lo creó
+        ),
+      );
+
+      appLog('UserProvider: Sincronizando avisos creados desde la API: $avisosCreadosUrl');
+      final response = await http.get(avisosCreadosUrl);
+
+      if (response.statusCode != 200) {
+        appLog('UserProvider: Error HTTP al sincronizar avisos creados (${response.statusCode}). Se conserva caché local.');
+        return;
+      }
+
+      final rawData = json.decode(response.body);
+      if (rawData is! List) {
+        appLog('UserProvider: La API de avisos creados devolvió un formato inesperado. Se conserva caché local.');
+        return;
+      }
+
+      // Filtro de seguridad adicional en cliente: solo avisos creados por este colaborador.
+      final List<Map<String, dynamic>> avisosDesdeApi = rawData
+          .whereType<Map<String, dynamic>>()
+          .where((a) => (a['id_colaborador_crea']?.toString() ?? '') == idColaboradorActual)
+          .map((a) => <String, dynamic>{
+                'id_aviso': a['id_calendario']?.toString() ?? '0',
+                'id_calendario': a['id_calendario']?.toString() ?? '0',
+                'titulo': a['titulo']?.toString() ?? '',
+                'comentario': a['comentario']?.toString() ?? '',
+                'seccion': a['seccion']?.toString() ?? '',
+                'valor_especifico': a['valor_especifico']?.toString() ?? '',
+                'tipo_respuesta': a['tipo_respuesta']?.toString() ?? 'Ninguna',
+                'fecha_inicio': a['fecha_inicio']?.toString() ?? '',
+                'fecha_fin': a['fecha_fin']?.toString() ?? '',
+                'opcion_1': a['opcion_1']?.toString() ?? '',
+                'opcion_2': a['opcion_2']?.toString() ?? '',
+                'opcion_3': a['opcion_3']?.toString() ?? '',
+                'archivo': (a['archivo']?.toString().isNotEmpty ?? false) ? a['archivo'].toString() : null,
+              })
+          .toList();
+
+      // Orden: más reciente primero.
+      avisosDesdeApi.sort((x, y) =>
+          (int.tryParse(y['id_calendario'] ?? '0') ?? 0).compareTo(int.tryParse(x['id_calendario'] ?? '0') ?? 0));
+
+      // Actualizamos estado en memoria.
+      _avisosCreados = avisosDesdeApi;
+      notifyListeners();
+
+      // Sincronizamos caché local con lo que regresó el servidor.
+      if (!kIsWeb) {
+        try {
+          await _dbHelper.replaceAvisosCreados(avisosDesdeApi);
+        } catch (e) {
+          appLog('UserProvider: Fallo al sincronizar avisos creados en DB local: $e');
+        }
+      }
+      await _saveAvisosCreadosToPrefs(avisosDesdeApi, _prefsAvisosCreadosKey);
+
+      appLog('UserProvider: ${avisosDesdeApi.length} avisos creados sincronizados desde la API.');
+    } on SocketException {
+      appLog('UserProvider: Sin conexión al sincronizar avisos creados. Se conserva caché local.');
+    } on http.ClientException {
+      appLog('UserProvider: Problema de red al sincronizar avisos creados. Se conserva caché local.');
+    } catch (e) {
+      appLog('UserProvider: Excepción al sincronizar avisos creados: $e. Se conserva caché local.');
+    }
+  }
   
   /// ⭐️ [MODIFICADO] Guarda una lista de avisos completa en SharedPreferences (Web/Fallback), usando una KEY específica.
   Future<void> _saveAvisosCreadosToPrefs(List<Map<String, dynamic>> avisos, String key) async {
@@ -637,12 +738,14 @@ Future<void> saveColaboradorSessionToPrefs({
         return rawData; 
       } else {
         // Error HTTP no 200 (ej: 404, 500)
-        return {'status': 'error', 'message': 'Error de servidor: ${response.statusCode}'};
+        appLog('UserProvider: Error HTTP al subir archivo: ${response.statusCode}');
+        return {'status': 'error', 'message': 'No se pudo subir el archivo. Intenta nuevamente.'};
       }
     } on SocketException {
       return {'status': 'error', 'message': 'Fallo de conexión a internet.'};
     } on Exception catch (e) {
-      return {'status': 'error', 'message': 'Excepción al subir archivo: ${e.toString()}'};
+      appLog('UserProvider: Excepción al subir archivo: $e');
+      return {'status': 'error', 'message': 'Ocurrió un error al subir el archivo. Intenta nuevamente.'};
     }
   }
 
@@ -669,9 +772,8 @@ Future<void> saveColaboradorSessionToPrefs({
         if (response.statusCode == 200) {
             return json.decode(response.body);
         } else {
-            // Manejar errores HTTP, por ejemplo, devolviendo un mapa de error
-            //appLog(response.body);
-            return {'status': 'error', 'message': 'Fallo en la conexión al servidor. Código: ${response.statusCode}'};
+            appLog('UserProvider: Error HTTP al eliminar archivo: ${response.statusCode}');
+            return {'status': 'error', 'message': 'No se pudo eliminar el archivo. Intenta nuevamente.'};
         }
     }
 
@@ -698,7 +800,11 @@ String _mapDestinatarioToApiCode(String destinatario) {
     }
 }
 
-Future<Map<String, dynamic>> saveAviso(Map<String, dynamic> avisoData) async {
+Future<Map<String, dynamic>> saveAviso(
+  Map<String, dynamic> avisoData, {
+  Uint8List? archivoBytes,
+  String? archivoNombre,
+}) async {
     // --- 1. Preparación y URLs ---
     final String idTokenValue = _idToken ?? ''; 
     final String escuelaCode = _escuela;
@@ -706,10 +812,13 @@ Future<Map<String, dynamic>> saveAviso(Map<String, dynamic> avisoData) async {
     final String idCicloValue = _idCiclo;     
     final String urlEndpoint = '${ApiConstants.apiBaseUrl}${ApiConstants.setCreaAvisoEndpoint}';
     final Uri url = Uri.parse(urlEndpoint);
+    // id_colaborador crea, enviar el id del colaborador que crea el aviso
+    final String idColaboradorCreador = _idColaborador ?? '';
 
     // Nuevas variables para el manejo de archivo
     final String? rutaArchivo = avisoData['archivo'] as String?;
-    final bool hasFile = rutaArchivo != null && rutaArchivo.isNotEmpty;
+    final bool hasFile = (rutaArchivo != null && rutaArchivo.isNotEmpty) ||
+        (archivoBytes != null && archivoNombre != null);
     
     // --- 2. Inicializar IDs y Mapeos ---
     String idSalon = '0';
@@ -732,8 +841,8 @@ Future<Map<String, dynamic>> saveAviso(Map<String, dynamic> avisoData) async {
          idSalon = salonData?.idSalon ?? '0';
          
     } else if (tipoDestinatario == 'Alumno Específico' && valorEspecifico != null) {
-        final match = regExp.firstMatch(valorEspecifico);
-        idAlumno = match?.group(1) ?? '0';
+        // ⭐️ Usamos el ID resuelto explícitamente desde la pantalla, ya no regex sobre texto visible
+        idAlumno = avisoData['destinatario_id_alumno']?.toString() ?? '0';
         
     } else if (tipoDestinatario == 'Colaborador Específico' && valorEspecifico != null) {
         // ⭐️ CORRECCIÓN: Usamos where().cast().firstOrNull ⭐️
@@ -765,11 +874,12 @@ Future<Map<String, dynamic>> saveAviso(Map<String, dynamic> avisoData) async {
     // --- 3. Preparar los campos base para la API ---
     final Map<String, String> baseFields = {
         'escuela': escuelaCode,
-        'id_calendario': avisoData['id_calendario'] ?? '0', 
-        'id_colaborador': idColaboradorDestino, 
-        'id_salon': idSalon, 
-        'id_alumno': idAlumno, 
-        'id_token': idTokenValue, 
+        'id_calendario': avisoData['id_calendario'] ?? '0',
+        'id_colaborador_crea': idColaboradorCreador,
+        'id_colaborador': idColaboradorDestino,
+        'id_salon': idSalon,
+        'id_alumno': idAlumno,
+        'id_token': idTokenValue,
         'titulo': avisoData['titulo'],
         'id_empresa': idEmpresaValue,
         'id_ciclo': idCicloValue,
@@ -792,23 +902,34 @@ Future<Map<String, dynamic>> saveAviso(Map<String, dynamic> avisoData) async {
         http.Response response;
         
         if (hasFile) {
-            if (kIsWeb) {
-                return {'success': false, 'message': 'La subida de archivos locales no está soportada en Web a través de esta implementación de Provider.'};
-            }
-            
             final request = http.MultipartRequest('POST', url);
-            
+
             // Agregamos todos los campos base
             request.fields.addAll(baseFields);
-            
-            // Agregamos el archivo
-            final file = await http.MultipartFile.fromPath('archivo', rutaArchivo);
-            request.files.add(file);
-            
+
+            if (kIsWeb) {
+                // 🌐 WEB: usamos los bytes recibidos desde la vista
+                if (archivoBytes == null || archivoNombre == null) {
+                    return {'success': false, 'message': 'No se pudo leer el archivo adjunto para subirlo.'};
+                }
+                request.files.add(
+                    http.MultipartFile.fromBytes(
+                        'archivo',
+                        archivoBytes,
+                        filename: archivoNombre,
+                    ),
+                );
+                appLog('UserProvider: Adjuntando archivo vía bytes (Web): $archivoNombre');
+            } else {
+                // 📱 MÓVIL/DESKTOP: usamos la ruta local
+                final file = await http.MultipartFile.fromPath('archivo', rutaArchivo!);
+                request.files.add(file);
+            }
+
             // Enviamos la solicitud y convertimos la respuesta
             final streamedResponse = await request.send();
             response = await http.Response.fromStream(streamedResponse);
-            
+
         } else {
             // ➡️ OPCIÓN POST SIMPLE: Si no hay archivo, usamos el post simple
             response = await http.post(url, body: baseFields);
@@ -831,10 +952,12 @@ Future<Map<String, dynamic>> saveAviso(Map<String, dynamic> avisoData) async {
             
             final String idAvisoServer = result['message']?.toString() ?? originalId;
 
-            // ⭐️ NUEVO: OBTENER LA RUTA DEL ARCHIVO DEVUELTA POR LA API ⭐️
-            // Si la API devuelve 'ruta_archivo', la usamos. Si no, usamos la ruta local si existe.
+            // ⭐️ OBTENER LA RUTA DEL ARCHIVO DEVUELTA POR LA API ⭐️
+            // En Web solo confiamos en lo que regrese la API (no hay ruta local válida).
+            // En móvil, si la API no regresa nada, usamos la ruta local como fallback.
             final String? apiFilePath = result['ruta_archivo'] as String?;
-            final String? finalFilePath = apiFilePath ?? (hasFile ? rutaArchivo : null);
+            final String? finalFilePath = apiFilePath ??
+                (!kIsWeb && hasFile ? rutaArchivo : null);
 
             
             // 1. Crear el mapa de datos para guardar localmente (DB/SP)
@@ -843,7 +966,9 @@ Future<Map<String, dynamic>> saveAviso(Map<String, dynamic> avisoData) async {
                 'id_calendario': idAvisoServer, 
                 'titulo': avisoData['titulo'],
                 // NOTA: Guardamos el comentario, o una nota si hay archivo
-                'comentario': hasFile ? 'Aviso con adjunto: ${rutaArchivo.split('/').last}' : avisoData['cuerpo'], 
+                'comentario': hasFile
+                    ? 'Aviso con adjunto: ${(archivoNombre ?? rutaArchivo?.split('/').last) ?? 'archivo'}'
+                    : avisoData['cuerpo'],
                 'seccion': apiSeccionCode,
                 'valor_especifico': valorEspecifico ?? '', 
                 'tipo_respuesta': tipoRespuesta,
@@ -890,24 +1015,26 @@ Future<Map<String, dynamic>> saveAviso(Map<String, dynamic> avisoData) async {
             notifyListeners(); 
 
             final String action = isNew ? 'creado' : 'actualizado';
-            return {'success': true, 'message': 'Aviso $action con éxito. ID: $idAvisoServer', 'ruta_archivo': finalFilePath};
+            return {'success': true, 'message': 'Aviso $action con éxito.', 'ruta_archivo': finalFilePath};
         
         } else {
-            // Fallo de la API
             dynamic apiMessage = result['message'];
             String errorMessage;
-            
+
             if (apiMessage is Map) {
-                errorMessage = apiMessage.toString();
+                appLog('UserProvider: Error de API (detalle): $apiMessage');
+                errorMessage = 'No se pudo guardar el aviso. Revisa los datos ingresados.';
             } else {
-                errorMessage = apiMessage?.toString() ?? 'Error desconocido.';
+                errorMessage = (apiMessage?.toString().isNotEmpty ?? false)
+                    ? apiMessage.toString()
+                    : 'No se pudo guardar el aviso. Intenta nuevamente.';
             }
-            
+
             return {'success': false, 'message': errorMessage};
         }
     } catch (e) {
         appLog('UserProvider: Excepción al guardar aviso: $e');
-        return {'success': false, 'message': 'Error de conexión: ${e.toString()}'};
+        return {'success': false, 'message': 'No se pudo guardar el aviso. Verifica tu conexión e intenta de nuevo.'};
     }
 }
 
@@ -978,7 +1105,7 @@ Future<Map<String, dynamic>> deleteAvisoCreado(String idAviso) async {
         }
     } catch (e) {
         appLog('UserProvider: Excepción al eliminar aviso: $e');
-        return {'success': false, 'message': 'Error de conexión: ${e.toString()}'};
+        return {'success': false, 'message': 'No se pudo eliminar el aviso. Verifica tu conexión e intenta de nuevo.'};
     }
 }
 
@@ -1210,6 +1337,8 @@ Future<Map<String, dynamic>> deleteAvisoCreado(String idAviso) async {
   switch (tipo) {
     case 'aviso_nuevo':
       return () => fetchAndLoadAvisosData(forceRefresh: true);
+    case 'aviso_nuevo_cafeteria':
+      return () async => triggerAutoRefresh();
     default:
       return null;
   }
@@ -2225,7 +2354,7 @@ void handleDataPush(Map<String, dynamic> data) {
   } else {
     appLog('Error de servidor HTTP: ${response.statusCode}');
     appLog('Cuerpo de la respuesta del servidor: ${response.body}');
-    return {'status': 'error', 'message': 'Error de conexión con el servidor (${response.statusCode}).'};
+    return {'status': 'error', 'message': 'No se pudo guardar la asistencia. Intenta nuevamente.'};
   }
     } on SocketException {
       appLog('Excepción al enviar asistencia: SocketException');
@@ -2345,7 +2474,7 @@ void handleDataPush(Map<String, dynamic> data) {
         }
       } else {
         appLog('Error de servidor HTTP: ${response.statusCode}');
-        return {'status': 'error', 'message': 'Error de conexión con el servidor (${response.statusCode}).'};
+        return {'status': 'error', 'message': 'No se pudieron guardar las calificaciones. Intenta nuevamente.'};
       }
     } on SocketException {
       return {'status': 'error', 'message': 'No se pudo conectar al servidor. Revisa tu conexión a internet.'};

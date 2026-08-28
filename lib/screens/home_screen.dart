@@ -116,6 +116,8 @@ class _HomeScreenState extends State<HomeScreen> {
   switch (section) {
     case 'avisos':
       return pages.indexWhere((p) => p is AvisosView);
+    case 'cafeteria':
+      return pages.indexWhere((p) => p is CafeteriaView);
     default:
       return -1;
   }
