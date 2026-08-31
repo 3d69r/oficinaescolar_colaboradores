@@ -85,13 +85,22 @@ class _EditarAvisoScreenState extends State<EditarAvisoScreen> {
           salonesAsignados.isNotEmpty ? salonesAsignados : colaborador.avisoSalones;
       final List<String> listaSalones =
           salonesParaMostrar.map((s) => s.salon).toList();
-      final List<String> listaAlumnos = colaborador.avisoAlumnos
+
+      // ⭐️ NUEVO: Si el colaborador tiene salón(es) asignado(s), solo mostramos
+      // alumnos de esos salones. Si no tiene ninguno asignado, se muestran todos.
+      final List<AvisoAlumnoModel> alumnosParaMostrar = salonesAsignados.isNotEmpty
+          ? colaborador.avisoAlumnos
+              .where((a) => listaSalones.contains(a.salon))
+              .toList()
+          : colaborador.avisoAlumnos;
+
+      final List<String> listaAlumnos = alumnosParaMostrar
           .map((a) => '${a.primerNombre} ${a.apellidoPat}')
           .toList();
 
       // ⭐️ NUEVO: mapa nombre -> id_alumno (para resolver sin depender del texto visible)
       _idAlumnoPorNombre = {
-        for (var a in colaborador.avisoAlumnos)
+        for (var a in alumnosParaMostrar)
           '${a.primerNombre} ${a.apellidoPat}': a.idAlumno
       };
 

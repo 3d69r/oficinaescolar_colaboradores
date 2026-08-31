@@ -58,8 +58,11 @@ class _AsistenciaCalificacionArchivoScreenState extends State<AsistenciaCalifica
     _userProvider = Provider.of<UserProvider>(context, listen: false);
     
     // ⭐️ LÓGICA DE PERMISOS: Extracción y asignación ⭐️
+    // ⭐️ LÓGICA DE PERMISOS: Extracción y asignación ⭐️
     final String permisos = _userProvider.colaboradorModel?.appPermisosColabDet ?? '';
+    appLog('DEBUG PERMISOS COLAB DET: appPermisosColabDet crudo = "$permisos"'); // ⭐️ NUEVO LOG
     final List<String> listaPermisos = permisos.split(',').map((e) => e.trim()).toList();
+    appLog('DEBUG PERMISOS COLAB DET: lista parseada = $listaPermisos'); // ⭐️ NUEVO LOG
     
     _puedeVerSalones = listaPermisos.contains('califica');
     _puedeVerClubes = listaPermisos.contains('asis_clubes');
@@ -343,7 +346,7 @@ class _AsistenciaCalificacionArchivoScreenState extends State<AsistenciaCalifica
                                               .textTheme
                                               .titleLarge,
                                         ),
-                                                                                const SizedBox(height: 20),
+                                        const SizedBox(height: 20),
 
                                         // ⭐️ FIX:
                                         // Ya no usamos Expanded porque
@@ -426,23 +429,234 @@ class _AsistenciaCalificacionArchivoScreenState extends State<AsistenciaCalifica
                       leading: Icon(Icons.class_, color: headerColor),
                       trailing: Icon(Icons.arrow_forward_ios, color: headerColor),
                       onTap: () {
-                          // ⭐️ NAVEGAR A LA VISTA DE SUBIDA DE ARCHIVOS POR SALÓN ⭐️
-                          Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                  builder: (_) => ArchivosCalificacionesScreen(
-                                      salonSeleccionado: salon,
-                                      alumnosSalon: alumnos,
-                                  ),
-                              ),
-                          );
+                          // ⭐️ NUEVO: Mostrar modal de selección de parcial antes de navegar
+                          _mostrarModalParciales(salon, alumnos, headerColor);
                       },
                   ),
               );
           },
       );
   }
-  
+
+    // ⭐️ NUEVO MÉTODO: Modal para elegir la parcial antes de entrar al listado de alumnos ⭐️
+  // ⭐️ MÉTODO MEJORADO: Modal para elegir la parcial con diseño de botones y contador ⭐️
+  void _mostrarModalParciales(
+    String salon,
+    List<AlumnoSalonModel> alumnos,
+    Color headerColor,
+  ) {
+    final List<String> camposArchivo =
+        alumnos.isNotEmpty ? alumnos.first.archivosCalificacion.keys.toList() : [];
+
+    final int totalAlumnos = alumnos.length;
+
+    String formatearCampo(String campo) {
+      return campo
+          .replaceAll('archivo_calif_', 'Archivo ')
+          .replaceAll('_', ' ')
+          .trim();
+    }
+
+    // ⭐️ NUEVO: Cuenta cuántos alumnos ya tienen archivo subido para un campo dado
+    int contarSubidos(String campo) {
+      return alumnos
+          .where((a) => (a.archivosCalificacion[campo] ?? '').isNotEmpty)
+          .length;
+    }
+
+    void navegar(String? campoFiltro) {
+      Navigator.of(context).pop(); // cierra el modal
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => ArchivosCalificacionesScreen(
+            salonSeleccionado: salon,
+            alumnosSalon: alumnos,
+            campoArchivoFiltro: campoFiltro,
+          ),
+        ),
+      );
+    }
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return Dialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Header
+              Container(
+                padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 20),
+                decoration: BoxDecoration(
+                  color: headerColor,
+                  borderRadius: const BorderRadius.only(
+                    topLeft: Radius.circular(18),
+                    topRight: Radius.circular(18),
+                  ),
+                ),
+                child: Column(
+                  children: [
+                    const Icon(Icons.filter_list, color: Colors.white, size: 28),
+                    const SizedBox(height: 6),
+                    Text(
+                      salon,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                        color: Colors.white,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    const Text(
+                      'Selecciona la parcial',
+                      style: TextStyle(color: Colors.white70, fontSize: 12),
+                    ),
+                  ],
+                ),
+              ),
+
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                child: Column(
+                  children: [
+                    // ⭐️ Botones por parcial
+                    ...camposArchivo.map((campo) {
+                      final int subidos = contarSubidos(campo);
+                      final bool completo = totalAlumnos > 0 && subidos == totalAlumnos;
+
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 10),
+                        child: Material(
+                          color: completo
+                              ? Colors.green.shade50
+                              : headerColor.withOpacity(0.06),
+                          borderRadius: BorderRadius.circular(12),
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(12),
+                            onTap: () => navegar(campo),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                vertical: 14,
+                                horizontal: 16,
+                              ),
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: completo
+                                      ? Colors.green
+                                      : headerColor.withOpacity(0.3),
+                                  width: 1,
+                                ),
+                              ),
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    Icons.description_outlined,
+                                    color: completo ? Colors.green : headerColor,
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Text(
+                                      formatearCampo(campo),
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.w600,
+                                        fontSize: 15,
+                                        color: completo
+                                            ? Colors.green.shade800
+                                            : Colors.black87,
+                                      ),
+                                    ),
+                                  ),
+                                  // ⭐️ Contador X/Y
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 10,
+                                      vertical: 5,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: completo
+                                          ? Colors.green
+                                          : headerColor,
+                                      borderRadius: BorderRadius.circular(20),
+                                    ),
+                                    child: Text(
+                                      '$subidos/$totalAlumnos',
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                  ),
+                                  if (completo) ...[
+                                    const SizedBox(width: 6),
+                                    const Icon(
+                                      Icons.check_circle,
+                                      color: Colors.green,
+                                      size: 20,
+                                    ),
+                                  ],
+                                  const SizedBox(width: 4),
+                                  Icon(
+                                    Icons.chevron_right,
+                                    color: completo ? Colors.green : headerColor,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      );
+                    }).toList(),
+
+                    const Divider(height: 20),
+
+                    // ⭐️ Botón "Todas las parciales"
+                    Material(
+                      color: headerColor,
+                      borderRadius: BorderRadius.circular(12),
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(12),
+                        onTap: () => navegar(null),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            vertical: 14,
+                            horizontal: 16,
+                          ),
+                          child: const Row(
+                            children: [
+                              Icon(Icons.select_all, color: Colors.white),
+                              SizedBox(width: 12),
+                              Expanded(
+                                child: Text(
+                                  'Todas las parciales',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 15,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ),
+                              Icon(Icons.chevron_right, color: Colors.white),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 8),
+            ],
+          ),
+        );
+      },
+    );
+  }
   // -------------------------------------------------------------
   // ✅ MÉTODOS Y WIDGETS AUXILIARES (Ajustados)
   // -------------------------------------------------

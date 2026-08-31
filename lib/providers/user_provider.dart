@@ -551,8 +551,18 @@ Future<void> saveColaboradorSessionToPrefs({
 
 Map<String, List<AlumnoSalonModel>> get groupedAlumnosBySalon {
   // 1. Obtener los datos (seguro contra nulos)
-  final List<AlumnoSalonModel> alumnos =
+  final List<AlumnoSalonModel> todosLosAlumnos =
       colaboradorModel?.alumnosSalon ?? [];
+
+  if (todosLosAlumnos.isEmpty) return {};
+
+  // ⭐️ NUEVO: Filtrar solo salones donde el colaborador es titular o suplente
+  final Set<String> salonesPermitidos = _salonesPermitidosParaColaborador;
+  appLog('DEBUG FILTRO SALONES: idColaborador=${colaboradorModel?.idColaborador}, salonesPermitidos=$salonesPermitidos');
+
+  final List<AlumnoSalonModel> alumnos = todosLosAlumnos
+      .where((a) => salonesPermitidos.contains(a.salon))
+      .toList();
 
   if (alumnos.isEmpty) return {};
 
@@ -593,6 +603,20 @@ Map<String, List<AlumnoSalonModel>> get groupedAlumnosBySalon {
   };
 
   return sortedSalones;
+}
+
+// ⭐️ NUEVO: Nombres de salón donde el colaborador es titular o suplente
+Set<String> get _salonesPermitidosParaColaborador {
+  final String idColab = colaboradorModel?.idColaborador ?? '';
+  if (idColab.isEmpty) return {};
+
+  final List<AvisoSalaModel> avisoSalones = colaboradorModel?.avisoSalones ?? [];
+
+  return avisoSalones
+      .where((s) =>
+          s.idMaestroTitular == idColab || s.idMaestroSuplente == idColab)
+      .map((s) => s.salon)
+      .toSet();
 }
   Future<void> enviarComentario(Comentario comentario) async {
     if (_escuela.isEmpty || _idColaborador.isEmpty) {
@@ -1713,7 +1737,7 @@ void handleDataPush(Map<String, dynamic> data) {
             // Si la API tiene éxito, actualizamos colaboradorJsonData
             colaboradorJsonData = rawData; 
             appLog('DEBUG SALONES: aviso_salones crudo de la API: ${json.encode(rawData['aviso_salones'])}');
-            
+                        appLog('DEBUG SALONES: alumnos_salon crudo de la API: ${json.encode(rawData['alumnos_salon'])}');
             // Guardamos el JSON COMPLETO en la caché.
             await DatabaseHelper.instance.saveColaboradorData(idColaborador, rawData);
             _lastColaboradorDataFetch = DateTime.now();

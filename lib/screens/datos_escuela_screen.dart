@@ -157,7 +157,7 @@ class DatosEscuelaScreen extends StatelessWidget {
         slivers: [
           // ---------- Header moderno con degradado ----------
           SliverAppBar(
-            expandedHeight: 240,
+            expandedHeight: 260,
             pinned: true,
             backgroundColor: colores.headerColor,
             iconTheme: const IconThemeData(color: Colors.white),
@@ -174,10 +174,11 @@ class DatosEscuelaScreen extends StatelessWidget {
                   ),
                 ),
                 child: SafeArea(
-                  child: Padding(
-                    padding: const EdgeInsets.only(top: 30, bottom: 20),
+                child: Padding(
+                    padding: const EdgeInsets.only(top: 20, bottom: 12),
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
+                      mainAxisSize: MainAxisSize.min,
                       children: [
                         Container(
                           width: 92,

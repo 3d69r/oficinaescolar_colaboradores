@@ -14,6 +14,7 @@ void showModernSnackBar(
   String message,
   SnackType type, {
   Color? accentColor,
+  bool celebrate = false, // ⭐️ NUEVO: activa la animación de cohete en éxitos especiales
 }) {
   if (!context.mounted) return;
 
@@ -51,7 +52,7 @@ void showModernSnackBar(
     SnackBar(
       duration: type == SnackType.loading
           ? const Duration(minutes: 5)
-          : const Duration(seconds: 4),
+          : (celebrate ? const Duration(seconds: 5) : const Duration(seconds: 4)),
       behavior: SnackBarBehavior.floating,
       backgroundColor: Colors.transparent,
       elevation: 0,
@@ -63,6 +64,7 @@ void showModernSnackBar(
         type: type,
         accent: accent,
         icon: icon,
+        celebrate: celebrate, // ⭐️ NUEVO
       ),
     ),
   );
@@ -75,6 +77,7 @@ class _AnimatedSnackContent extends StatefulWidget {
     required this.type,
     required this.accent,
     required this.icon,
+    this.celebrate = false, // ⭐️ NUEVO
   });
 
   final String message;
@@ -82,6 +85,7 @@ class _AnimatedSnackContent extends StatefulWidget {
   final SnackType type;
   final Color accent;
   final IconData icon;
+  final bool celebrate; // ⭐️ NUEVO
 
   @override
   State<_AnimatedSnackContent> createState() => _AnimatedSnackContentState();
@@ -92,7 +96,8 @@ class _AnimatedSnackContentState extends State<_AnimatedSnackContent>
   late final AnimationController _entryController;
   late final AnimationController _iconController;
   late final AnimationController _glowController;
-
+  late final AnimationController _rocketController; // ⭐️ NUEVO: despegue del cohete
+  
   late final Animation<double> _fadeAnimation;
   late final Animation<double> _scaleAnimation;
   late final Animation<Offset> _slideAnimation;
@@ -153,6 +158,14 @@ class _AnimatedSnackContentState extends State<_AnimatedSnackContent>
       duration: const Duration(milliseconds: 1800),
     )..repeat(reverse: true);
 
+    // ------------------------------------------------------------
+    // COHETE (solo cuando celebrate == true) ⭐️ NUEVO
+    // ------------------------------------------------------------
+    _rocketController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1400),
+    );
+
     _startAnimations();
   }
 
@@ -166,6 +179,12 @@ class _AnimatedSnackContentState extends State<_AnimatedSnackContent>
     } else {
       await _iconController.forward();
     }
+
+    // ⭐️ NUEVO: si es una celebración de éxito, lanza el cohete
+    if (!mounted) return;
+    if (widget.type == SnackType.success && widget.celebrate) {
+      _rocketController.forward();
+    }
   }
 
   @override
@@ -173,6 +192,7 @@ class _AnimatedSnackContentState extends State<_AnimatedSnackContent>
     _entryController.dispose();
     _iconController.dispose();
     _glowController.dispose();
+    _rocketController.dispose(); // ⭐️ NUEVO: liberar el controlador del cohete
     super.dispose();
   }
 
@@ -315,6 +335,11 @@ class _AnimatedSnackContentState extends State<_AnimatedSnackContent>
   }
 
   Widget _buildAnimatedIcon() {
+    // ⭐️ NUEVO: si es celebración de éxito, muestra el cohete despegando
+    if (widget.type == SnackType.success && widget.celebrate) {
+      return _buildRocketIcon();
+    }
+
     return AnimatedBuilder(
       animation: _iconController,
       builder: (context, child) {
@@ -370,6 +395,80 @@ class _AnimatedSnackContentState extends State<_AnimatedSnackContent>
     );
   }
 
+  // ⭐️ NUEVO WIDGET: Ícono de cohete despegando con estela de partículas
+  Widget _buildRocketIcon() {
+    return SizedBox(
+      width: 44,
+      height: 54, // un poco más alto para dar espacio a la estela
+      child: AnimatedBuilder(
+        animation: _rocketController,
+        builder: (context, child) {
+          final t = _rocketController.value;
+
+          // Despegue: sube y hace un leve "overshoot" con vibración lateral
+          final launchProgress = Curves.easeInCubic.transform(t);
+          final wobble = math.sin(t * math.pi * 10) * (1 - t) * 2.2;
+          final dy = -launchProgress * 30; // sube hasta 30px antes de desaparecer
+
+          // Ligera inclinación al despegar
+          final tilt = (1 - t) * 0.05 - (t * 0.02);
+
+          return Opacity(
+            opacity: (1 - (t * 0.85)).clamp(0.0, 1.0),
+            child: Transform.translate(
+              offset: Offset(wobble, dy),
+              child: Transform.rotate(
+                angle: tilt,
+                child: child,
+              ),
+            ),
+          );
+        },
+        child: Stack(
+          alignment: Alignment.bottomCenter,
+          clipBehavior: Clip.none,
+          children: [
+            // Estela de partículas / flama
+            Positioned(
+              bottom: -2,
+              child: AnimatedBuilder(
+                animation: _rocketController,
+                builder: (context, _) {
+                  return CustomPaint(
+                    size: const Size(30, 22),
+                    painter: _RocketTrailPainter(
+                      progress: _rocketController.value,
+                      color: widget.accent,
+                    ),
+                  );
+                },
+              ),
+            ),
+            // Cuerpo del cohete
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: widget.accent.withOpacity(0.12),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(
+                  color: widget.accent.withOpacity(0.14),
+                ),
+              ),
+              child: Center(
+                child: Icon(
+                  Icons.rocket_launch_rounded,
+                  color: widget.accent,
+                  size: 23,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildText() {
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -402,6 +501,8 @@ class _AnimatedSnackContentState extends State<_AnimatedSnackContent>
     );
   }
 
+  
+
   Widget _buildCloseButton() {
     return Material(
       color: Colors.transparent,
@@ -420,5 +521,49 @@ class _AnimatedSnackContentState extends State<_AnimatedSnackContent>
         ),
       ),
     );
+  }
+}
+// ⭐️ NUEVO: Pintor de la estela de partículas del cohete al despegar
+class _RocketTrailPainter extends CustomPainter {
+  _RocketTrailPainter({required this.progress, required this.color});
+
+  final double progress;
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final random = math.Random(7); // semilla fija para una estela consistente
+    final particleCount = 6;
+
+    for (int i = 0; i < particleCount; i++) {
+      final seedOffset = i / particleCount;
+      // cada partícula "nace" en un momento distinto del progreso
+      final localT = ((progress + seedOffset) % 1.0);
+
+      final dx = size.width / 2 +
+          (random.nextDouble() - 0.5) * 14 * localT;
+      final dy = size.height * localT;
+
+      final radius = (1 - localT) * 3.2;
+      if (radius <= 0) continue;
+
+      final opacity = (1 - localT).clamp(0.0, 1.0);
+
+      final paint = Paint()
+        ..color = Color.lerp(
+          color,
+          Colors.orangeAccent,
+          localT,
+        )!
+            .withOpacity(opacity * 0.85)
+        ..style = PaintingStyle.fill;
+
+      canvas.drawCircle(Offset(dx, dy), radius, paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _RocketTrailPainter oldDelegate) {
+    return oldDelegate.progress != progress;
   }
 }

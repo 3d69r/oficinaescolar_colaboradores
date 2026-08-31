@@ -6,6 +6,7 @@ import 'package:oficinaescolar_colaboradores/screens/pdf_viewer_screen.dart';
 import 'package:provider/provider.dart';
 import 'dart:io'; 
 import 'package:oficinaescolar_colaboradores/utils/log_util.dart';
+import 'package:oficinaescolar_colaboradores/utils/snackbar_util.dart'; // ⭐️ NUEVO: showModernSnackBar
 import 'package:file_picker/file_picker.dart'; 
 // import 'package:shared_preferences/shared_preferences.dart'; // ❌ Eliminada
 
@@ -16,13 +17,14 @@ class ArchivosCalificacionesScreen extends StatefulWidget {
   
   final String salonSeleccionado;
   final List<AlumnoSalonModel> alumnosSalon;
+  final String? campoArchivoFiltro; // ⭐️ NUEVO: si viene null, se muestran todas las parciales
 
   const ArchivosCalificacionesScreen({
     super.key,
     required this.salonSeleccionado,
     required this.alumnosSalon,
+    this.campoArchivoFiltro,
   });
-
   @override
   State<ArchivosCalificacionesScreen> createState() => _ArchivosCalificacionesScreenState();
 }
@@ -30,6 +32,8 @@ class ArchivosCalificacionesScreen extends StatefulWidget {
 class _ArchivosCalificacionesScreenState extends State<ArchivosCalificacionesScreen> {
   
   List<AlumnoSalonModel> _alumnosDelSalon = [];
+  List<AlumnoSalonModel> _alumnosFiltrados = []; // ⭐️ NUEVO: Lista filtrada por búsqueda
+  final TextEditingController _searchController = TextEditingController(); // ⭐️ NUEVO
   final Map<String, String?> _selectedFilePaths = {};
   bool _isLoading = true;
   
@@ -40,8 +44,30 @@ class _ArchivosCalificacionesScreenState extends State<ArchivosCalificacionesScr
     super.initState();
     appLog('DEBUG VISTA: initState - Cargando alumnos del salón.'); // ⭐️ DEBUG
     _cargarAlumnosDelSalon();
+    _searchController.addListener(_filtrarAlumnos); // ⭐️ NUEVO
   }
 
+  @override
+  void dispose() {
+    _searchController.removeListener(_filtrarAlumnos); // ⭐️ NUEVO
+    _searchController.dispose(); // ⭐️ NUEVO
+    super.dispose();
+  }
+
+  // ⭐️ NUEVO MÉTODO: Filtra alumnos según el texto de búsqueda
+  void _filtrarAlumnos() {
+    final query = _searchController.text.trim().toLowerCase();
+    if (!mounted) return;
+    setState(() {
+      if (query.isEmpty) {
+        _alumnosFiltrados = List.from(_alumnosDelSalon);
+      } else {
+        _alumnosFiltrados = _alumnosDelSalon
+            .where((alumno) => alumno.nombreCompleto.toLowerCase().contains(query))
+            .toList();
+      }
+    });
+  }
   /// Asigna y ordena los alumnos proporcionados por la vista anterior.
   void _cargarAlumnosDelSalon() async { 
     List<AlumnoSalonModel> alumnos = widget.alumnosSalon;
@@ -53,6 +79,7 @@ class _ArchivosCalificacionesScreenState extends State<ArchivosCalificacionesScr
     if (mounted) {
       setState(() {
         _alumnosDelSalon = alumnos;
+        _alumnosFiltrados = List.from(alumnos); // ⭐️ NUEVO: inicializa lista filtrada
         _isLoading = false;
         appLog('DEBUG VISTA: setState - Alumnos cargados y listos.'); // ⭐️ DEBUG
       });
@@ -101,11 +128,10 @@ void _seleccionarArchivo(AlumnoSalonModel alumno, String campoArchivo) async {
   } catch (e) {
     // Muestra el error capturado en el log y al usuario (SnackBar).
     appLog('FILE_PICKER_CATCH_ERROR: Error al intentar seleccionar archivo: $e');
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Error de selección (seguridad/web): ${e.toString()}'),
-        backgroundColor: Colors.red,
-      ),
+    showModernSnackBar(
+      context,
+      'Error de selección (seguridad/web): ${e.toString()}',
+      SnackType.error,
     );
     return; // Detiene la ejecución si hay un error en la selección.
   }
@@ -160,11 +186,10 @@ void _seleccionarArchivo(AlumnoSalonModel alumno, String campoArchivo) async {
     } else {
       appLog('DEBUG SELECCIONAR: [Web] Error, bytes o nombre nulos.'); // ⭐️ DEBUG
       // ignore: use_build_context_synchronously
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Error: Datos del archivo Web no disponibles después de la selección.'),
-          backgroundColor: Colors.red,
-        ),
+      showModernSnackBar(
+        context,
+        'Error: Datos del archivo Web no disponibles después de la selección.',
+        SnackType.error,
       );
     }
   }
@@ -190,9 +215,11 @@ void _seleccionarArchivo(AlumnoSalonModel alumno, String campoArchivo) async {
 
       if (!kIsWeb) {
         // 💻 MÓVIL/DESKTOP: Usa localPath (y tu verificación de existencia)
-        if (!await File(localPath).exists()) {
-            ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Error: Archivo local no encontrado.'), backgroundColor: Colors.red),
+    if (!await File(localPath).exists()) {
+            showModernSnackBar(
+              context,
+              'Error: Archivo local no encontrado.',
+              SnackType.error,
             );
             return;
         }
@@ -206,8 +233,10 @@ void _seleccionarArchivo(AlumnoSalonModel alumno, String campoArchivo) async {
         // 🛠️ CORRECCIÓN WEB: Aquí se lee la data que _seleccionarArchivo acaba de guardar.
         if (bytesArchivoWeb == null || nombreArchivoWeb == null) {
             appLog('DEBUG ENVIAR: [Web] Fallo, bytes/nombre son nulos en _enviarArchivos.'); // ⭐️ DEBUG
-            ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Error Web: Archivo no cargado en memoria (bytes/nombre).'), backgroundColor: Colors.red),
+            showModernSnackBar(
+              context,
+              'Error Web: Archivo no cargado en memoria (bytes/nombre).',
+              SnackType.error,
             );
             return;
         }
@@ -222,8 +251,10 @@ void _seleccionarArchivo(AlumnoSalonModel alumno, String campoArchivo) async {
       // Crear la lista para la llamada al Provider
       final List<DatosArchivoASubir> archivosParaEnviar = [archivoParaSubir];
       
-      ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Subiendo ${_getFileNameFromPath(localPath)}...'), duration: const Duration(seconds: 20)),
+      showModernSnackBar(
+        context,
+        'Subiendo ${_getFileNameFromPath(localPath)}...',
+        SnackType.loading,
       );
 
       try {
@@ -236,7 +267,7 @@ void _seleccionarArchivo(AlumnoSalonModel alumno, String campoArchivo) async {
           );
           
           // Imprime el resultado completo de la API para depuración
-          print('✅ Respuesta de la API para campo $campoArchivo: $result');
+          //print('✅ Respuesta de la API para campo $campoArchivo: $result');
           
           ScaffoldMessenger.of(context).hideCurrentSnackBar(); 
           
@@ -244,11 +275,11 @@ void _seleccionarArchivo(AlumnoSalonModel alumno, String campoArchivo) async {
           final bool isSuccess = (result['status'] == 'correcto') || 
                                 (result['message'] == 'Información enviada correctamente!!');
           
-          ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                  content: Text(result['message'] as String),
-                  backgroundColor: isSuccess ? Colors.green : Colors.red,
-              ),
+          showModernSnackBar(
+            context,
+            result['message'] as String,
+            isSuccess ? SnackType.success : SnackType.error,
+            celebrate: isSuccess, // ⭐️ NUEVO: cohete despegando en éxito
           );
           
           if (isSuccess) {
@@ -281,6 +312,12 @@ void _seleccionarArchivo(AlumnoSalonModel alumno, String campoArchivo) async {
               if (index != -1) {
                   _alumnosDelSalon[index] = updatedAlumno;
               }
+              final int indexFiltrado = _alumnosFiltrados.indexWhere(
+                (a) => a.idCicloAlumno == alumno.idCicloAlumno,
+              ); // ⭐️ NUEVO
+              if (indexFiltrado != -1) {
+                  _alumnosFiltrados[indexFiltrado] = updatedAlumno; // ⭐️ NUEVO
+              }
 
               setState(() {
                   appLog('DEBUG ENVIAR: Llamando a setState después de subida exitosa. Esto gatilla el build.'); // ⭐️ DEBUG
@@ -294,12 +331,13 @@ void _seleccionarArchivo(AlumnoSalonModel alumno, String campoArchivo) async {
       } catch (e) {
           ScaffoldMessenger.of(context).hideCurrentSnackBar(); 
           print('❌ Error inesperado en _enviarArchivos: $e');
-          ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Error inesperado al subir: $e'), backgroundColor: Colors.red),
+          showModernSnackBar(
+            context,
+            'Error inesperado al subir: $e',
+            SnackType.error,
           );
       }
   }
-
   // ⭐️ MÉTODO MODIFICADO: Quitar Archivo (Añadida llamada a la API de eliminación) ⭐️
   void _quitarArchivo(String idCicloAlumno, String campoArchivo) async {
     if (!mounted) return;
@@ -321,21 +359,18 @@ void _seleccionarArchivo(AlumnoSalonModel alumno, String campoArchivo) async {
               _alumnosDelSalon = List.from(_alumnosDelSalon);
             });
         }
-        ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-                content: Text('No hay archivo para eliminar.'), 
-                backgroundColor: Colors.blueGrey,
-                duration: Duration(seconds: 2),
-            ),
+        showModernSnackBar(
+          context,
+          'No hay archivo para eliminar.',
+          SnackType.warning,
         );
         return;
     }
     
-    ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-            content: Text('Eliminando archivo: ${_getFileNameFromPath(archivoAEliminar)}...'), 
-            duration: const Duration(seconds: 20),
-        ),
+    showModernSnackBar(
+      context,
+      'Eliminando archivo: ${_getFileNameFromPath(archivoAEliminar)}...',
+      SnackType.loading,
     );
 
     final userProvider = Provider.of<UserProvider>(context, listen: false);
@@ -364,33 +399,30 @@ void _seleccionarArchivo(AlumnoSalonModel alumno, String campoArchivo) async {
             setState(() {
               appLog('DEBUG ELIMINAR: Llamando a setState después de eliminación exitosa. Esto gatilla el build.'); // ⭐️ DEBUG
               _alumnosDelSalon = List.from(_alumnosDelSalon);
+              _alumnosFiltrados = List.from(_alumnosFiltrados); // ⭐️ NUEVO
             });
 
-            ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                    content: Text(result['message'] ?? 'Archivo eliminado correctamente.'), 
-                    backgroundColor: Colors.green,
-                    duration: const Duration(seconds: 2),
-                ),
+            showModernSnackBar(
+              context,
+              result['message'] ?? 'Archivo eliminado correctamente.',
+              SnackType.success, // Sin cohete: es una eliminación, no una subida
             );
         } else if (mounted) {
             // Error reportado por la API
-            ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                    content: Text(result['message'] ?? 'Error al eliminar el archivo.'), 
-                    backgroundColor: Colors.red,
-                ),
+            showModernSnackBar(
+              context,
+              result['message'] ?? 'Error al eliminar el archivo.',
+              SnackType.error,
             );
         }
 
     } catch (e) {
         ScaffoldMessenger.of(context).hideCurrentSnackBar(); 
         print('❌ Error al llamar a delete_file_calificacion: $e');
-        ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-                content: Text('Error de conexión o inesperado al eliminar: $e'), 
-                backgroundColor: Colors.red,
-            ),
+        showModernSnackBar(
+          context,
+          'Error de conexión o inesperado al eliminar: $e',
+          SnackType.error,
         );
     }
   }
@@ -403,11 +435,10 @@ void _seleccionarArchivo(AlumnoSalonModel alumno, String campoArchivo) async {
     appLog('DEBUG VISUALIZAR: Intentando visualizar URL: $url'); // ⭐️ DEBUG
     
     if (url.isEmpty || urlBaseServidor.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Error: No se puede obtener la ruta del archivo o la URL base del servidor.'),
-            backgroundColor: Colors.red,
-          ),
+        showModernSnackBar(
+          context,
+          'Error: No se puede obtener la ruta del archivo o la URL base del servidor.',
+          SnackType.error,
         );
         return;
     }
@@ -424,11 +455,10 @@ void _seleccionarArchivo(AlumnoSalonModel alumno, String campoArchivo) async {
     appLog('DEBUG VISUALIZAR: URL completa construida: $urlCompleta'); // ⭐️ DEBUG
     
     if (!urlCompleta.startsWith('http')) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error al construir la URL. Resultado: $urlCompleta'),
-            backgroundColor: Colors.red,
-          ),
+        showModernSnackBar(
+          context,
+          'Error al construir la URL. Resultado: $urlCompleta',
+          SnackType.error,
         );
         return;
     }
@@ -497,7 +527,11 @@ void _seleccionarArchivo(AlumnoSalonModel alumno, String campoArchivo) async {
     final Color headerColor = userProvider.colores.headerColor;
     
     final AlumnoSalonModel? firstAlumno = _alumnosDelSalon.isNotEmpty ? _alumnosDelSalon.first : null;
-    final List<String> camposArchivo = firstAlumno?.archivosCalificacion.keys.toList() ?? [];
+    final List<String> todosCampos = firstAlumno?.archivosCalificacion.keys.toList() ?? [];
+    // ⭐️ NUEVO: si viene un filtro de parcial, solo mostramos ese campo
+    final List<String> camposArchivo = widget.campoArchivoFiltro != null
+        ? todosCampos.where((c) => c == widget.campoArchivoFiltro).toList()
+        : todosCampos;
 
     // 🚀 CAMBIO: Envolvemos el Scaffold en un SafeArea
     return SafeArea(
@@ -521,7 +555,55 @@ void _seleccionarArchivo(AlumnoSalonModel alumno, String campoArchivo) async {
                       style: TextStyle(color: Colors.grey.shade600, fontSize: 16),
                     ),
                   )
-                : _buildAlumnoList(userProvider, camposArchivo),
+                : Column( // ⭐️ NUEVO: Column para colocar el buscador arriba del listado
+                    children: [
+                      _buildSearchField(userProvider), // ⭐️ NUEVO
+                      Expanded(
+                        child: _alumnosFiltrados.isEmpty
+                            ? Center(
+                                child: Text(
+                                  'No se encontraron alumnos con ese nombre.',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(color: Colors.grey.shade600, fontSize: 16),
+                                ),
+                              )
+                            : _buildAlumnoList(userProvider, camposArchivo),
+                      ),
+                    ],
+                  ),
+      ),
+    );
+  }
+
+  // ⭐️ NUEVO WIDGET: Campo de búsqueda
+  Widget _buildSearchField(UserProvider userProvider) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12.0, 12.0, 12.0, 0),
+      child: TextField(
+        controller: _searchController,
+        decoration: InputDecoration(
+          hintText: 'Buscar alumno por nombre...',
+          prefixIcon: const Icon(Icons.search),
+          suffixIcon: _searchController.text.isNotEmpty
+              ? IconButton(
+                  icon: const Icon(Icons.clear),
+                  onPressed: () {
+                    _searchController.clear();
+                  },
+                )
+              : null,
+          filled: true,
+          fillColor: Colors.grey.shade100,
+          contentPadding: const EdgeInsets.symmetric(vertical: 0, horizontal: 16),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide.none,
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: userProvider.colores.headerColor, width: 1.5),
+          ),
+        ),
       ),
     );
   }
@@ -538,9 +620,9 @@ void _seleccionarArchivo(AlumnoSalonModel alumno, String campoArchivo) async {
     
     return ListView.builder(
       padding: const EdgeInsets.all(12.0),
-      itemCount: _alumnosDelSalon.length,
+      itemCount: _alumnosFiltrados.length,
       itemBuilder: (context, index) {
-        final alumno = _alumnosDelSalon[index];
+        final alumno = _alumnosFiltrados[index];
         final int alumnoNumero = index + 1;
         
         return Card(
