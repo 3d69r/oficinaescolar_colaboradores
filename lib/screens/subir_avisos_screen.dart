@@ -362,6 +362,11 @@ void _mostrarAvisoParaEdicion(Map<String, dynamic> aviso) {
 }
 
 void _mostrarVisualizadosAviso(Map<String, dynamic> aviso, UserProvider userProvider) async {
+  if (!_tieneAccesoADestinatario(aviso, userProvider)) {
+    _mostrarAlertaSinAcceso('ver quién vio');
+    return;
+  }
+
   final String idAviso = aviso['id_calendario']?.toString() ?? aviso['id_aviso']?.toString() ?? '0';
   final String titulo = aviso['titulo'] as String? ?? 'Aviso';
   final String destinatarioTipo = aviso['seccion'] as String? ?? aviso['destinatario_tipo'] as String? ?? 'Todos';
@@ -397,12 +402,17 @@ void _mostrarVisualizadosAviso(Map<String, dynamic> aviso, UserProvider userProv
 }
   // ⭐️ 2. FUNCIÓN PARA NAVEGAR A LA VISTA DE EDICIÓN (Modificada para recargar) ⭐️
   void _navegarAEdicion(Map<String, dynamic> aviso) async {
+    final userProvider = Provider.of<UserProvider>(context, listen: false);
+    if (!_tieneAccesoADestinatario(aviso, userProvider)) {
+      _mostrarAlertaSinAcceso('editar');
+      return;
+    }
+
     await Navigator.of(context).push(
       MaterialPageRoute(
         builder: (context) => EditarAvisoScreen(avisoParaEditar: aviso),
       ),
     );
-    // Recargar avisos cuando se regrese de la edición/creación
     if (mounted) {
        Provider.of<UserProvider>(context, listen: false).loadAvisosCreados();
     }
@@ -490,11 +500,119 @@ Future<void> _seleccionarRangoDeFechas(BuildContext context) async {
       }
   }
 
+    // ⭐️ Replica la misma restricción de permisos que EditarAvisoScreen:
+  // determina si el colaborador logueado tiene acceso al tipo de
+  // destinatario con el que se creó este aviso.
+  bool _tieneAccesoADestinatario(
+      Map<String, dynamic> aviso, UserProvider userProvider) {
+    final colaborador = userProvider.colaboradorModel;
+    if (colaborador == null) return true; // fallback conservador
+
+    final String idColaboradorActual = userProvider.idColaborador;
+    final salonesAsignados = colaborador.avisoSalones
+        .where((s) =>
+            s.idMaestroTitular == idColaboradorActual ||
+            s.idMaestroSuplente == idColaboradorActual)
+        .toList();
+
+    final bool tieneSalonAsignado = salonesAsignados.isNotEmpty;
+
+    List<String> destinatariosPermitidos;
+    if (tieneSalonAsignado) {
+      final salonesParaMostrar = salonesAsignados;
+      final listaSalones = salonesParaMostrar.map((s) => s.salon).toList();
+      final listaAlumnos = colaborador.avisoAlumnos
+          .where((a) => listaSalones.contains(a.salon))
+          .map((a) => '${a.primerNombre} ${a.apellidoPat}')
+          .toList();
+
+      destinatariosPermitidos = [
+        if (listaSalones.isNotEmpty) 'Salón',
+        if (listaAlumnos.isNotEmpty) 'Alumno Específico',
+      ];
+    } else {
+      final listaNiveles = colaborador.avisoNivelesEducativos
+          .map((n) => n.nivelEducativo)
+          .toList();
+      final listaSalones =
+          colaborador.avisoSalones.map((s) => s.salon).toList();
+      final listaAlumnos = colaborador.avisoAlumnos
+          .map((a) => '${a.primerNombre} ${a.apellidoPat}')
+          .toList();
+      final listaColaboradores = colaborador.avisoColaboradores
+          .map((c) => c.nombreCompleto)
+          .toList();
+
+      destinatariosPermitidos = [
+        'Todos',
+        'Todos los Alumnos',
+        'Todos los Colaboradores',
+        if (listaNiveles.isNotEmpty) 'Nivel Educativo',
+        if (listaSalones.isNotEmpty) 'Salón',
+        if (listaAlumnos.isNotEmpty) 'Alumno Específico',
+        if (listaColaboradores.isNotEmpty) 'Colaborador Específico',
+      ];
+    }
+
+    final String codigoApiSeccion = aviso['seccion'] as String? ??
+        aviso['destinatario_tipo'] as String? ??
+        'Todos';
+    String destinatarioTipoApi;
+    switch (codigoApiSeccion) {
+      case 'AlumnoEspecifico':
+        destinatarioTipoApi = 'Alumno Específico';
+        break;
+      case 'ColaboradorEspecifico':
+        destinatarioTipoApi = 'Colaborador Específico';
+        break;
+      case 'AlumnosSalon':
+        destinatarioTipoApi = 'Salón';
+        break;
+      case 'AlumnosNivelEdu':
+        destinatarioTipoApi = 'Nivel Educativo';
+        break;
+      case 'Alumnos':
+        destinatarioTipoApi = 'Todos los Alumnos';
+        break;
+      case 'Colaboradores':
+        destinatarioTipoApi = 'Todos los Colaboradores';
+        break;
+      case 'Todos':
+      default:
+        destinatarioTipoApi = 'Todos';
+    }
+
+    return destinatariosPermitidos.contains(destinatarioTipoApi);
+  }
+
+  void _mostrarAlertaSinAcceso(String accion) {
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Sin acceso'),
+        content: Text(
+          'No tienes permiso para $accion este aviso, ya que fue creado '
+          'para destinatarios a los que no tienes acceso.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('Entendido'),
+          ),
+        ],
+      ),
+    );
+  }
+
   // ⭐️ 4. FUNCIÓN PARA MANEJAR LA CONFIRMACIÓN Y ELIMINACIÓN (CORREGIDA) ⭐️
 Future<void> _confirmarYEliminar(BuildContext context, Map<String, dynamic> aviso, UserProvider userProvider) async {
-    // ⭐️ CORRECCIÓN: Usar id_calendario o id_aviso, y asegurar que no sea '0'.
     final String idAviso = aviso['id_calendario']?.toString() ?? aviso['id_aviso']?.toString() ?? '0'; 
     final String tituloAviso = aviso['titulo']?.toString() ?? 'este aviso';
+
+    if (!_tieneAccesoADestinatario(aviso, userProvider)) {
+      _mostrarAlertaSinAcceso('eliminar');
+      return;
+    }
     
     if (idAviso == '0') {
       // ⚠️ El error se lanza si el ID es '0'

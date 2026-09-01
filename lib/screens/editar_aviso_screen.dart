@@ -60,6 +60,7 @@ class _EditarAvisoScreenState extends State<EditarAvisoScreen> {
   String? _archivoNombre;
 
   bool _esArchivoRemoto = false;
+  bool _sinAccesoADestinatario = false;
   // ----------------------------------------------------
 
   @override
@@ -115,15 +116,27 @@ class _EditarAvisoScreenState extends State<EditarAvisoScreen> {
         'Colaborador Específico': listaColaboradores,
       };
 
-      _destinatariosPrincipales = [
-        'Todos',
-        'Todos los Alumnos',
-        'Todos los Colaboradores',
-        if (listaNiveles.isNotEmpty) 'Nivel Educativo',
-        if (listaSalones.isNotEmpty) 'Salón',
-        if (listaAlumnos.isNotEmpty) 'Alumno Específico',
-        if (listaColaboradores.isNotEmpty) 'Colaborador Específico',
-      ];
+      // ⭐️ Misma restricción que CrearAvisoScreen: si el colaborador tiene
+      // salón(es) asignado(s) como titular/suplente, solo puede elegir
+      // 'Salón' o 'Alumno Específico'.
+      final bool tieneSalonAsignado = salonesAsignados.isNotEmpty;
+
+      if (tieneSalonAsignado) {
+        _destinatariosPrincipales = [
+          if (listaSalones.isNotEmpty) 'Salón',
+          if (listaAlumnos.isNotEmpty) 'Alumno Específico',
+        ];
+      } else {
+        _destinatariosPrincipales = [
+          'Todos',
+          'Todos los Alumnos',
+          'Todos los Colaboradores',
+          if (listaNiveles.isNotEmpty) 'Nivel Educativo',
+          if (listaSalones.isNotEmpty) 'Salón',
+          if (listaAlumnos.isNotEmpty) 'Alumno Específico',
+          if (listaColaboradores.isNotEmpty) 'Colaborador Específico',
+        ];
+      }
     }
 
     // 2. Llenar los campos para EDICIÓN (Carga de datos de la API)
@@ -144,19 +157,41 @@ class _EditarAvisoScreenState extends State<EditarAvisoScreen> {
       _mostrarEditor = false;
       _rutaArchivoAdjunto = null;
     }
-
-    String destinatarioTipoApi = aviso['seccion'] as String? ?? 'Todos';
-    if (destinatarioTipoApi == 'ColaboradorEspecifico') {
-      destinatarioTipoApi = 'Colaborador Específico';
-    } else if (destinatarioTipoApi == 'AlumnoEspecifico') {
-      destinatarioTipoApi = 'Alumno Específico';
+    final String codigoApiSeccion = aviso['seccion'] as String? ?? 'Todos';
+    String destinatarioTipoApi;
+    switch (codigoApiSeccion) {
+      case 'AlumnoEspecifico':
+        destinatarioTipoApi = 'Alumno Específico';
+        break;
+      case 'ColaboradorEspecifico':
+        destinatarioTipoApi = 'Colaborador Específico';
+        break;
+      case 'AlumnosSalon':
+        destinatarioTipoApi = 'Salón';
+        break;
+      case 'AlumnosNivelEdu':
+        destinatarioTipoApi = 'Nivel Educativo';
+        break;
+      case 'Alumnos':
+        destinatarioTipoApi = 'Todos los Alumnos';
+        break;
+      case 'Colaboradores':
+        destinatarioTipoApi = 'Todos los Colaboradores';
+        break;
+      case 'Todos':
+      default:
+        destinatarioTipoApi = 'Todos';
     }
 
     if (_destinatariosPrincipales.contains(destinatarioTipoApi)) {
       _destinatarioSeleccionado = destinatarioTipoApi;
     } else {
-      _destinatarioSeleccionado = 'Todos';
+      _sinAccesoADestinatario = true;
+      _destinatarioSeleccionado = _destinatariosPrincipales.isNotEmpty
+          ? _destinatariosPrincipales.first
+          : 'Todos';
     }
+
 
     final String apiRespuesta =
         aviso['tipo_respuesta'] as String? ?? 'Ninguna';
@@ -196,12 +231,36 @@ class _EditarAvisoScreenState extends State<EditarAvisoScreen> {
       _opcion3Controller.text = opcion3;
     }
 
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
-        setState(() {
-          _resetSeleccionEspecifica();
-        });
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
+
+      if (_sinAccesoADestinatario) {
+        await showDialog<void>(
+          context: context,
+          barrierDismissible: false,
+          builder: (dialogContext) => AlertDialog(
+            title: const Text('Sin acceso'),
+            content: const Text(
+              'No tienes permiso para editar este aviso, ya que fue creado '
+              'para destinatarios a los que no tienes acceso.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(),
+                child: const Text('Entendido'),
+              ),
+            ],
+          ),
+        );
+        if (mounted) {
+          Navigator.of(context).pop(); // cierra EditarAvisoScreen
+        }
+        return;
       }
+
+      setState(() {
+        _resetSeleccionEspecifica();
+      });
     });
   }
 
@@ -558,13 +617,72 @@ class _EditarAvisoScreenState extends State<EditarAvisoScreen> {
     }
   }
 
-  void _eliminarAviso() {
-    // Implementar la lógica de eliminación aquí
-    // userProvider.deleteAviso(idAviso);
-    // ...
-    // ignore: avoid_print
-    print('Aviso eliminado');
-    Navigator.pop(context); // Regresar a la pantalla de lista
+  void _eliminarAviso() async {
+    final String idAviso =
+        widget.avisoParaEditar['id_calendario']?.toString() ??
+        widget.avisoParaEditar['id_aviso']?.toString() ??
+        '0';
+    final String tituloAviso =
+        widget.avisoParaEditar['titulo']?.toString() ?? 'este aviso';
+
+    if (idAviso == '0') {
+      if (mounted) {
+        showModernSnackBar(
+          context,
+          'Error: No se pudo obtener el ID del aviso para eliminar.',
+          SnackType.error,
+        );
+      }
+      return;
+    }
+
+    final bool? confirmar = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Confirmar Eliminación'),
+          content: Text(
+              '¿Está seguro de que desea eliminar el aviso "$tituloAviso"? Esta acción no se puede deshacer.'),
+          actions: <Widget>[
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancelar'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Eliminar', style: TextStyle(color: Colors.red)),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmar != true) return;
+
+    final userProvider = Provider.of<UserProvider>(context, listen: false);
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(child: CircularProgressIndicator()),
+    );
+
+    final result = await userProvider.deleteAvisoCreado(idAviso);
+
+    if (!mounted) return;
+    Navigator.of(context).pop(); // cierra el indicador de carga
+
+    showModernSnackBar(
+      context,
+      result['message'] ?? (result['success'] == true
+          ? 'Aviso "$tituloAviso" eliminado con éxito.'
+          : 'Error al eliminar el aviso.'),
+      result['success'] == true ? SnackType.success : SnackType.error,
+    );
+
+    if (result['success'] == true && mounted) {
+      Navigator.pop(context); // Regresa a la lista, que ya recarga en su propio flujo
+    }
   }
 
   // ⭐️ FUNCIÓN: Construye la barra de herramientas separada ⭐️
@@ -759,6 +877,15 @@ class _EditarAvisoScreenState extends State<EditarAvisoScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (_sinAccesoADestinatario) {
+      // Evita construir el formulario/dropdown con un valor inválido
+      // mientras se muestra la alerta y se cierra la pantalla.
+      return const Scaffold(
+        backgroundColor: Color(0xFFF4F5FA),
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
     final userProvider = Provider.of<UserProvider>(context);
     final colores = userProvider.colores;
     final Color dynamicPrimaryColor = colores.footerColor;
