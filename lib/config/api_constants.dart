@@ -137,7 +137,7 @@ class ApiConstants {
   // NUEVO MÉTODO: Construye la URL completa para el endpoint de recuperación de co       ntraseña.
   // Utiliza el dominio 'apiUrl'.
   static String getForgotPasswordUrl() {
-    return '$apiUrl$forgotPasswordEndpoint';
+    return '$apiBaseUrl$forgotPasswordEndpoint';
   }
 
   /// API: get_avisos/escuela/id_empresa/fechahora/id_alumno

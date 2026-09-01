@@ -499,7 +499,7 @@ class _LoginScreenState extends State<LoginScreen> {
     
     final body = {
       'escuela': finalSchoolCode,
-      'seccion': 'Colaboradores',
+      'seccion': 'colaboradores',
       'tipo_envio': type,
       'psw': newPassword,
       'email': type == 'email' ? value : '',
@@ -527,7 +527,22 @@ class _LoginScreenState extends State<LoginScreen> {
         'ForgotPassword response (${response.statusCode}): ${response.body}',
       );
 
-      final data = json.decode(response.body);
+      if (response.body.trim().isEmpty) {
+        _showSnackBar(
+          'El servidor no respondió correctamente. Inténtalo de nuevo.',
+        );
+        return;
+      }
+
+      Map<String, dynamic> data;
+      try {
+        data = json.decode(response.body) as Map<String, dynamic>;
+      } catch (_) {
+        _showSnackBar(
+          'Respuesta inesperada del servidor. Inténtalo más tarde.',
+        );
+        return;
+      }
 
       if (response.statusCode == 200 &&
           (data['status'] == 'success' || data['status'] == 'correcto')) {
