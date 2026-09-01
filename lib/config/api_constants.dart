@@ -61,6 +61,9 @@ class ApiConstants {
 
   // endpoint para eliminar el aviso creado
   static const String eliminaAviso = 'elimina_aviso';
+
+  // ⭐️ NUEVO: endpoint para obtener el seguimiento/visualizaciones de un aviso
+  static const String getInfoSeguimientoEndpoint = 'get_info_seguimiento';
   
 
   // --- Métodos para construir URLs GET con parámetros dinámicos ---
@@ -167,6 +170,12 @@ class ApiConstants {
   /// Obtiene los datos específicos de un colaborador.
   static String getColaboradorAllData(String escuela, String idColaborador, String idEmpresa, String idCicloEscolar, String fechaHora, String idToken) {
     return '${apiBaseUrl}get_colaborador_data/$escuela/$idColaborador/$idEmpresa/$idCicloEscolar/$fechaHora/$idToken';
+  }
+
+  /// API: get_info_seguimiento (POST, form-encoded)
+  /// Body esperado: escuela, id_token, calendario_id
+  static String getInfoSeguimiento() {
+    return '$apiBaseUrl$getInfoSeguimientoEndpoint/';
   }
 
   /// API: download_file/escuela/seccion/id_empresa/extension_file/fechahora/nombre_archivo_sin_extension

@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:oficinaescolar_colaboradores/config/api_constants.dart';
 import 'package:oficinaescolar_colaboradores/screens/editar_aviso_screen.dart';
+import 'package:oficinaescolar_colaboradores/models/modo_visualizacion.dart';
+import 'package:oficinaescolar_colaboradores/models/aviso_seguimiento_model.dart';
+import 'package:oficinaescolar_colaboradores/widgets/visualizaciones_aviso_modal.dart';
 import 'package:provider/provider.dart'; 
 import 'package:intl/intl.dart'; 
 import 'crear_aviso_screen.dart';
@@ -30,7 +33,7 @@ class SubirAvisosScreen extends StatefulWidget {
 class _SubirAvisosScreenState extends State<SubirAvisosScreen> {
   DateTime? _fechaFiltroInicio;
   DateTime? _fechaFiltroFin;
-
+  DateTime? _lastManualRefreshTime;
   // ⭐️ Lógica agregada para la carga inicial de avisos ⭐️
   @override
   void initState() {
@@ -352,6 +355,41 @@ void _mostrarAvisoParaEdicion(Map<String, dynamic> aviso) {
     },
   );
 }
+
+void _mostrarVisualizadosAviso(Map<String, dynamic> aviso, UserProvider userProvider) async {
+  final String idAviso = aviso['id_calendario']?.toString() ?? aviso['id_aviso']?.toString() ?? '0';
+  final String titulo = aviso['titulo'] as String? ?? 'Aviso';
+  final String destinatarioTipo = aviso['seccion'] as String? ?? aviso['destinatario_tipo'] as String? ?? 'Todos';
+  final ModoVisualizacion modo = resolverModoVisualizacion(destinatarioTipo);
+
+  showDialog(
+    context: context,
+    barrierDismissible: false,
+    builder: (_) => const Center(child: CircularProgressIndicator()),
+  );
+
+  final bool ok = await userProvider.fetchInfoSeguimientoAviso(idAviso);
+
+  if (mounted) Navigator.of(context).pop();
+  if (!mounted) return;
+
+  if (!ok) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('No se pudo cargar el seguimiento de este aviso.')),
+    );
+    return;
+  }
+
+  showDialog(
+    context: context,
+    builder: (_) => VisualizacionesAvisoModal(
+      titulo: titulo,
+      modo: modo,
+      seguimiento: userProvider.seguimientoAviso, // ⭐️ CAMBIO de nombre de parámetro
+      colores: userProvider.colores,
+    ),
+  );
+}
   // ⭐️ 2. FUNCIÓN PARA NAVEGAR A LA VISTA DE EDICIÓN (Modificada para recargar) ⭐️
   void _navegarAEdicion(Map<String, dynamic> aviso) async {
     await Navigator.of(context).push(
@@ -527,6 +565,13 @@ Future<void> _confirmarYEliminar(BuildContext context, Map<String, dynamic> avis
       ),
       items: <PopupMenuEntry<String>>[
         const PopupMenuItem<String>(
+          value: 'seguimiento',
+          child: ListTile(
+            leading: Icon(Icons.visibility),
+            title: Text('Ver quién lo vio'),
+          ),
+        ),
+        const PopupMenuItem<String>(
           value: 'editar',
           child: ListTile(
             leading: Icon(Icons.edit),
@@ -543,7 +588,9 @@ Future<void> _confirmarYEliminar(BuildContext context, Map<String, dynamic> avis
       ],
       elevation: 8.0,
     ).then((String? result) {
-      if (result == 'editar') {
+      if (result == 'seguimiento') {
+        _mostrarVisualizadosAviso(aviso, userProvider);
+      } else if (result == 'editar') {
         _navegarAEdicion(aviso);
       } else if (result == 'eliminar') {
         _confirmarYEliminar(context, aviso, userProvider);
@@ -570,8 +617,56 @@ Future<void> _confirmarYEliminar(BuildContext context, Map<String, dynamic> avis
               backgroundColor: colores.headerColor,
               centerTitle: true,
             ),
-          body: Column(
-            children: [
+          body: RefreshIndicator(
+            color: dynamicPrimaryColor,
+            onRefresh: () async {
+              final now = DateTime.now();
+              // Si pasó menos de un minuto desde la última recarga manual, no pega a la API.
+              if (_lastManualRefreshTime != null &&
+                  now.difference(_lastManualRefreshTime!).inSeconds < 60) {
+                ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Datos actualizados.'),
+                    backgroundColor: Colors.green,
+                    behavior: SnackBarBehavior.floating,
+                    duration: Duration(seconds: 2),
+                    margin: EdgeInsets.all(12),
+                  ),
+                );
+                return;
+              }
+
+              ScaffoldMessenger.of(context).hideCurrentSnackBar();
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Recargando datos...'),
+                  backgroundColor: Colors.grey,
+                  behavior: SnackBarBehavior.floating,
+                  duration: Duration(seconds: 1),
+                  margin: EdgeInsets.all(12),
+                ),
+              );
+
+              _lastManualRefreshTime = now;
+
+              await userProvider.loadAvisosCreados();
+
+              if (mounted) {
+                ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Datos actualizados.'),
+                    backgroundColor: Colors.green,
+                    behavior: SnackBarBehavior.floating,
+                    duration: Duration(seconds: 2),
+                    margin: EdgeInsets.all(12),
+                  ),
+                );
+              }
+            },
+            child: Column(
+              children: [
               // Botón 'Crear Nuevo'
               Padding(
                 padding: const EdgeInsets.all(16.0),
@@ -704,7 +799,8 @@ Future<void> _confirmarYEliminar(BuildContext context, Map<String, dynamic> avis
                     },
                   ),
                 ),
-            ],
+              ],
+            ),
           ),
         );
       },

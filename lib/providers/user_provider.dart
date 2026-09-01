@@ -23,6 +23,7 @@ import 'package:oficinaescolar_colaboradores/models/articulo_model.dart';
 import 'package:oficinaescolar_colaboradores/models/colores_model.dart';
 import 'package:oficinaescolar_colaboradores/providers/tipo_curso.dart';
 import 'package:oficinaescolar_colaboradores/screens/lista_screen.dart';
+import 'package:oficinaescolar_colaboradores/models/aviso_seguimiento_model.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:oficinaescolar_colaboradores/utils/log_util.dart';
@@ -1144,6 +1145,67 @@ Future<Map<String, dynamic>> deleteAvisoCreado(String idAviso) async {
         appLog('UserProvider: Excepción al eliminar aviso: $e');
         return {'success': false, 'message': 'No se pudo eliminar el aviso. Verifica tu conexión e intenta de nuevo.'};
     }
+}
+
+List<AvisoSeguimientoModel> _seguimientoAviso = [];
+List<AvisoSeguimientoModel> get seguimientoAviso => _seguimientoAviso;
+bool _isLoadingSeguimiento = false;
+bool get isLoadingSeguimiento => _isLoadingSeguimiento;
+
+/// ⭐️ NUEVO: Carga el seguimiento (quién vio, cuándo, y su respuesta) de un aviso.
+Future<bool> fetchInfoSeguimientoAviso(String idCalendario) async {
+  _isLoadingSeguimiento = true;
+  notifyListeners();
+
+  final String idTokenValue = _idToken ?? '';
+  final String escuelaCode = _escuela;
+
+  if (escuelaCode.isEmpty || idCalendario.isEmpty) {
+    appLog('UserProvider: Datos incompletos para cargar seguimiento del aviso.');
+    _seguimientoAviso = [];
+    _isLoadingSeguimiento = false;
+    notifyListeners();
+    return false;
+  }
+
+  final url = Uri.parse(ApiConstants.getInfoSeguimiento());
+  final body = {
+    'escuela': escuelaCode,
+    'id_token': idTokenValue,
+    'calendario_id': idCalendario,
+  };
+
+  appLog('UserProvider: Cargando seguimiento de aviso. URL: $url, BODY: $body');
+
+  try {
+    final response = await http.post(url, body: body);
+
+    appLog('UserProvider: Status seguimiento aviso: ${response.statusCode}');
+    appLog('UserProvider: Body seguimiento aviso: ${response.body}');
+
+    if (response.statusCode == 200 && response.body.isNotEmpty) {
+      final rawData = json.decode(response.body);
+
+      if (rawData is List) {
+        _seguimientoAviso = rawData
+            .whereType<Map<String, dynamic>>()
+            .map((e) => AvisoSeguimientoModel.fromJson(e))
+            .toList();
+        _isLoadingSeguimiento = false;
+        notifyListeners();
+        return true;
+      }
+    }
+  } on SocketException {
+    appLog('UserProvider: Sin conexión al cargar seguimiento del aviso.');
+  } catch (e) {
+    appLog('UserProvider: Excepción al cargar seguimiento del aviso $idCalendario: $e');
+  }
+
+  _seguimientoAviso = [];
+  _isLoadingSeguimiento = false;
+  notifyListeners();
+  return false;
 }
 
   Future<List<AlumnoAsistenciaModel>> fetchAlumnosPorCurso({
