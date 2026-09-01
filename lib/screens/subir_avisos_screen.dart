@@ -38,6 +38,11 @@ class _SubirAvisosScreenState extends State<SubirAvisosScreen> {
   @override
   void initState() {
     super.initState();
+    // ⭐️ Rango por defecto: últimos 31 días hasta hoy.
+    final DateTime hoy = DateTime.now();
+    _fechaFiltroFin = DateTime(hoy.year, hoy.month, hoy.day);
+    _fechaFiltroInicio = _fechaFiltroFin!.subtract(const Duration(days: 31));
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       Provider.of<UserProvider>(context, listen: false).loadAvisosCreados();
     });
@@ -409,6 +414,9 @@ Future<void> _seleccionarRangoDeFechas(BuildContext context) async {
       context: context,
       firstDate: DateTime(2023),
       lastDate: DateTime(2030),
+      initialDateRange: (_fechaFiltroInicio != null && _fechaFiltroFin != null)
+          ? DateTimeRange(start: _fechaFiltroInicio!, end: _fechaFiltroFin!)
+          : null,
       // 🎯 NUEVO: Forzar la localización a español 🎯
       locale: const Locale('es', 'ES'), 
       
